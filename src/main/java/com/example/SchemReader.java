@@ -62,12 +62,23 @@ public class SchemReader {
         }
     }
 
-    public static Vector3f[][] loadNbtFile() throws Exception {
+    public static class CubeSetup {
+        Vector3f[] positions;
+        int[] colorIndices;
+        Vector3f[] colorPalette;
+
+        public CubeSetup(Vector3f[] positions, int[] colorIndices, Vector3f[] colorPalette) {
+            this.positions = positions;
+            this.colorIndices = colorIndices;
+            this.colorPalette = colorPalette;
+        }
+    }
+    public static CubeSetup loadNbtFile() throws Exception {
 
         String europe = "D:\\Repos\\worldpainter_related";
         String jerusalem = "C:/Users/Max1M/curseforge/minecraft/Instances/neoforge 1.12.1 camboi " +
                 "shaders/config/worldedit/schematics";
-        File dir = new File(europe);
+        File dir = new File(jerusalem);
         List<Path> pathList = findAllFiles(dir.toPath());
         ArrayList<WPObject> schematics = new ArrayList<>();
         for (Path path : pathList) {
@@ -83,7 +94,10 @@ public class SchemReader {
 
 
         List<Vector3f> positions = new ArrayList<>();
-        List<Vector3f> blockTypes = new ArrayList<>();
+        List<Integer> colorIndices = new ArrayList<>();
+
+        HashMap<Material, Integer> mat_to_color_idx = new HashMap<>();
+        int maxColorIdx = 0;
         Point3i gridOffset = new Point3i(0,0,0);
         int spacer = 10;
         int maxDepth = 0;
@@ -103,23 +117,28 @@ public class SchemReader {
                         Material mat = object.getMaterial(x, y, z);
                         if (mat != null && mat != Material.AIR) {
                             positions.add(new Vector3f(x + offset.x + gridOffset.x, z + offset.z, y + offset.y + gridOffset.y));
-                            Color c = new Color(mat.colour);
-                            blockTypes.add(new Vector3f(c.getRed() / 255f, c.getGreen() / 255f, c.getBlue() / 255f));
+                            if (mat_to_color_idx.containsKey(mat)) {
+                                colorIndices.add(mat_to_color_idx.get(mat));
+                            } else {
+                                colorIndices.add(maxColorIdx);
+                                mat_to_color_idx.put(mat,maxColorIdx);
+                                maxColorIdx++;
+                            }
                         }
                     }
                 }
             }
-
 
             maxDepth = Math.max(maxDepth,object.getDimensions().y);
             gridOffset.x += object.getDimensions().x + spacer;
             index++;
         }
 
-
-        Vector3f[] colors = blockTypes.toArray(Vector3f[]::new);
-        Vector3f[] result = positions.toArray(new Vector3f[0]);
-        System.out.println("Loaded " + result.length + " block positions.");
-        return new Vector3f[][]{result, colors};
+        Vector3f[] colorPalette = new Vector3f[mat_to_color_idx.size()];
+        for (var entry: mat_to_color_idx.entrySet()) {
+            Color color = new Color(entry.getKey().colour);
+            colorPalette[entry.getValue()] = new Vector3f(color.getRed()/255f,color.getGreen()/255f,color.getBlue()/255f);
+        }
+        return new CubeSetup(positions.toArray(new Vector3f[0]),colorIndices.stream().mapToInt(i -> i).toArray(), colorPalette);
     }
 }

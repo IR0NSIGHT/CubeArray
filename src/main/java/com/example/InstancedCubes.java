@@ -24,22 +24,31 @@ import com.example.SchemReader;
 
 public class InstancedCubes {
 
+    int gridX = 1000;
+    int gridY = 10;
+    int gridZ = 1000;
+    float radius = java.lang.Math.max(gridX, gridY) * 1.1f;
+    float yaw = (float) java.lang.Math.toRadians(15);
+    float pitch = (float) java.lang.Math.toRadians(15);
+    float maxRadius = java.lang.Math.max(gridX, gridY);
+    //mouse movement since last frame
+    float xoffset;
+    float yoffset;
     private long window;
     private int width = 1600;
     private int height = 1000;
-
     private int vao, vbo, ebo, instanceVBO;
     private int shaderProgram;
+    private Vector3f[] instancePositions;
+    private int[] instanceColorIndices;
+    private Vector3f[] colorPalette;
+    private double lastMouseX, lastMouseY;
+    private boolean firstMouse = true;
+    private Vector3f cameraTarget = new Vector3f(0, 0, 0); // the point the camera looks at
 
-    private Vector3f[] instancePositions = {
-        new Vector3f(0, 0, 0),
-        new Vector3f(2, 0, 0),
-        new Vector3f(-2, 0, 0),
-        new Vector3f(0, 2, 0),
-        new Vector3f(0, -2, 0),
-        new Vector3f(0, -3, 1),
-    };
-    private Vector3f[] instanceColors;
+    public static void main(String[] args) throws Exception {
+        new InstancedCubes().run();
+    }
 
     public void run() throws Exception {
         init();
@@ -47,16 +56,20 @@ public class InstancedCubes {
         cleanup();
     }
 
-    int gridX = 1000;
-    int gridY = 10;
-    int gridZ = 1000;
-
     private void init() throws Exception {
         var res = SchemReader.loadNbtFile();
-        instancePositions = res[0];
-        instanceColors = res[1];
+        instancePositions = res.positions;
+        instanceColorIndices = res.colorIndices;
+        colorPalette = res.colorPalette;
 
         System.out.println("generating " + instancePositions.length + " cubes");
+
+        for (int i = 0; i < 10; i++) {
+            int idx = i * 13;
+            System.out.printf("idx %d has pos %s color index %d, maps to color %s \n", idx, instancePositions[idx],
+                    instanceColorIndices[idx], colorPalette[instanceColorIndices[idx]]);
+        }
+        ;
 
         GLFWErrorCallback.createPrint(System.err).set();
 
@@ -82,190 +95,14 @@ public class InstancedCubes {
         setupBuffers();
     }
 
-    private void setupShaders() {
-
-        String vertexShaderSource = """
-            #version 330 core
-            layout(location = 0) in vec3 aPos;
-            layout(location = 1) in vec3 aInstancePos;
-            layout(location = 2) in vec3 aInstanceColor;
-
-            
-            uniform mat4 projection;
-            uniform mat4 view;
-
-            out vec3 vColor;
-            out vec3 vWorldPos;
-
-            void main() {
-                vec3 worldPos = aPos + aInstancePos;
-                vWorldPos = worldPos;
-                vColor = aInstanceColor;
-                gl_Position = projection * view * vec4(worldPos, 1.0);
-            }
-
-        """;
-        String geometryShaderSource = """
-            #version 330 core
-            layout(triangles) in;
-            layout(triangle_strip, max_vertices = 3) out;
-
-            in vec3 vColor[3];
-            in vec3 vWorldPos[3];
-
-            
-            out vec3 gColor;
-            flat out vec3 Normal;
-            out vec3 FragPos;
-
-            void main() {
-                vec3 edge1 = vWorldPos[1] - vWorldPos[0];
-                vec3 edge2 = vWorldPos[2] - vWorldPos[0];
-                vec3 faceNormal = normalize(cross(edge1, edge2));
-
-                for (int i = 0; i < 3; ++i) {
-                    FragPos = vWorldPos[i];
-                    Normal = faceNormal;
-                    gColor = vColor[i]; // Pass color
-                    gl_Position = gl_in[i].gl_Position;
-                    EmitVertex();
-                }
-                EndPrimitive();
-            }
-
-        """;
-
-        String fragmentShaderSource = """
-            #version 330 core
-            out vec4 FragColor;
-
-            in vec3 gColor;
-            in vec3 FragPos;
-            flat in vec3 Normal;
-
-            uniform vec3 lightDir = normalize(vec3(-0.5, -1.0, -0.3));
-            uniform vec3 lightColor = vec3(1.0, 1.0, 1.0);
-
-            void main() {
-                float diff = max(dot(Normal, -lightDir), 0.0);
-                vec3 diffuse = diff * lightColor;
-                vec3 result = 0.1+ diffuse * gColor;
-                FragColor = vec4(result, 1.0);
-            }
-        """;
-
-
-        int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(vertexShader, vertexShaderSource);
-        glCompileShader(vertexShader);
-        checkCompileErrors(vertexShader, "VERTEX");
-
-        int geometryShader = glCreateShader(GL_GEOMETRY_SHADER);
-        glShaderSource(geometryShader, geometryShaderSource);
-        glCompileShader(geometryShader);
-        checkCompileErrors(geometryShader, "GEOMETRY");
-
-        int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(fragmentShader, fragmentShaderSource);
-        glCompileShader(fragmentShader);
-        checkCompileErrors(fragmentShader, "FRAGMENT");
-
-        shaderProgram = glCreateProgram();
-        glAttachShader(shaderProgram, vertexShader);
-        glAttachShader(shaderProgram, geometryShader);
-        glAttachShader(shaderProgram, fragmentShader);
-        glLinkProgram(shaderProgram);
-        checkCompileErrors(shaderProgram, "PROGRAM");
-
-        glDeleteShader(vertexShader);
-        glDeleteShader(geometryShader);
-        glDeleteShader(fragmentShader);
-    }
-
-    private void setupBuffers() {
-        float[] cubeVertices = {
-            -0.5f, -0.5f, -0.5f,
-             0.5f, -0.5f, -0.5f,
-             0.5f,  0.5f, -0.5f,
-            -0.5f,  0.5f, -0.5f,
-            -0.5f, -0.5f,  0.5f,
-             0.5f, -0.5f,  0.5f,
-             0.5f,  0.5f,  0.5f,
-            -0.5f,  0.5f,  0.5f
-        };
-
-        int[] cubeIndices = {
-            0, 1, 2, 2, 3, 0,
-            4, 5, 6, 6, 7, 4,
-            0, 1, 5, 5, 4, 0,
-            2, 3, 7, 7, 6, 2,
-            0, 3, 7, 7, 4, 0,
-            1, 2, 6, 6, 5, 1
-        };
-
-        vao = glGenVertexArrays();
-        glBindVertexArray(vao);
-
-        vbo = glGenBuffers();
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, cubeVertices, GL_STATIC_DRAW);
-        glVertexAttribPointer(0, 3, GL_FLOAT, false, 3 * Float.BYTES, 0);
-        glEnableVertexAttribArray(0);
-
-        ebo = glGenBuffers();
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, cubeIndices, GL_STATIC_DRAW);
-
-        FloatBuffer instanceData = BufferUtils.createFloatBuffer(instancePositions.length * 3);
-        for (Vector3f pos : instancePositions) {
-            instanceData.put(pos.x).put(pos.y).put(pos.z);
-        }
-        instanceData.flip();
-
-        instanceVBO = glGenBuffers();
-        glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-        glBufferData(GL_ARRAY_BUFFER, instanceData, GL_STATIC_DRAW);
-        glVertexAttribPointer(1, 3, GL_FLOAT, false, 3 * Float.BYTES, 0);
-        glEnableVertexAttribArray(1);
-        glVertexAttribDivisor(1, 1);
-
-        FloatBuffer colorData = BufferUtils.createFloatBuffer(instanceColors.length * 3);
-        for (Vector3f color : instanceColors) {
-            colorData.put(color.x).put(color.y).put(color.z);
-        }
-        colorData.flip();
-
-        int colorVBO = glGenBuffers();
-        glBindBuffer(GL_ARRAY_BUFFER, colorVBO);
-        glBufferData(GL_ARRAY_BUFFER, colorData, GL_STATIC_DRAW);
-        glVertexAttribPointer(2, 3, GL_FLOAT, false, 3 * Float.BYTES, 0);
-        glEnableVertexAttribArray(2);
-        glVertexAttribDivisor(2, 1); // One color per instance
-
-        glBindVertexArray(0);
-    }
-
-    float radius = java.lang.Math.max(gridX, gridY) * 1.1f;
-    float yaw = (float)java.lang.Math.toRadians(15);
-    float pitch = (float)java.lang.Math.toRadians(15);
-    float maxRadius = java.lang.Math.max(gridX, gridY);
-    
-    private double lastMouseX, lastMouseY;
-    private boolean firstMouse = true;
-
-    private Vector3f cameraTarget = new Vector3f(0, 0, 0); // the point the camera looks at
-
-    //mouse movement since last frame
-    float xoffset;
-    float yoffset;
-
     private void loop() {
         glEnable(GL_DEPTH_TEST);
 
         FloatBuffer projBuffer = BufferUtils.createFloatBuffer(16);
         FloatBuffer viewBuffer = BufferUtils.createFloatBuffer(16);
 
-        Matrix4f projection = new Matrix4f().perspective((float)java.lang.Math.toRadians(45.0f), (float)width / height, 10f, 10000.0f);
+        Matrix4f projection = new Matrix4f().perspective((float) java.lang.Math.toRadians(45.0f),
+                (float) width / height, 10f, 10000.0f);
 
         // Scroll callback for zoom
         glfwSetScrollCallback(window, (win, xoffset, yoffset) -> {
@@ -304,21 +141,21 @@ public class InstancedCubes {
         while (!glfwWindowShouldClose(window)) {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            
+
             // Calculate camera direction vectors
             Vector3f forward = new Vector3f(
-                (float)java.lang.Math.sin(yaw),
-                0,
-                (float)java.lang.Math.cos(yaw)
+                    (float) java.lang.Math.sin(yaw),
+                    0,
+                    (float) java.lang.Math.cos(yaw)
             ).normalize();
 
-            Vector3f up = new Vector3f(0,1,0);
+            Vector3f up = new Vector3f(0, 1, 0);
             Vector3f right = new Vector3f(forward).cross(up).normalize();
             Vector3f forwardFlat = new Vector3f(up).cross(right).normalize();
-            float moveSpeed = java.lang.Math.max(.5f,0.006f * radius);
+            float moveSpeed = java.lang.Math.max(.5f, 0.006f * radius);
 
 
-            Vector3f movement = new Vector3f(0,0,0);
+            Vector3f movement = new Vector3f(0, 0, 0);
 
             if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
                 movement.sub(forward);
@@ -333,12 +170,11 @@ public class InstancedCubes {
             if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
                 movement.sub(up);
 
-        
 
             boolean rotateCamera = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
-                     
+
             boolean moveCamera = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
-                  
+
             if (movement.length() != 0)
                 movement.normalize().mul(moveSpeed);
 
@@ -354,24 +190,21 @@ public class InstancedCubes {
                 float sensitivityShift = 0.5f;
                 movement.add(right.mul(xoffset * sensitivityShift));
                 movement.add(forwardFlat.mul(yoffset * sensitivityShift));
-            };
-            
-            
-           
+            }
+            ;
 
 
             // Calculate camera position
-            float camX = (float)(radius * java.lang.Math.cos(pitch) * java.lang.Math.sin(yaw));
-            float camY = (float)(radius * java.lang.Math.sin(pitch));
-            float camZ = (float)(radius * java.lang.Math.cos(pitch) * java.lang.Math.cos(yaw));
+            float camX = (float) (radius * java.lang.Math.cos(pitch) * java.lang.Math.sin(yaw));
+            float camY = (float) (radius * java.lang.Math.sin(pitch));
+            float camZ = (float) (radius * java.lang.Math.cos(pitch) * java.lang.Math.cos(yaw));
 
             Vector3f cameraPos = new Vector3f(camX, camY, camZ);
-            
-          //  System.out.printf("yaw %f pitch %f \n",yaw,pitch);
+
+            //  System.out.printf("yaw %f pitch %f \n",yaw,pitch);
 
             cameraTarget.add(movement);
             cameraPos.add(cameraTarget);
-            
 
 
             Matrix4f view = new Matrix4f().lookAt(cameraPos, cameraTarget, new Vector3f(0, 1, 0));
@@ -400,10 +233,6 @@ public class InstancedCubes {
         }
     }
 
-
-
-
-
     private void cleanup() {
         glDeleteVertexArrays(vao);
         glDeleteBuffers(vbo);
@@ -415,6 +244,210 @@ public class InstancedCubes {
         glfwDestroyWindow(window);
         glfwTerminate();
         glfwSetErrorCallback(null).free();
+    }
+
+    private void setupShaders() {
+        // --- Vertex Shader ---
+        String vertexShaderSource = """
+                    #version 330 core
+                    layout(location = 0) in vec3 aPos;
+                    layout(location = 1) in vec3 aInstancePos;
+                    layout(location = 2) in int aInstanceColorIndex;
+
+                    uniform mat4 projection;
+                    uniform mat4 view;
+
+                    // Palette (fixed max size)
+                    uniform vec3 palette[256];
+
+                    out vec3 vColor;
+                    out vec3 vWorldPos;
+
+                    void main() {
+                        vec3 worldPos = aPos + aInstancePos;
+                        vWorldPos = worldPos;
+
+                        // Lookup color from palette
+                        vColor = palette[aInstanceColorIndex];
+
+                        gl_Position = projection * view * vec4(worldPos, 1.0);
+                    }
+                """;
+
+        // --- Geometry Shader ---
+        String geometryShaderSource = """
+                    #version 330 core
+                    layout(triangles) in;
+                    layout(triangle_strip, max_vertices = 3) out;
+
+                    in vec3 vColor[3];
+                    in vec3 vWorldPos[3];
+
+                    out vec3 gColor;
+                    flat out vec3 Normal;
+                    out vec3 FragPos;
+
+                    void main() {
+                        // Compute face normal (flat shading)
+                        vec3 edge1 = vWorldPos[1] - vWorldPos[0];
+                        vec3 edge2 = vWorldPos[2] - vWorldPos[0];
+                        vec3 faceNormal = normalize(cross(edge1, edge2));
+
+                        for (int i = 0; i < 3; ++i) {
+                            FragPos = vWorldPos[i];
+                            Normal = faceNormal;   // same for all verts (flat shading)
+                            gColor = vColor[i];
+                            gl_Position = gl_in[i].gl_Position;
+                            EmitVertex();
+                        }
+                        EndPrimitive();
+                    }
+                """;
+
+        // --- Fragment Shader ---
+        String fragmentShaderSource = """
+                    #version 330 core
+                    out vec4 FragColor;
+
+                    in vec3 gColor;
+                    in vec3 FragPos;
+                    flat in vec3 Normal;
+
+                    uniform vec3 lightDir;   // should be normalized on CPU side
+                    uniform vec3 lightColor;
+
+                    void main() {
+                        // Lambertian diffuse
+                        float diff = max(dot(Normal, -lightDir), 0.0);
+                        vec3 diffuse = diff * lightColor;
+
+                        // Ambient + diffuse
+                        vec3 ambient = vec3(0.2);
+                        vec3 result = (ambient + diffuse) * gColor;
+
+                        FragColor = vec4(result, 1.0);
+                    }
+                """;
+
+        // --- Compile Shaders ---
+        int vertexShader = compileShader(GL_VERTEX_SHADER, vertexShaderSource, "VERTEX");
+        int geometryShader = compileShader(GL_GEOMETRY_SHADER, geometryShaderSource, "GEOMETRY");
+        int fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentShaderSource, "FRAGMENT");
+
+        // --- Link Program ---
+        shaderProgram = glCreateProgram();
+        glAttachShader(shaderProgram, vertexShader);
+        glAttachShader(shaderProgram, geometryShader);
+        glAttachShader(shaderProgram, fragmentShader);
+        glLinkProgram(shaderProgram);
+        checkCompileErrors(shaderProgram, "PROGRAM");
+
+        // --- Delete shaders after linking ---
+        glDeleteShader(vertexShader);
+        glDeleteShader(geometryShader);
+        glDeleteShader(fragmentShader);
+    }
+
+    private void setupBuffers() {
+        // --- Cube geometry ---
+        float[] cubeVertices = {
+                -0.5f, -0.5f, -0.5f,
+                0.5f, -0.5f, -0.5f,
+                0.5f, 0.5f, -0.5f,
+                -0.5f, 0.5f, -0.5f,
+                -0.5f, -0.5f, 0.5f,
+                0.5f, -0.5f, 0.5f,
+                0.5f, 0.5f, 0.5f,
+                -0.5f, 0.5f, 0.5f
+        };
+
+        int[] cubeIndices = {
+                0, 1, 2, 2, 3, 0,
+                4, 5, 6, 6, 7, 4,
+                0, 1, 5, 5, 4, 0,
+                2, 3, 7, 7, 6, 2,
+                0, 3, 7, 7, 4, 0,
+                1, 2, 6, 6, 5, 1
+        };
+
+        vao = glGenVertexArrays();
+        glBindVertexArray(vao);
+
+        // --- Vertex buffer (cube positions) ---
+        vbo = glGenBuffers();
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, cubeVertices, GL_STATIC_DRAW);
+        glVertexAttribPointer(0, 3, GL_FLOAT, false, 3 * Float.BYTES, 0);
+        glEnableVertexAttribArray(0);
+
+        // --- Element buffer ---
+        ebo = glGenBuffers();
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, cubeIndices, GL_STATIC_DRAW);
+
+        // --- Upload color palette uniform ---
+        int paletteLoc = glGetUniformLocation(shaderProgram, "palette");
+
+        // Flatten Vector3f[] → FloatBuffer
+        FloatBuffer paletteBuffer = BufferUtils.createFloatBuffer(colorPalette.length * 3);
+        for (Vector3f c : colorPalette) {
+            paletteBuffer.put(c.x).put(c.y).put(c.z);
+        }
+        paletteBuffer.flip();
+
+        glUseProgram(shaderProgram);
+        glUniform3fv(paletteLoc, paletteBuffer);
+
+        // --- Instance positions ---
+        FloatBuffer instancePositionsFlat = BufferUtils.createFloatBuffer(instancePositions.length * 3);
+        for (Vector3f pos : instancePositions) {
+            instancePositionsFlat.put(pos.x).put(pos.y).put(pos.z);
+        }
+        instancePositionsFlat.flip();
+
+        instanceVBO = glGenBuffers();
+        glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+        glBufferData(GL_ARRAY_BUFFER, instancePositionsFlat, GL_STATIC_DRAW);
+        glVertexAttribPointer(1, 3, GL_FLOAT, false, 3 * Float.BYTES, 0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribDivisor(1, 1); // advances per instance
+
+        // --- Instance color indices ---
+        IntBuffer colorIndexData = BufferUtils.createIntBuffer(instanceColorIndices.length);
+        colorIndexData.put(instanceColorIndices).flip();
+
+        int colorIndexVBO = glGenBuffers();
+        glBindBuffer(GL_ARRAY_BUFFER, colorIndexVBO);
+        glBufferData(GL_ARRAY_BUFFER, colorIndexData, GL_STATIC_DRAW);
+        glVertexAttribIPointer(2, 1, GL_INT, Integer.BYTES, 0); // integer attribute
+        glEnableVertexAttribArray(2);
+        glVertexAttribDivisor(2, 1); // one index per instance
+
+        glBindVertexArray(0);
+
+        int lightDirLoc = glGetUniformLocation(shaderProgram, "lightDir");
+        int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
+
+        glUseProgram(shaderProgram);
+
+        // Directional light pointing "down and forward"
+        glUniform3f(lightDirLoc, -0.5f, -1.0f, -0.3f);
+
+        // White light
+        glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
+
+    }
+
+
+    /**
+     * Utility to compile a shader and check for errors.
+     */
+    private int compileShader(int type, String source, String typeName) {
+        int shader = glCreateShader(type);
+        glShaderSource(shader, source);
+        glCompileShader(shader);
+        checkCompileErrors(shader, typeName);
+        return shader;
     }
 
     private void checkCompileErrors(int shader, String type) {
@@ -432,9 +465,5 @@ public class InstancedCubes {
                 System.err.println(glGetShaderInfoLog(shader));
             }
         }
-    }
-
-    public static void main(String[] args) throws Exception {
-        new InstancedCubes().run();
     }
 }
