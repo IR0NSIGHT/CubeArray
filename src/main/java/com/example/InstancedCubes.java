@@ -149,7 +149,7 @@ public class InstancedCubes {
             void main() {
                 float diff = max(dot(Normal, -lightDir), 0.0);
                 vec3 diffuse = diff * lightColor;
-                vec3 result = 0.3 + 0.7 * diffuse * gColor;
+                vec3 result = 0.1+ diffuse * gColor;
                 FragColor = vec4(result, 1.0);
             }
         """;
@@ -178,6 +178,7 @@ public class InstancedCubes {
         checkCompileErrors(shaderProgram, "PROGRAM");
 
         glDeleteShader(vertexShader);
+        glDeleteShader(geometryShader);
         glDeleteShader(fragmentShader);
     }
 
@@ -264,7 +265,7 @@ public class InstancedCubes {
         FloatBuffer projBuffer = BufferUtils.createFloatBuffer(16);
         FloatBuffer viewBuffer = BufferUtils.createFloatBuffer(16);
 
-        Matrix4f projection = new Matrix4f().perspective((float)java.lang.Math.toRadians(45.0f), (float)width / height, 0.1f, 1000.0f);
+        Matrix4f projection = new Matrix4f().perspective((float)java.lang.Math.toRadians(45.0f), (float)width / height, 10f, 10000.0f);
 
         // Scroll callback for zoom
         glfwSetScrollCallback(window, (win, xoffset, yoffset) -> {
