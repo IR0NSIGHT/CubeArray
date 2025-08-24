@@ -25,33 +25,12 @@ import javax.vecmath.Point3i;
 
 public class SchemReader {
 
-    public static Vector3f getColorForBlockType(String blockType) {
-        switch (blockType) {
-            case "minecraft:stone":
-                return new Vector3f(0.5f, 0.5f, 0.5f); // gray
-            case "minecraft:tuff":
-                return new Vector3f(0.4f, 0.4f, 0.5f); // bluish-gray
-            case "minecraft:andesite":
-                return new Vector3f(0.6f, 0.6f, 0.6f); // light gray
-            case "minecraft:granite":
-                return new Vector3f(0.7f, 0.5f, 0.5f); // pinkish
-            case "minecraft:diorite":
-                return new Vector3f(0.9f, 0.9f, 0.9f); // white
-            case "minecraft:grass_block":
-                return new Vector3f(0.3f, 0.6f, 0.2f); // green
-            case "minecraft:dirt":
-                return new Vector3f(0.55f, 0.27f, 0.07f); // brown
-            case "minecraft:sand":
-                return new Vector3f(0.9f, 0.85f, 0.6f); // light tan
-            case "minecraft:water":
-                return new Vector3f(0.2f, 0.4f, 0.8f); // blue
-            case "minecraft:leaves":
-            case "minecraft:oak_leaves":
-                return new Vector3f(0.2f, 0.5f, 0.2f); // dark green
-            default:
-                System.out.println("Unknown block type: " + blockType);
-                return new Vector3f(0.5f, 0.0f, 0.5f); // purple (default)
-        }
+    //TEST
+    public static void main(String[] args) {
+        Material mat = Material.COBBLESTONE_STAIRS;
+        var vert = mat.verticalOrientationScheme;
+
+        System.out.println(mat);
     }
 
     public static List<Path> findAllFiles(Path dir) throws IOException {
@@ -78,7 +57,7 @@ public class SchemReader {
         String europe = "D:\\Repos\\worldpainter_related";
         String jerusalem = "C:/Users/Max1M/curseforge/minecraft/Instances/neoforge 1.12.1 camboi " +
                 "shaders/config/worldedit/schematics";
-        File dir = new File(jerusalem);
+        File dir = new File(europe);
         List<Path> pathList = findAllFiles(dir.toPath());
         ArrayList<WPObject> schematics = new ArrayList<>();
         for (Path path : pathList) {

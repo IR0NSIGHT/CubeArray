@@ -64,13 +64,6 @@ public class InstancedCubes {
 
         System.out.println("generating " + instancePositions.length + " cubes");
 
-        for (int i = 0; i < 10; i++) {
-            int idx = i * 13;
-            System.out.printf("idx %d has pos %s color index %d, maps to color %s \n", idx, instancePositions[idx],
-                    instanceColorIndices[idx], colorPalette[instanceColorIndices[idx]]);
-        }
-        ;
-
         GLFWErrorCallback.createPrint(System.err).set();
 
         if (!glfwInit())
@@ -249,84 +242,83 @@ public class InstancedCubes {
     private void setupShaders() {
         // --- Vertex Shader ---
         String vertexShaderSource = """
-                    #version 330 core
-                    layout(location = 0) in vec3 aPos;
-                    layout(location = 1) in vec3 aInstancePos;
-                    layout(location = 2) in int aInstanceColorIndex;
+                #version 330 core
+                layout(location = 0) in vec3 aPos;
+                layout(location = 1) in vec3 aInstancePos;
+                layout(location = 2) in int aInstanceColorIndex;
 
-                    uniform mat4 projection;
-                    uniform mat4 view;
+                uniform mat4 projection;
+                uniform mat4 view;
 
-                    // Palette (fixed max size)
-                    uniform vec3 palette[256];
+                // Palette as 1D texture
+                uniform sampler1D colorPaletteTex;
+                uniform int paletteSize; // total number of palette entries
 
-                    out vec3 vColor;
-                    out vec3 vWorldPos;
+                out vec3 vColor;
+                out vec3 vWorldPos;
 
-                    void main() {
-                        vec3 worldPos = aPos + aInstancePos;
-                        vWorldPos = worldPos;
+                void main() {
+                    vec3 worldPos = aPos  + aInstancePos;
+                    vWorldPos = worldPos;
 
-                        // Lookup color from palette
-                        vColor = palette[aInstanceColorIndex];
+                    // Lookup color from palette texture
+                    float texCoord = (float(aInstanceColorIndex) + 0.5) / float(paletteSize);
+                    vColor = texture(colorPaletteTex, texCoord).rgb;
 
-                        gl_Position = projection * view * vec4(worldPos, 1.0);
-                    }
+                    gl_Position = projection * view * vec4(worldPos, 1.0);
+                }
                 """;
 
         // --- Geometry Shader ---
         String geometryShaderSource = """
-                    #version 330 core
-                    layout(triangles) in;
-                    layout(triangle_strip, max_vertices = 3) out;
+                #version 330 core
+                layout(triangles) in;
+                layout(triangle_strip, max_vertices = 3) out;
 
-                    in vec3 vColor[3];
-                    in vec3 vWorldPos[3];
+                in vec3 vColor[3];
+                in vec3 vWorldPos[3];
 
-                    out vec3 gColor;
-                    flat out vec3 Normal;
-                    out vec3 FragPos;
+                out vec3 gColor;
+                flat out vec3 Normal;
+                out vec3 FragPos;
 
-                    void main() {
-                        // Compute face normal (flat shading)
-                        vec3 edge1 = vWorldPos[1] - vWorldPos[0];
-                        vec3 edge2 = vWorldPos[2] - vWorldPos[0];
-                        vec3 faceNormal = normalize(cross(edge1, edge2));
+                void main() {
+                    vec3 edge1 = vWorldPos[1] - vWorldPos[0];
+                    vec3 edge2 = vWorldPos[2] - vWorldPos[0];
+                    vec3 faceNormal = normalize(cross(edge1, edge2));
 
-                        for (int i = 0; i < 3; ++i) {
-                            FragPos = vWorldPos[i];
-                            Normal = faceNormal;   // same for all verts (flat shading)
-                            gColor = vColor[i];
-                            gl_Position = gl_in[i].gl_Position;
-                            EmitVertex();
-                        }
-                        EndPrimitive();
+                    for (int i = 0; i < 3; ++i) {
+                        FragPos = vWorldPos[i];
+                        Normal = faceNormal;   // same for all verts (flat shading)
+                        gColor = vColor[i];
+                        gl_Position = gl_in[i].gl_Position;
+                        EmitVertex();
                     }
+                    EndPrimitive();
+                }
                 """;
 
         // --- Fragment Shader ---
         String fragmentShaderSource = """
-                    #version 330 core
-                    out vec4 FragColor;
+                #version 330 core
+                out vec4 FragColor;
 
-                    in vec3 gColor;
-                    in vec3 FragPos;
-                    flat in vec3 Normal;
+                in vec3 gColor;
+                in vec3 FragPos;
+                flat in vec3 Normal;
 
-                    uniform vec3 lightDir;   // should be normalized on CPU side
-                    uniform vec3 lightColor;
+                uniform vec3 lightDir;
+                uniform vec3 lightColor;
 
-                    void main() {
-                        // Lambertian diffuse
-                        float diff = max(dot(Normal, -lightDir), 0.0);
-                        vec3 diffuse = diff * lightColor;
+                void main() {
+                    float diff = max(dot(Normal, -lightDir), 0.0);
+                    vec3 diffuse = diff * lightColor;
 
-                        // Ambient + diffuse
-                        vec3 ambient = vec3(0.2);
-                        vec3 result = (ambient + diffuse) * gColor;
+                    vec3 ambient = vec3(0.2);
+                    vec3 result = (ambient + diffuse) * gColor;
 
-                        FragColor = vec4(result, 1.0);
-                    }
+                    FragColor = vec4(result, 1.0);
+                }
                 """;
 
         // --- Compile Shaders ---
@@ -373,7 +365,7 @@ public class InstancedCubes {
         vao = glGenVertexArrays();
         glBindVertexArray(vao);
 
-        // --- Vertex buffer (cube positions) ---
+        // --- Vertex buffer ---
         vbo = glGenBuffers();
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
         glBufferData(GL_ARRAY_BUFFER, cubeVertices, GL_STATIC_DRAW);
@@ -385,24 +377,9 @@ public class InstancedCubes {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, cubeIndices, GL_STATIC_DRAW);
 
-        // --- Upload color palette uniform ---
-        int paletteLoc = glGetUniformLocation(shaderProgram, "palette");
-
-        // Flatten Vector3f[] → FloatBuffer
-        FloatBuffer paletteBuffer = BufferUtils.createFloatBuffer(colorPalette.length * 3);
-        for (Vector3f c : colorPalette) {
-            paletteBuffer.put(c.x).put(c.y).put(c.z);
-        }
-        paletteBuffer.flip();
-
-        glUseProgram(shaderProgram);
-        glUniform3fv(paletteLoc, paletteBuffer);
-
         // --- Instance positions ---
         FloatBuffer instancePositionsFlat = BufferUtils.createFloatBuffer(instancePositions.length * 3);
-        for (Vector3f pos : instancePositions) {
-            instancePositionsFlat.put(pos.x).put(pos.y).put(pos.z);
-        }
+        for (Vector3f pos : instancePositions) instancePositionsFlat.put(pos.x).put(pos.y).put(pos.z);
         instancePositionsFlat.flip();
 
         instanceVBO = glGenBuffers();
@@ -410,7 +387,7 @@ public class InstancedCubes {
         glBufferData(GL_ARRAY_BUFFER, instancePositionsFlat, GL_STATIC_DRAW);
         glVertexAttribPointer(1, 3, GL_FLOAT, false, 3 * Float.BYTES, 0);
         glEnableVertexAttribArray(1);
-        glVertexAttribDivisor(1, 1); // advances per instance
+        glVertexAttribDivisor(1, 1);
 
         // --- Instance color indices ---
         IntBuffer colorIndexData = BufferUtils.createIntBuffer(instanceColorIndices.length);
@@ -419,23 +396,41 @@ public class InstancedCubes {
         int colorIndexVBO = glGenBuffers();
         glBindBuffer(GL_ARRAY_BUFFER, colorIndexVBO);
         glBufferData(GL_ARRAY_BUFFER, colorIndexData, GL_STATIC_DRAW);
-        glVertexAttribIPointer(2, 1, GL_INT, Integer.BYTES, 0); // integer attribute
+        glVertexAttribIPointer(2, 1, GL_INT, Integer.BYTES, 0);
         glEnableVertexAttribArray(2);
-        glVertexAttribDivisor(2, 1); // one index per instance
+        glVertexAttribDivisor(2, 1);
 
         glBindVertexArray(0);
 
-        int lightDirLoc = glGetUniformLocation(shaderProgram, "lightDir");
-        int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
-
         glUseProgram(shaderProgram);
 
-        // Directional light pointing "down and forward"
+        // --- Lights ---
+        int lightDirLoc = glGetUniformLocation(shaderProgram, "lightDir");
+        int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
         glUniform3f(lightDirLoc, -0.5f, -1.0f, -0.3f);
-
-        // White light
         glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
 
+        // --- Palette texture ---
+        int colorPaletteTexID = glGenTextures();
+        glBindTexture(GL_TEXTURE_1D, colorPaletteTexID);
+
+        FloatBuffer paletteBuffer = BufferUtils.createFloatBuffer(colorPalette.length * 3);
+        for (Vector3f c : colorPalette) paletteBuffer.put(c.x).put(c.y).put(c.z);
+        paletteBuffer.flip();
+
+        glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, colorPalette.length, 0, GL_RGB, GL_FLOAT, paletteBuffer);
+        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+        int paletteLoc = glGetUniformLocation(shaderProgram, "colorPaletteTex");
+        int paletteSizeLoc = glGetUniformLocation(shaderProgram, "paletteSize");
+
+        glUniform1i(paletteLoc, 0); // texture unit 0
+        glUniform1i(paletteSizeLoc, colorPalette.length);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_1D, colorPaletteTexID);
     }
 
 
