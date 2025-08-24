@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.pepsoft.minecraft.Material.LEVEL;
 import static org.pepsoft.minecraft.Material.TYPE;
 
 public class SchemReader {
@@ -30,7 +31,7 @@ public class SchemReader {
 
     public static CubeSetup loadNbtFile() throws Exception {
 
-        String europe = "D:\\Repos\\worldpainter_related";
+        String europe = "D:\\Repos\\worldpainter_related\\Vanilla_plus_House_Pack-Dannypan\\Schematics\\Desert";
         String jerusalem = "C:/Users/Max1M/curseforge/minecraft/Instances/neoforge 1.12.1 camboi " +
                 "shaders/config/worldedit/schematics";
         File dir = new File(europe);
@@ -94,13 +95,14 @@ public class SchemReader {
 
         Vector3f[] colorPalette = new Vector3f[mat_to_palette_idx.size()];
         Vector3f[] sizePalette = new Vector3f[mat_to_palette_idx.size()];
-        Arrays.fill(sizePalette, new Vector3f(1,1,1));
+        Arrays.fill(sizePalette, new Vector3f(1, 1, 1));
         Vector3f[] offsetPalette = new Vector3f[mat_to_palette_idx.size()];
-        Arrays.fill(offsetPalette, new Vector3f(0,0,0));
+        Arrays.fill(offsetPalette, new Vector3f(0, 0, 0));
 
         for (var entry : mat_to_palette_idx.entrySet()) {
             Material mat = entry.getKey();
             int matIdx = entry.getValue();
+
             // ADD color to palette
             Color color = new Color(mat.colour);
             colorPalette[matIdx] = new Vector3f(color.getRed() / 255f, color.getGreen() / 255f, color.getBlue() / 255f);
@@ -109,17 +111,28 @@ public class SchemReader {
             //ADD size and offset to palette
             if (mat.name.contains("slab") && mat.hasProperty(TYPE)) {
                 if (mat.getProperty(TYPE).equals("top"))
-                   offsetPalette[matIdx] = new Vector3f(0,0.5f/2,0);
+                    offsetPalette[matIdx] = new Vector3f(0, 0.5f / 2, 0);
                 if (mat.getProperty(TYPE).equals("bottom"))
-                    offsetPalette[matIdx] = new Vector3f(0,-0.5f/2f,0);
-                sizePalette[matIdx] = new Vector3f(1,0.5f,1);
+                    offsetPalette[matIdx] = new Vector3f(0, -0.5f / 2f, 0);
+                sizePalette[matIdx] = new Vector3f(1, 0.5f, 1);
             } else {
-                sizePalette[matIdx] = new Vector3f(1,1,1);
+                sizePalette[matIdx] = new Vector3f(1, 1, 1);
             }
             if (mat.name.contains("lantern")) {
-                sizePalette[matIdx] = new Vector3f(0.4f,0.7f,0.4f);
-                offsetPalette[matIdx] = new Vector3f(0,0.3f/2f,0);
+                sizePalette[matIdx] = new Vector3f(0.4f, 0.7f, 0.4f);
+                offsetPalette[matIdx] = new Vector3f(0, 0.3f / 2f, 0);
             }
+            if (mat.hasProperty(LEVEL)) {
+                int level = mat.getProperty(LEVEL, 0);
+                if (level == 8)
+                    level = 0; //falling water is a fully block
+                sizePalette[matIdx] = new Vector3f(1, 1-(level / 8f), 1); //zero is full, 8 is empty
+                offsetPalette[matIdx] = new Vector3f(0, -(level / 8f) / 2f, 0); //shift water down slighty
+                if (mat.name.contains("water")) {
+                     offsetPalette[matIdx].y -= .1f; //shift water down slighty
+                }
+            }
+
         }
 
 
@@ -146,16 +159,16 @@ public class SchemReader {
         Vector3f[] colorPalette;
         // block dimensions by type
         Vector3f[] sizePalette;
+        //how to shift blocks from their origin at 0.5 0.5 0.5 (width height depth)
+        Vector3f[] offsetPalette;
 
-        public CubeSetup(Vector3f[] positions, int[] colorIndices, Vector3f[] colorPalette, Vector3f[] sizePalette, Vector3f[] offsetPalette) {
+        public CubeSetup(Vector3f[] positions, int[] colorIndices, Vector3f[] colorPalette, Vector3f[] sizePalette,
+                         Vector3f[] offsetPalette) {
             this.positions = positions;
             this.colorIndices = colorIndices;
             this.colorPalette = colorPalette;
             this.sizePalette = sizePalette;
             this.offsetPalette = offsetPalette;
         }
-
-        //how to shift blocks from their origin at 0.5 0.5 0.5 (width height depth)
-        Vector3f[] offsetPalette;
     }
 }
