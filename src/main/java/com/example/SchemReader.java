@@ -18,8 +18,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.pepsoft.minecraft.Material.LEVEL;
-import static org.pepsoft.minecraft.Material.TYPE;
+import static org.pepsoft.minecraft.Material.*;
 
 public class SchemReader {
 
@@ -72,6 +71,8 @@ public class SchemReader {
                     for (int z = object.getDimensions().z - 1; z >= 0; z--) {
                         Material mat = object.getMaterial(x, y, z);
                         if (mat != null && mat != Material.AIR) {
+                      //      if (!mat.name.contains("carpet"))
+                      //          continue; //DEBUG
                             positions.add(new Vector3f(x + offset.x + gridOffset.x, z + offset.z,
                                     y + offset.y + gridOffset.y));
                             int materialPaletteIdx = 0;
@@ -126,13 +127,34 @@ public class SchemReader {
                 int level = mat.getProperty(LEVEL, 0);
                 if (level == 8)
                     level = 0; //falling water is a fully block
-                sizePalette[matIdx] = new Vector3f(1, 1-(level / 8f), 1); //zero is full, 8 is empty
-                offsetPalette[matIdx] = new Vector3f(0, -(level / 8f) / 2f, 0); //shift water down slighty
+                sizePalette[matIdx] = new Vector3f(1, 1 - (level / 8f), 1); //zero is full, 8 is empty
+                offsetPalette[matIdx] = new Vector3f(0, -(level / 8f) / 2f, 0);
                 if (mat.name.contains("water")) {
-                     offsetPalette[matIdx].y -= .1f; //shift water down slighty
+                    offsetPalette[matIdx].y -= .1f; //shift water down slighty
                 }
             }
 
+            if (mat.name.contains("carpet")) {
+                sizePalette[matIdx] = new Vector3f(1, (1 / 16f), 1);
+                offsetPalette[matIdx] = new Vector3f(0, -sizePalette[matIdx].y / 2f, 0);
+            }
+
+            if (mat.name.contains("fence")) {
+                boolean facing = (mat.is(WEST) || mat.is(NORTH) || mat.is(EAST) || mat.is(SOUTH));
+                if (!facing) {
+                    sizePalette[matIdx] = new Vector3f((1 / 4f), 1f,(1 / 4f));
+                }
+            }
+
+            if (mat.name.contains("banner")) {
+                sizePalette[matIdx] = new Vector3f(.8f, 2f,.8f);
+                offsetPalette[matIdx] = new Vector3f(0, -.5f, 0);
+                colorPalette[matIdx] = new Vector3f(1,1,1);
+            }
+
+            if (mat.vegetation) {
+                sizePalette[matIdx] = new Vector3f(0.6f,1f,0.6f);
+            }
         }
 
 
