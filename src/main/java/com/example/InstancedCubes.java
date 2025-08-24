@@ -39,6 +39,7 @@ public class InstancedCubes {
     private int[] instanceColorIndices;
     private Vector3f[] colorPalette;
     private Vector3f[] sizePalette;
+    private Vector3f[] offsetPalette;
     private double lastMouseX, lastMouseY;
     private boolean firstMouse = true;
     private Vector3f cameraTarget = new Vector3f(0, 0, 0); // the point the camera looks at
@@ -58,15 +59,14 @@ public class InstancedCubes {
         instancePositions = res.positions;
         instanceColorIndices = res.colorIndices;
         colorPalette = res.colorPalette;
-        sizePalette = new Vector3f[colorPalette.length];
-        Arrays.fill(sizePalette, new Vector3f(1, 1, 1));
+        sizePalette = res.sizePalette;
+        offsetPalette = res.offsetPalette;
 
         System.out.println("generating " + instancePositions.length + " cubes");
 
         GLFWErrorCallback.createPrint(System.err).set();
 
-        if (!glfwInit())
-            throw new IllegalStateException("Unable to initialize GLFW");
+        if (!glfwInit()) throw new IllegalStateException("Unable to initialize GLFW");
 
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -74,8 +74,7 @@ public class InstancedCubes {
         glfwWindowHint(GLFW.GLFW_SAMPLES, 4); // 4x MSAA
 
         window = glfwCreateWindow(width, height, "Instanced Cubes", NULL, NULL);
-        if (window == NULL)
-            throw new RuntimeException("Failed to create GLFW window");
+        if (window == NULL) throw new RuntimeException("Failed to create GLFW window");
 
         glfwMakeContextCurrent(window);
         glfwSwapInterval(1);
@@ -135,11 +134,8 @@ public class InstancedCubes {
 
 
             // Calculate camera direction vectors
-            Vector3f forward = new Vector3f(
-                    (float) java.lang.Math.sin(yaw),
-                    0,
-                    (float) java.lang.Math.cos(yaw)
-            ).normalize();
+            Vector3f forward =
+                    new Vector3f((float) java.lang.Math.sin(yaw), 0, (float) java.lang.Math.cos(yaw)).normalize();
 
             Vector3f up = new Vector3f(0, 1, 0);
             Vector3f right = new Vector3f(forward).cross(up).normalize();
@@ -149,26 +145,19 @@ public class InstancedCubes {
 
             Vector3f movement = new Vector3f(0, 0, 0);
 
-            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-                movement.sub(forward);
-            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-                movement.add(forward);
-            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-                movement.add(right);
-            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-                movement.sub(right);
-            if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-                movement.add(up);
-            if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-                movement.sub(up);
+            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) movement.sub(forward);
+            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) movement.add(forward);
+            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) movement.add(right);
+            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) movement.sub(right);
+            if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) movement.add(up);
+            if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) movement.sub(up);
 
 
             boolean rotateCamera = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
 
             boolean moveCamera = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
 
-            if (movement.length() != 0)
-                movement.normalize().mul(moveSpeed);
+            if (movement.length() != 0) movement.normalize().mul(moveSpeed);
 
             if (rotateCamera) {
                 float sensitivity = 0.002f; // adjust for speed
@@ -260,25 +249,11 @@ public class InstancedCubes {
 
     private void setupBuffers() {
         // --- Cube geometry ---
-        float[] cubeVertices = {
-                -0.5f, -0.5f, -0.5f,
-                0.5f, -0.5f, -0.5f,
-                0.5f, 0.5f, -0.5f,
-                -0.5f, 0.5f, -0.5f,
-                -0.5f, -0.5f, 0.5f,
-                0.5f, -0.5f, 0.5f,
-                0.5f, 0.5f, 0.5f,
-                -0.5f, 0.5f, 0.5f
-        };
+        float[] cubeVertices = {-0.5f, -0.5f, -0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, -0.5f, 0.5f, -0.5f, -0.5f
+                , -0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f};
 
-        int[] cubeIndices = {
-                0, 1, 2, 2, 3, 0,
-                4, 5, 6, 6, 7, 4,
-                0, 1, 5, 5, 4, 0,
-                2, 3, 7, 7, 6, 2,
-                0, 3, 7, 7, 4, 0,
-                1, 2, 6, 6, 5, 1
-        };
+        int[] cubeIndices = {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4, 0, 1, 5, 5, 4, 0, 2, 3, 7, 7, 6, 2, 0, 3, 7, 7, 4, 0
+                , 1, 2, 6, 6, 5, 1};
 
         vao = glGenVertexArrays();
         glBindVertexArray(vao);
@@ -331,40 +306,63 @@ public class InstancedCubes {
         // --- Color palette ---
         int colorPaletteTexID = glGenTextures();
         glBindTexture(GL_TEXTURE_1D, colorPaletteTexID);
+        {
+            FloatBuffer colorBuffer = BufferUtils.createFloatBuffer(colorPalette.length * 3);
+            for (Vector3f c : colorPalette) colorBuffer.put(c.x).put(c.y).put(c.z);
+            colorBuffer.flip();
 
-        FloatBuffer colorBuffer = BufferUtils.createFloatBuffer(colorPalette.length * 3);
-        for (Vector3f c : colorPalette) colorBuffer.put(c.x).put(c.y).put(c.z);
-        colorBuffer.flip();
-
-        glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, colorPalette.length, 0, GL_RGB, GL_FLOAT, colorBuffer);
-        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, colorPalette.length, 0, GL_RGB, GL_FLOAT, colorBuffer);
+            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        }
 
 // --- Size palette ---
         int sizePaletteTexID = glGenTextures();
         glBindTexture(GL_TEXTURE_1D, sizePaletteTexID);
+        {
+            FloatBuffer sizeBuffer = BufferUtils.createFloatBuffer(sizePalette.length * 3);
+            for (Vector3f s : sizePalette) sizeBuffer.put(s.x).put(s.y).put(s.z);
+            sizeBuffer.flip();
 
-        FloatBuffer sizeBuffer = BufferUtils.createFloatBuffer(sizePalette.length * 3);
-        for (Vector3f s : sizePalette) sizeBuffer.put(s.x).put(s.y).put(s.z);
-        sizeBuffer.flip();
+            glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, sizePalette.length, 0, GL_RGB, GL_FLOAT, sizeBuffer);
+            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        }
 
-        glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, sizePalette.length, 0, GL_RGB, GL_FLOAT, sizeBuffer);
-        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+// --- Offset palette ---
+        int offsetPaletteTexID = glGenTextures();
+        glBindTexture(GL_TEXTURE_1D, offsetPaletteTexID);
+
+        {
+            FloatBuffer offsetBuffer = BufferUtils.createFloatBuffer(offsetPalette.length * 3);
+            for (Vector3f s : offsetPalette) offsetBuffer.put(s.x).put(s.y).put(s.z);
+            offsetBuffer.flip();
+
+            glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, offsetPalette.length, 0, GL_RGB, GL_FLOAT, offsetBuffer);
+            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        }
 
 // bind to texture units
         int colorLoc = glGetUniformLocation(shaderProgram, "colorPaletteTex");
         glUniform1i(colorLoc, 0);
         int sizeLoc = glGetUniformLocation(shaderProgram, "sizePaletteTex");
         glUniform1i(sizeLoc, 1);
+        int offsetLoc = glGetUniformLocation(shaderProgram, "offsetPaletteTex");
+        glUniform1i(offsetLoc, 2);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_1D, colorPaletteTexID);
 
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_1D, sizePaletteTexID);
+
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_1D, offsetPaletteTexID);
+
 
         int paletteSizeLoc = glGetUniformLocation(shaderProgram, "paletteSize");
         glUniform1i(paletteSizeLoc, colorPalette.length);

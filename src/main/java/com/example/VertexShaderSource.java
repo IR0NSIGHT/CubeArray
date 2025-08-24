@@ -18,6 +18,7 @@ public class VertexShaderSource {
             // Palettes (bound to texture units 0 and 1 in your Java code)
             uniform sampler1D colorPaletteTex;
             uniform sampler1D sizePaletteTex;
+            uniform sampler1D offsetPaletteTex;
             uniform int paletteSize; // total number of entries
                             
             // Pass to fragment shader
@@ -32,10 +33,11 @@ public class VertexShaderSource {
              // Lookup per-block attributes
              vec3 blockColor = texture(colorPaletteTex, texCoord).rgb;
              vec3 blockSize  = texture(sizePaletteTex,  texCoord).rgb;
-                            
+             vec3 blockOffset = texture(offsetPaletteTex,  texCoord).rgb;
+              
              // Scale + translate block vertex into world space
              vec3 scaledVertex = aPos * blockSize;
-             vec3 worldPos     = scaledVertex + aInstancePos;
+             vec3 worldPos     = scaledVertex + blockOffset + aInstancePos;
                             
              // Outputs
              vColor    = blockColor;
