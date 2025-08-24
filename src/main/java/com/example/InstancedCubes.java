@@ -6,7 +6,6 @@ package com.example;
 import org.lwjgl.*;
 import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.*;
-import org.lwjgl.system.*;
 
 import java.nio.*;
 import java.util.*;
@@ -16,10 +15,7 @@ import org.joml.*;
 import static org.lwjgl.glfw.Callbacks.*;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL33.*;
-import static org.lwjgl.system.MemoryStack.*;
 import static org.lwjgl.system.MemoryUtil.*;
-
-import com.example.SchemReader;
 
 
 public class InstancedCubes {
@@ -42,6 +38,7 @@ public class InstancedCubes {
     private Vector3f[] instancePositions;
     private int[] instanceColorIndices;
     private Vector3f[] colorPalette;
+    private Vector3f[] sizePalette;
     private double lastMouseX, lastMouseY;
     private boolean firstMouse = true;
     private Vector3f cameraTarget = new Vector3f(0, 0, 0); // the point the camera looks at
@@ -61,6 +58,8 @@ public class InstancedCubes {
         instancePositions = res.positions;
         instanceColorIndices = res.colorIndices;
         colorPalette = res.colorPalette;
+        sizePalette = new Vector3f[colorPalette.length];
+        Arrays.fill(sizePalette, new Vector3f(1, 1, 1));
 
         System.out.println("generating " + instancePositions.length + " cubes");
 
@@ -240,91 +239,10 @@ public class InstancedCubes {
     }
 
     private void setupShaders() {
-        // --- Vertex Shader ---
-        String vertexShaderSource = """
-                #version 330 core
-                layout(location = 0) in vec3 aPos;
-                layout(location = 1) in vec3 aInstancePos;
-                layout(location = 2) in int aInstanceColorIndex;
-
-                uniform mat4 projection;
-                uniform mat4 view;
-
-                // Palette as 1D texture
-                uniform sampler1D colorPaletteTex;
-                uniform int paletteSize; // total number of palette entries
-
-                out vec3 vColor;
-                out vec3 vWorldPos;
-
-                void main() {
-                    vec3 worldPos = aPos  + aInstancePos;
-                    vWorldPos = worldPos;
-
-                    // Lookup color from palette texture
-                    float texCoord = (float(aInstanceColorIndex) + 0.5) / float(paletteSize);
-                    vColor = texture(colorPaletteTex, texCoord).rgb;
-
-                    gl_Position = projection * view * vec4(worldPos, 1.0);
-                }
-                """;
-
-        // --- Geometry Shader ---
-        String geometryShaderSource = """
-                #version 330 core
-                layout(triangles) in;
-                layout(triangle_strip, max_vertices = 3) out;
-
-                in vec3 vColor[3];
-                in vec3 vWorldPos[3];
-
-                out vec3 gColor;
-                flat out vec3 Normal;
-                out vec3 FragPos;
-
-                void main() {
-                    vec3 edge1 = vWorldPos[1] - vWorldPos[0];
-                    vec3 edge2 = vWorldPos[2] - vWorldPos[0];
-                    vec3 faceNormal = normalize(cross(edge1, edge2));
-
-                    for (int i = 0; i < 3; ++i) {
-                        FragPos = vWorldPos[i];
-                        Normal = faceNormal;   // same for all verts (flat shading)
-                        gColor = vColor[i];
-                        gl_Position = gl_in[i].gl_Position;
-                        EmitVertex();
-                    }
-                    EndPrimitive();
-                }
-                """;
-
-        // --- Fragment Shader ---
-        String fragmentShaderSource = """
-                #version 330 core
-                out vec4 FragColor;
-
-                in vec3 gColor;
-                in vec3 FragPos;
-                flat in vec3 Normal;
-
-                uniform vec3 lightDir;
-                uniform vec3 lightColor;
-
-                void main() {
-                    float diff = max(dot(Normal, -lightDir), 0.0);
-                    vec3 diffuse = diff * lightColor;
-
-                    vec3 ambient = vec3(0.2);
-                    vec3 result = (ambient + diffuse) * gColor;
-
-                    FragColor = vec4(result, 1.0);
-                }
-                """;
-
         // --- Compile Shaders ---
-        int vertexShader = compileShader(GL_VERTEX_SHADER, vertexShaderSource, "VERTEX");
-        int geometryShader = compileShader(GL_GEOMETRY_SHADER, geometryShaderSource, "GEOMETRY");
-        int fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentShaderSource, "FRAGMENT");
+        int vertexShader = compileShader(GL_VERTEX_SHADER, VertexShaderSource.source, "VERTEX");
+        int geometryShader = compileShader(GL_GEOMETRY_SHADER, GeometryShaderSource.source, "GEOMETRY");
+        int fragmentShader = compileShader(GL_FRAGMENT_SHADER, FragmentShaderSource.source, "FRAGMENT");
 
         // --- Link Program ---
         shaderProgram = glCreateProgram();
@@ -410,27 +328,46 @@ public class InstancedCubes {
         glUniform3f(lightDirLoc, -0.5f, -1.0f, -0.3f);
         glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
 
-        // --- Palette texture ---
+        // --- Color palette ---
         int colorPaletteTexID = glGenTextures();
         glBindTexture(GL_TEXTURE_1D, colorPaletteTexID);
 
-        FloatBuffer paletteBuffer = BufferUtils.createFloatBuffer(colorPalette.length * 3);
-        for (Vector3f c : colorPalette) paletteBuffer.put(c.x).put(c.y).put(c.z);
-        paletteBuffer.flip();
+        FloatBuffer colorBuffer = BufferUtils.createFloatBuffer(colorPalette.length * 3);
+        for (Vector3f c : colorPalette) colorBuffer.put(c.x).put(c.y).put(c.z);
+        colorBuffer.flip();
 
-        glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, colorPalette.length, 0, GL_RGB, GL_FLOAT, paletteBuffer);
+        glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, colorPalette.length, 0, GL_RGB, GL_FLOAT, colorBuffer);
         glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-        int paletteLoc = glGetUniformLocation(shaderProgram, "colorPaletteTex");
-        int paletteSizeLoc = glGetUniformLocation(shaderProgram, "paletteSize");
+// --- Size palette ---
+        int sizePaletteTexID = glGenTextures();
+        glBindTexture(GL_TEXTURE_1D, sizePaletteTexID);
 
-        glUniform1i(paletteLoc, 0); // texture unit 0
-        glUniform1i(paletteSizeLoc, colorPalette.length);
+        FloatBuffer sizeBuffer = BufferUtils.createFloatBuffer(sizePalette.length * 3);
+        for (Vector3f s : sizePalette) sizeBuffer.put(s.x).put(s.y).put(s.z);
+        sizeBuffer.flip();
+
+        glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, sizePalette.length, 0, GL_RGB, GL_FLOAT, sizeBuffer);
+        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+// bind to texture units
+        int colorLoc = glGetUniformLocation(shaderProgram, "colorPaletteTex");
+        glUniform1i(colorLoc, 0);
+        int sizeLoc = glGetUniformLocation(shaderProgram, "sizePaletteTex");
+        glUniform1i(sizeLoc, 1);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_1D, colorPaletteTexID);
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_1D, sizePaletteTexID);
+
+        int paletteSizeLoc = glGetUniformLocation(shaderProgram, "paletteSize");
+        glUniform1i(paletteSizeLoc, colorPalette.length);
     }
 
 
