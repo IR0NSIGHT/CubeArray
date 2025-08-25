@@ -14,8 +14,8 @@ public class GeometryShaderSource {
                 out vec3 FragPos;
 
                 void main() {
-                    vec3 edge1 = vWorldPos[1] - vWorldPos[0];
-                    vec3 edge2 = vWorldPos[2] - vWorldPos[0];
+                    vec3 edge1 = vWorldPos[0] - vWorldPos[1];
+                    vec3 edge2 = vWorldPos[2] - vWorldPos[1];
                     vec3 faceNormal = normalize(cross(edge1, edge2));
 
                     for (int i = 0; i < 3; ++i) {

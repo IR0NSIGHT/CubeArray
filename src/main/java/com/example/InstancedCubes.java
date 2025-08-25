@@ -241,11 +241,41 @@ public class InstancedCubes {
 
     private void setupBuffers() {
         // --- Cube geometry ---
-        float[] cubeVertices = {-0.5f, -0.5f, -0.5f, 0.5f, -0.5f, -0.5f, 0.5f, 0.5f, -0.5f, -0.5f, 0.5f, -0.5f, -0.5f
-                , -0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f, 0.5f, 0.5f, -0.5f, 0.5f, 0.5f};
+        float[] cubeVertices = {
+                0, 0, 0,
+                1, 0, 0,
+                1, 0, 1,
+                0, 0, 1,
 
-        int[] cubeIndices = {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4, 0, 1, 5, 5, 4, 0, 2, 3, 7, 7, 6, 2, 0, 3, 7, 7, 4, 0
-                , 1, 2, 6, 6, 5, 1};
+                0, 1, 0,
+                1, 1, 0,
+                1, 1, 1,
+                0, 1, 1,
+        };
+        for (int i = 0; i < cubeVertices.length; i++) {
+            cubeVertices[i] -= 0.5f;
+        }
+
+        int[] cubeIndices = {
+                //bottom
+                2, 1, 0,
+                0, 3, 2,
+                //top plane 1
+                5, 6, 7,
+                7, 4, 5,
+                //front (in z dir)
+                1, 5, 4,
+                4, 0, 1,
+                //back (-z dir)
+                3, 7, 6,
+                6, 2, 3,
+                //left
+                0, 4, 7,
+                7, 3, 0,
+                //right
+                2, 6, 5,
+                5, 1, 2
+        };
 
         vao = glGenVertexArrays();
         glBindVertexArray(vao);
@@ -292,7 +322,8 @@ public class InstancedCubes {
         // --- Lights ---
         int lightDirLoc = glGetUniformLocation(shaderProgram, "lightDir");
         int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
-        glUniform3f(lightDirLoc, -0.5f, -1.0f, -0.3f);
+        Vector3f lightDir = new Vector3f(-1, -2, -3).normalize();
+        glUniform3f(lightDirLoc, lightDir.x, lightDir.y, lightDir.z);
         glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
 
         // --- Color palette ---
@@ -332,7 +363,23 @@ public class InstancedCubes {
             for (Vector3f s : inputData.offsetPalette) offsetBuffer.put(s.x).put(s.y).put(s.z);
             offsetBuffer.flip();
 
-            glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, inputData.offsetPalette.length, 0, GL_RGB, GL_FLOAT, offsetBuffer);
+            glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, inputData.offsetPalette.length, 0, GL_RGB, GL_FLOAT,
+                    offsetBuffer);
+            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        }
+
+        // --- Offset palette ---
+        int rotationPaletteTexID = glGenTextures();
+        {
+            glBindTexture(GL_TEXTURE_1D, rotationPaletteTexID);
+
+            FloatBuffer buffer = BufferUtils.createFloatBuffer(inputData.rotationPalette.length * 3);
+            for (Vector3f s : inputData.rotationPalette) buffer.put(s.x).put(s.y).put(s.z);
+            buffer.flip();
+
+            glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, inputData.rotationPalette.length, 0, GL_RGB, GL_FLOAT, buffer);
             glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -345,6 +392,8 @@ public class InstancedCubes {
         glUniform1i(sizeLoc, 1);
         int offsetLoc = glGetUniformLocation(shaderProgram, "offsetPaletteTex");
         glUniform1i(offsetLoc, 2);
+        int rotationLoc = glGetUniformLocation(shaderProgram, "rotationPaletteTex");
+        glUniform1i(rotationLoc, 3);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_1D, colorPaletteTexID);
@@ -355,8 +404,13 @@ public class InstancedCubes {
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_1D, offsetPaletteTexID);
 
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_1D, rotationPaletteTexID);
+
         int paletteSizeLoc = glGetUniformLocation(shaderProgram, "paletteSize");
         glUniform1i(paletteSizeLoc, inputData.offsetPalette.length);
+
+        glDisable(GL_CULL_FACE);
     }
 
 

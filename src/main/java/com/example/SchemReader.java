@@ -12,9 +12,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
+import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -157,7 +155,28 @@ public class SchemReader {
             if (mat.name.contains("banner")) {
                 Vector3f size = new Vector3f(.8f, 2f, .1f);
                 sizePalette[matIdx] = size;
-                offsetPalette[matIdx] = new Vector3f(0, -.5f, -(1-size.z)/2f);
+                offsetPalette[matIdx] = new Vector3f(0, -.5f, (1-size.z)/2f);
+                colorPalette[matIdx] = new Vector3f(1, 1, 1);
+            }
+            if ( mat.name.contains("door")) {
+                Vector3f size = new Vector3f(1f, 2f, .2f);
+                sizePalette[matIdx] = size;
+                offsetPalette[matIdx] = new Vector3f(0, -.5f, (1-size.z)/2f);
+            }
+            if (mat.name.contains("ladder")) {
+                Vector3f size = new Vector3f(1f, 1f, .1f);
+                sizePalette[matIdx] = size;
+                offsetPalette[matIdx] = new Vector3f(0, 0, (1-size.z)/2f);
+            }
+
+            if (mat.name.contains("stairs")) {
+                Vector3f size = new Vector3f(1,.5f, .5f);
+                sizePalette[matIdx] = size;
+                if (Objects.equals(mat.getProperty(HALF), "top")) {
+                    offsetPalette[matIdx] = new Vector3f(0, (1-size.y)/2f, -(1-size.z)/2f); //shift up on y
+                } else {
+                    offsetPalette[matIdx] = new Vector3f(0, -(1-size.y)/2f, -(1-size.z)/2f); //shift down on y
+                }
                 colorPalette[matIdx] = new Vector3f(1, 1, 1);
             }
 
@@ -167,13 +186,13 @@ public class SchemReader {
 
             //implicit: no rotation for north
             if (Direction.EAST.equals(mat.getDirection()) || mat.is(EAST)) {
-                rotationPalette[matIdx] = new Vector3f(0, 90, 0);
+                rotationPalette[matIdx] = new Vector3f( 0, (float)Math.toRadians(90), 0);
             }
             if (Direction.SOUTH.equals(mat.getDirection()) || mat.is(SOUTH)) {
-                rotationPalette[matIdx] = new Vector3f(0, 180, 0);
+                rotationPalette[matIdx] = new Vector3f(0, (float)Math.toRadians(180), 0);
             }
             if (Direction.WEST.equals(mat.getDirection())  || mat.is(WEST)) {
-                rotationPalette[matIdx] = new Vector3f(0, 270, 0);
+                rotationPalette[matIdx] = new Vector3f(0, (float)Math.toRadians(270), 0);
             }
         }
 

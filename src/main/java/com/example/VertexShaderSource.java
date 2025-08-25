@@ -19,6 +19,7 @@ public class VertexShaderSource {
             uniform sampler1D colorPaletteTex;
             uniform sampler1D sizePaletteTex;
             uniform sampler1D offsetPaletteTex;
+            uniform sampler1D rotationPaletteTex;
             uniform int paletteSize; // total number of entries
                             
             // Pass to fragment shader
@@ -70,10 +71,10 @@ public class VertexShaderSource {
              vec3 blockColor = texture(colorPaletteTex, texCoord).rgb;
              vec3 blockSize  = texture(sizePaletteTex,  texCoord).rgb;
              vec3 blockOffset = texture(offsetPaletteTex,  texCoord).rgb;
-              
+             vec3 blockRotation = texture(rotationPaletteTex,  texCoord).rgb;
              // Scale + translate block vertex into world space
              vec3 scaledVertex = aPos * blockSize + blockOffset;
-             vec3 rotatedPosition = rotationX(0) * rotationY(radians(45.0)) * rotationZ(0) * scaledVertex;
+             vec3 rotatedPosition =  rotationY(blockRotation.y) * scaledVertex;
              vec3 worldPos     = rotatedPosition + aInstancePos;
                             
              // Outputs
