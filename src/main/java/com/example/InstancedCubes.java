@@ -32,8 +32,8 @@ public class InstancedCubes {
     float xoffset;
     float yoffset;
     private long window;
-    private int width = 1600;
-    private int height = 1000;
+    private int width = 1280;
+    private int height = 720;
     private int vao, vbo, ebo, instanceVBO;
     private int shaderProgram;
     private double lastMouseX, lastMouseY;
@@ -79,7 +79,7 @@ public class InstancedCubes {
         setupBuffers();
     }
 
-    private float autoRotate = 10f;
+    private float autoRotate = 25f;
 
     private void loop() {
         glEnable(GL_DEPTH_TEST);

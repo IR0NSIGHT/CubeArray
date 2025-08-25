@@ -64,15 +64,39 @@ public class SchemReader {
                 gridOffset.x = 0;
                 maxDepth = 0;
             }
-
+            var dimensions = object.getDimensions();
             var offset = object.getOffset();
             for (int x = 0; x < object.getDimensions().x; x++) {
                 for (int y = 0; y < object.getDimensions().y; y++) {
                     for (int z = object.getDimensions().z - 1; z >= 0; z--) {
                         Material mat = object.getMaterial(x, y, z);
                         if (mat != null && mat != Material.AIR) {
-                            //      if (!mat.name.contains("carpet"))
-                            //          continue; //DEBUG
+                            //test neighbours
+                            boolean hasNonSolidNeighbour = false;
+                            for (int xN = -1; xN <= 1 && !hasNonSolidNeighbour; xN++)
+                                for (int yN = -1; yN <= 1 && !hasNonSolidNeighbour; yN++)
+                                    for (int zN = -1; zN <= 1 && !hasNonSolidNeighbour; zN++) {
+                                        if (xN == 0 && yN == 0 && zN == 0)
+                                            continue;
+
+                                        int xNN = x+xN, yNN = y+yN, zNN = z+zN;
+
+                                        //always render edge blocks
+                                        if (xNN < 0 || yNN < 0|| zNN < 0) {
+                                            hasNonSolidNeighbour = true;
+                                            continue;
+                                        }
+                                        if (xNN >= dimensions.x || yNN >= dimensions.y|| zNN  >= dimensions.z) {
+                                            hasNonSolidNeighbour = true;
+                                            continue;
+                                        }
+
+                                        Material neighbour = object.getMaterial(xNN, yNN, zNN);
+                                        if (neighbour != null && !neighbour.solid)
+                                            hasNonSolidNeighbour = true;
+                                    }
+                            if (!hasNonSolidNeighbour)
+                                continue;
                             positions.add(new Vector3f(x + offset.x + gridOffset.x, z + offset.z,
                                     y + offset.y + gridOffset.y));
                             int materialPaletteIdx = 0;
@@ -219,7 +243,6 @@ public class SchemReader {
             }
 
 
-
             if (mat.vegetation) {
                 sizePalette[matIdx] = new Vector3f(0.6f, 1f, 0.6f);
             }
@@ -277,10 +300,10 @@ public class SchemReader {
             }
             if (mat.name.endsWith("_trapdoor")) {
                 Vector3f size = new Vector3f(1f, 1f, .2f); //open to north
-                Vector3f offset = new Vector3f(0,0,.4f);
+                Vector3f offset = new Vector3f(0, 0, .4f);
                 Vector3f rotation = new Vector3f(0, 0, 0);
 
-                if (!Objects.equals(mat.getProperty("open"), "true") ) {
+                if (!Objects.equals(mat.getProperty("open"), "true")) {
                     size = new Vector3f(1f, .2f, 1f);
                     offset.z = 0;
                     if (Objects.equals(mat.getProperty(HALF), "top")) {
@@ -288,8 +311,7 @@ public class SchemReader {
                     } else {
                         offset.y = -.4f;
                     }
-                } else
-                if (mat.getProperty(FACING) == Direction.SOUTH) {
+                } else if (mat.getProperty(FACING) == Direction.SOUTH) {
                     rotation.y = (float) Math.toRadians(180);
                 } else if (mat.getProperty(FACING) == Direction.NORTH) {
                     rotation.y = (float) Math.toRadians(0);
