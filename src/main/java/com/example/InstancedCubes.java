@@ -85,7 +85,7 @@ public class InstancedCubes {
         FloatBuffer viewBuffer = BufferUtils.createFloatBuffer(16);
 
         Matrix4f projection = new Matrix4f().perspective((float) java.lang.Math.toRadians(45.0f),
-                (float) width / height, 10f, 10000.0f);
+                (float) width / height, .1f, 10000.0f);
 
         // Scroll callback for zoom
         glfwSetScrollCallback(window, (win, xoffset, yoffset) -> {
