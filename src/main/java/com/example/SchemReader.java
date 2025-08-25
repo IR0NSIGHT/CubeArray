@@ -85,8 +85,7 @@ public class SchemReader {
                             blockTypeIndicesList.add(materialPaletteIdx);
 
                             if (mat.name.contains("stairs")) { //add a bottom slab
-                                positions.add(new Vector3f(x + offset.x + gridOffset.x, z + offset.z,
-                                        y + offset.y + gridOffset.y));
+
                                 Material slab = Material.get(mat.name.replace("stairs", "slab"));
                                 if (Objects.equals(mat.getProperty(HALF), "top")) {
                                     slab = slab.withProperty(TYPE, "top");
@@ -99,6 +98,23 @@ public class SchemReader {
                                     materialPaletteIdx = maxColorIdx++;
                                     mat_to_palette_idx.put(slab, materialPaletteIdx);
                                 }
+
+                                positions.add(new Vector3f(x + offset.x + gridOffset.x, z + offset.z,
+                                        y + offset.y + gridOffset.y));
+                                blockTypeIndicesList.add(materialPaletteIdx);
+                            }
+
+                            if (mat.is(WATERLOGGED) || mat.watery) {
+                                Material water = WATER;
+                                if (mat_to_palette_idx.containsKey(water)) {
+                                    materialPaletteIdx = mat_to_palette_idx.get(water);
+                                } else {
+                                    materialPaletteIdx = maxColorIdx++;
+                                    mat_to_palette_idx.put(water, materialPaletteIdx);
+                                }
+
+                                positions.add(new Vector3f(x + offset.x + gridOffset.x, z + offset.z,
+                                        y + offset.y + gridOffset.y));
                                 blockTypeIndicesList.add(materialPaletteIdx);
                             }
                         }
@@ -155,9 +171,11 @@ public class SchemReader {
                     level = 0; //falling water is a fully block
                 sizePalette[matIdx] = new Vector3f(1, 1 - (level / 8f), 1); //zero is full, 8 is empty
                 offsetPalette[matIdx] = new Vector3f(0, -(level / 8f) / 2f, 0);
-                if (mat.name.contains("water")) {
-                    offsetPalette[matIdx].y -= .1f; //shift water down slighty
-                }
+            }
+            if (mat.name.contains("water")) {
+                offsetPalette[matIdx].y -= .1f; //shift water down slighty
+                sizePalette[matIdx].x = 0.999f; //slightly less wide than 1x1 for waterlogged blocks
+                sizePalette[matIdx].z = 0.999f;
             }
 
             if (mat.name.contains("carpet")) {
@@ -201,6 +219,7 @@ public class SchemReader {
             }
 
 
+
             if (mat.vegetation) {
                 sizePalette[matIdx] = new Vector3f(0.6f, 1f, 0.6f);
             }
@@ -219,8 +238,6 @@ public class SchemReader {
             if (mat.name.endsWith("_wall")) {
                 Vector3f size = new Vector3f(0.5f, 1, 0.5f);
                 Vector3f offset = new Vector3f(0, 0, 0);
-                Vector3f from = new Vector3f(-.25f, 0, -.25f);
-                Vector3f to = new Vector3f(.25f, 0, 25f);
                 Vector3f rotation = new Vector3f(0, 0, 0);
 
                 boolean north = !Objects.equals(mat.getProperty("north"), "none");
