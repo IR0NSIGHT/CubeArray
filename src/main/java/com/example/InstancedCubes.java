@@ -35,13 +35,9 @@ public class InstancedCubes {
     private int height = 1000;
     private int vao, vbo, ebo, instanceVBO;
     private int shaderProgram;
-    private Vector3f[] instancePositions;
-    private int[] instanceColorIndices;
-    private Vector3f[] colorPalette;
-    private Vector3f[] sizePalette;
-    private Vector3f[] offsetPalette;
     private double lastMouseX, lastMouseY;
     private boolean firstMouse = true;
+    private SchemReader.CubeSetup inputData;
     private Vector3f cameraTarget = new Vector3f(0, 0, 0); // the point the camera looks at
 
     public static void main(String[] args) throws Exception {
@@ -56,13 +52,9 @@ public class InstancedCubes {
 
     private void init() throws Exception {
         var res = SchemReader.loadNbtFile();
-        instancePositions = res.positions;
-        instanceColorIndices = res.colorIndices;
-        colorPalette = res.colorPalette;
-        sizePalette = res.sizePalette;
-        offsetPalette = res.offsetPalette;
+        inputData = res;
 
-        System.out.println("generating " + instancePositions.length + " cubes");
+        System.out.println("generating " + inputData.positions.length + " cubes");
 
         GLFWErrorCallback.createPrint(System.err).set();
 
@@ -206,7 +198,7 @@ public class InstancedCubes {
             glUniformMatrix4fv(viewLoc, false, viewBuffer);
 
             glBindVertexArray(vao);
-            glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, instancePositions.length);
+            glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, inputData.positions.length);
             glBindVertexArray(0);
 
             glfwSwapBuffers(window);
@@ -271,8 +263,8 @@ public class InstancedCubes {
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, cubeIndices, GL_STATIC_DRAW);
 
         // --- Instance positions ---
-        FloatBuffer instancePositionsFlat = BufferUtils.createFloatBuffer(instancePositions.length * 3);
-        for (Vector3f pos : instancePositions) instancePositionsFlat.put(pos.x).put(pos.y).put(pos.z);
+        FloatBuffer instancePositionsFlat = BufferUtils.createFloatBuffer(inputData.positions.length * 3);
+        for (Vector3f pos : inputData.positions) instancePositionsFlat.put(pos.x).put(pos.y).put(pos.z);
         instancePositionsFlat.flip();
 
         instanceVBO = glGenBuffers();
@@ -283,8 +275,8 @@ public class InstancedCubes {
         glVertexAttribDivisor(1, 1);
 
         // --- Instance color indices ---
-        IntBuffer colorIndexData = BufferUtils.createIntBuffer(instanceColorIndices.length);
-        colorIndexData.put(instanceColorIndices).flip();
+        IntBuffer colorIndexData = BufferUtils.createIntBuffer(inputData.colorIndices.length);
+        colorIndexData.put(inputData.colorIndices).flip();
 
         int colorIndexVBO = glGenBuffers();
         glBindBuffer(GL_ARRAY_BUFFER, colorIndexVBO);
@@ -307,11 +299,11 @@ public class InstancedCubes {
         int colorPaletteTexID = glGenTextures();
         glBindTexture(GL_TEXTURE_1D, colorPaletteTexID);
         {
-            FloatBuffer colorBuffer = BufferUtils.createFloatBuffer(colorPalette.length * 3);
-            for (Vector3f c : colorPalette) colorBuffer.put(c.x).put(c.y).put(c.z);
+            FloatBuffer colorBuffer = BufferUtils.createFloatBuffer(inputData.colorPalette.length * 3);
+            for (Vector3f c : inputData.colorPalette) colorBuffer.put(c.x).put(c.y).put(c.z);
             colorBuffer.flip();
 
-            glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, colorPalette.length, 0, GL_RGB, GL_FLOAT, colorBuffer);
+            glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, inputData.colorPalette.length, 0, GL_RGB, GL_FLOAT, colorBuffer);
             glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -321,11 +313,11 @@ public class InstancedCubes {
         int sizePaletteTexID = glGenTextures();
         glBindTexture(GL_TEXTURE_1D, sizePaletteTexID);
         {
-            FloatBuffer sizeBuffer = BufferUtils.createFloatBuffer(sizePalette.length * 3);
-            for (Vector3f s : sizePalette) sizeBuffer.put(s.x).put(s.y).put(s.z);
+            FloatBuffer sizeBuffer = BufferUtils.createFloatBuffer(inputData.sizePalette.length * 3);
+            for (Vector3f s : inputData.sizePalette) sizeBuffer.put(s.x).put(s.y).put(s.z);
             sizeBuffer.flip();
 
-            glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, sizePalette.length, 0, GL_RGB, GL_FLOAT, sizeBuffer);
+            glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, inputData.sizePalette.length, 0, GL_RGB, GL_FLOAT, sizeBuffer);
             glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -336,11 +328,11 @@ public class InstancedCubes {
         glBindTexture(GL_TEXTURE_1D, offsetPaletteTexID);
 
         {
-            FloatBuffer offsetBuffer = BufferUtils.createFloatBuffer(offsetPalette.length * 3);
-            for (Vector3f s : offsetPalette) offsetBuffer.put(s.x).put(s.y).put(s.z);
+            FloatBuffer offsetBuffer = BufferUtils.createFloatBuffer(inputData.offsetPalette.length * 3);
+            for (Vector3f s : inputData.offsetPalette) offsetBuffer.put(s.x).put(s.y).put(s.z);
             offsetBuffer.flip();
 
-            glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, offsetPalette.length, 0, GL_RGB, GL_FLOAT, offsetBuffer);
+            glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, inputData.offsetPalette.length, 0, GL_RGB, GL_FLOAT, offsetBuffer);
             glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -363,9 +355,8 @@ public class InstancedCubes {
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_1D, offsetPaletteTexID);
 
-
         int paletteSizeLoc = glGetUniformLocation(shaderProgram, "paletteSize");
-        glUniform1i(paletteSizeLoc, colorPalette.length);
+        glUniform1i(paletteSizeLoc, inputData.offsetPalette.length);
     }
 
 
