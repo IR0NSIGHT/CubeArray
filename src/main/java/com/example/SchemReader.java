@@ -33,7 +33,7 @@ public class SchemReader {
         String europe = "D:\\Repos\\worldpainter_related\\Vanilla_plus_House_Pack-Dannypan\\Schematics";
         String jerusalem = "C:/Users/Max1M/curseforge/minecraft/Instances/neoforge 1.12.1 camboi " +
                 "shaders/config/worldedit/schematics";
-        File dir = new File(europe);
+        File dir = new File(jerusalem);
         List<Path> pathList = findAllFiles(dir.toPath());
         ArrayList<WPObject> schematics = new ArrayList<>();
         for (Path path : pathList) {

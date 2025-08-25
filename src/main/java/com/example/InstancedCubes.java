@@ -7,6 +7,7 @@ import org.lwjgl.*;
 import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.*;
 
+import java.lang.Math;
 import java.nio.*;
 import java.util.*;
 
@@ -78,6 +79,8 @@ public class InstancedCubes {
         setupBuffers();
     }
 
+    private float autoRotate = 10f;
+
     private void loop() {
         glEnable(GL_DEPTH_TEST);
 
@@ -89,8 +92,8 @@ public class InstancedCubes {
 
         // Scroll callback for zoom
         glfwSetScrollCallback(window, (win, xoffset, yoffset) -> {
-            radius *= java.lang.Math.pow(0.9, yoffset); // exponential zoom
-            radius = java.lang.Math.max(2.0f, java.lang.Math.min(maxRadius, radius)); // clamp zoom
+            radius *= (float) Math.pow(0.85, yoffset); // exponential zoom
+            radius = java.lang.Math.max(0.0f, java.lang.Math.min(maxRadius, radius)); // clamp zoom
         });
 
         // Mouse click callback
@@ -104,36 +107,62 @@ public class InstancedCubes {
 
         // Mouse movement callback for pitch and yaw
         glfwSetCursorPosCallback(window, (win, xpos, ypos) -> {
-
-
             if (firstMouse) {
                 lastMouseX = xpos;
                 lastMouseY = ypos;
                 firstMouse = false;
             }
 
-
-            xoffset += xpos - lastMouseX;
-            yoffset += lastMouseY - ypos; // reversed: y-coordinates go from bottom to top
+            xoffset += (float) (xpos - lastMouseX);
+            yoffset += (float) (lastMouseY - ypos); // reversed: y-coordinates go from bottom to top
 
             lastMouseX = xpos;
             lastMouseY = ypos;
         });
+        final boolean[] keys = new boolean[GLFW_KEY_LAST];
+        glfwSetKeyCallback(window, (win, key, scancode, action, mods) -> {
+            if (key == GLFW_KEY_UNKNOWN) return;
 
+            if (action == GLFW_PRESS) {
+                if (!keys[key]) {
+                    // 🔹 Run once when key is pressed
+                    System.out.println("Key pressed once: " + key);
+
+                    // put your action here
+                    if (key == GLFW_KEY_SPACE) {
+                        autoRotate = autoRotate == 0 ? 15 : 0;
+                    }
+                }
+                keys[key] = true;
+            }
+            else if (action == GLFW_RELEASE) {
+                keys[key] = false;
+                System.out.println("Key released: " + key);
+            }
+        });
+
+        double lastTime = glfwGetTime();
 
         while (!glfwWindowShouldClose(window)) {
+            double currentTime = glfwGetTime();
+            float deltaTime = (float) (currentTime - lastTime);
+            lastTime = currentTime;
+
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-
             // Calculate camera direction vectors
-            Vector3f forward =
-                    new Vector3f((float) java.lang.Math.sin(yaw), 0, (float) java.lang.Math.cos(yaw)).normalize();
+            Vector3f forward = new Vector3f(
+                    (float) Math.sin(yaw),
+                    0,
+                    (float) Math.cos(yaw)
+            ).normalize();
 
             Vector3f up = new Vector3f(0, 1, 0);
             Vector3f right = new Vector3f(forward).cross(up).normalize();
             Vector3f forwardFlat = new Vector3f(up).cross(right).normalize();
-            float moveSpeed = java.lang.Math.max(.5f, 0.006f * radius);
 
+            // Movement speed scaled by deltaTime
+            float moveSpeedKeys = 10f * deltaTime;
 
             Vector3f movement = new Vector3f(0, 0, 0);
 
@@ -143,46 +172,42 @@ public class InstancedCubes {
             if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) movement.sub(right);
             if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) movement.add(up);
             if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) movement.sub(up);
+            if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) moveSpeedKeys *= 4;
+            if (movement.length() != 0) movement.normalize().mul(moveSpeedKeys);
 
+            boolean rotateCameraByMouse = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
+            boolean moveCameraByMouse   = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
 
-            boolean rotateCamera = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
-
-            boolean moveCamera = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
-
-            if (movement.length() != 0) movement.normalize().mul(moveSpeed);
-
-            if (rotateCamera) {
-                float sensitivity = 0.002f; // adjust for speed
-                yaw -= xoffset * sensitivity;
+            if (rotateCameraByMouse) {
+                float sensitivity = .2f * deltaTime; // scaled by delta time
+                yaw   -= xoffset * sensitivity;
                 pitch -= yoffset * sensitivity;
 
                 // Clamp pitch to avoid flipping
-                pitch = java.lang.Math.max(-1.5f, java.lang.Math.min(1.5f, pitch));
-            } else if (moveCamera) {
-                //System.out.println("MOVE CAMERA BY MOUSE:" + xoffset "," + yoffset);
-                float sensitivityShift = 0.5f;
+                pitch = Math.max(-1.5f, Math.min(1.5f, pitch));
+            } else if (moveCameraByMouse) {
+                float sensitivityShift = 25f * deltaTime;
                 movement.add(right.mul(xoffset * sensitivityShift));
                 movement.add(forwardFlat.mul(yoffset * sensitivityShift));
             }
-            ;
 
+            if (autoRotate != 0) {
+                yaw = (float)Math.toRadians((Math.toDegrees(yaw) + autoRotate * deltaTime + 360f) % 360f);
+            }
 
-            // Calculate camera position
-            float camX = (float) (radius * java.lang.Math.cos(pitch) * java.lang.Math.sin(yaw));
-            float camY = (float) (radius * java.lang.Math.sin(pitch));
-            float camZ = (float) (radius * java.lang.Math.cos(pitch) * java.lang.Math.cos(yaw));
+            // Calculate camera position (orbit style)
+            float camX = (float) (radius * Math.cos(pitch) * Math.sin(yaw));
+            float camY = (float) (radius * Math.sin(pitch));
+            float camZ = (float) (radius * Math.cos(pitch) * Math.cos(yaw));
 
             Vector3f cameraPos = new Vector3f(camX, camY, camZ);
-
-            //  System.out.printf("yaw %f pitch %f \n",yaw,pitch);
 
             cameraTarget.add(movement);
             cameraPos.add(cameraTarget);
 
-
             Matrix4f view = new Matrix4f().lookAt(cameraPos, cameraTarget, new Vector3f(0, 1, 0));
 
-            // reset mouse movement tracker
+            // reset mouse offsets
             xoffset = 0;
             yoffset = 0;
 
@@ -190,12 +215,8 @@ public class InstancedCubes {
             view.get(viewBuffer);
 
             glUseProgram(shaderProgram);
-
-            int projLoc = glGetUniformLocation(shaderProgram, "projection");
-            int viewLoc = glGetUniformLocation(shaderProgram, "view");
-
-            glUniformMatrix4fv(projLoc, false, projBuffer);
-            glUniformMatrix4fv(viewLoc, false, viewBuffer);
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), false, projBuffer);
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), false, viewBuffer);
 
             glBindVertexArray(vao);
             glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, inputData.positions.length);
@@ -204,6 +225,7 @@ public class InstancedCubes {
             glfwSwapBuffers(window);
             glfwPollEvents();
         }
+
     }
 
     private void cleanup() {
