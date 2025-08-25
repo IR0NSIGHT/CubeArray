@@ -1,6 +1,7 @@
 package com.example;
 
 import org.joml.Vector3f;
+import org.pepsoft.minecraft.Direction;
 import org.pepsoft.minecraft.Material;
 import org.pepsoft.worldpainter.DefaultCustomObjectProvider;
 import org.pepsoft.worldpainter.objects.WPObject;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.pepsoft.minecraft.Constants.MC_WEST;
 import static org.pepsoft.minecraft.Material.*;
 
 public class SchemReader {
@@ -71,8 +73,8 @@ public class SchemReader {
                     for (int z = object.getDimensions().z - 1; z >= 0; z--) {
                         Material mat = object.getMaterial(x, y, z);
                         if (mat != null && mat != Material.AIR) {
-                      //      if (!mat.name.contains("carpet"))
-                      //          continue; //DEBUG
+                            //      if (!mat.name.contains("carpet"))
+                            //          continue; //DEBUG
                             positions.add(new Vector3f(x + offset.x + gridOffset.x, z + offset.z,
                                     y + offset.y + gridOffset.y));
                             int materialPaletteIdx = 0;
@@ -95,9 +97,15 @@ public class SchemReader {
         }
 
         Vector3f[] colorPalette = new Vector3f[mat_to_palette_idx.size()];
+        Arrays.fill(colorPalette, new Vector3f(1, 1, 1));
+
         Vector3f[] sizePalette = new Vector3f[mat_to_palette_idx.size()];
         Arrays.fill(sizePalette, new Vector3f(1, 1, 1));
+
         Vector3f[] offsetPalette = new Vector3f[mat_to_palette_idx.size()];
+        Arrays.fill(offsetPalette, new Vector3f(0, 0, 0));
+
+        Vector3f[] rotationPalette = new Vector3f[mat_to_palette_idx.size()];
         Arrays.fill(offsetPalette, new Vector3f(0, 0, 0));
 
         for (var entry : mat_to_palette_idx.entrySet()) {
@@ -142,18 +150,30 @@ public class SchemReader {
             if (mat.name.contains("fence")) {
                 boolean facing = (mat.is(WEST) || mat.is(NORTH) || mat.is(EAST) || mat.is(SOUTH));
                 if (!facing) {
-                    sizePalette[matIdx] = new Vector3f((1 / 4f), 1f,(1 / 4f));
+                    sizePalette[matIdx] = new Vector3f((1 / 4f), 1f, (1 / 4f));
                 }
             }
 
             if (mat.name.contains("banner")) {
-                sizePalette[matIdx] = new Vector3f(.8f, 2f,.8f);
-                offsetPalette[matIdx] = new Vector3f(0, -.5f, 0);
-                colorPalette[matIdx] = new Vector3f(1,1,1);
+                Vector3f size = new Vector3f(.8f, 2f, .1f);
+                sizePalette[matIdx] = size;
+                offsetPalette[matIdx] = new Vector3f(0, -.5f, -(1-size.z)/2f);
+                colorPalette[matIdx] = new Vector3f(1, 1, 1);
             }
 
             if (mat.vegetation) {
-                sizePalette[matIdx] = new Vector3f(0.6f,1f,0.6f);
+                sizePalette[matIdx] = new Vector3f(0.6f, 1f, 0.6f);
+            }
+
+            //implicit: no rotation for north
+            if (Direction.EAST.equals(mat.getDirection()) || mat.is(EAST)) {
+                rotationPalette[matIdx] = new Vector3f(0, 90, 0);
+            }
+            if (Direction.SOUTH.equals(mat.getDirection()) || mat.is(SOUTH)) {
+                rotationPalette[matIdx] = new Vector3f(0, 180, 0);
+            }
+            if (Direction.WEST.equals(mat.getDirection())  || mat.is(WEST)) {
+                rotationPalette[matIdx] = new Vector3f(0, 270, 0);
             }
         }
 
@@ -163,7 +183,7 @@ public class SchemReader {
         return new CubeSetup(positions.toArray(new Vector3f[0]),
                 blockTypeIndices,
                 colorPalette,
-                sizePalette, offsetPalette);
+                sizePalette, offsetPalette, rotationPalette);
     }
 
     public static List<Path> findAllFiles(Path dir) throws IOException {
@@ -183,14 +203,16 @@ public class SchemReader {
         Vector3f[] sizePalette;
         //how to shift blocks from their origin at 0.5 0.5 0.5 (width height depth)
         Vector3f[] offsetPalette;
+        Vector3f[] rotationPalette;
 
         public CubeSetup(Vector3f[] positions, int[] colorIndices, Vector3f[] colorPalette, Vector3f[] sizePalette,
-                         Vector3f[] offsetPalette) {
+                         Vector3f[] offsetPalette, Vector3f[] rotationPalette) {
             this.positions = positions;
             this.colorIndices = colorIndices;
             this.colorPalette = colorPalette;
             this.sizePalette = sizePalette;
             this.offsetPalette = offsetPalette;
+            this.rotationPalette = rotationPalette;
         }
     }
 }
