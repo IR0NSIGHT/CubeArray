@@ -175,10 +175,15 @@ public class SchemReader {
                 offsetPalette[matIdx] = new Vector3f(0, -.5f, (1 - size.z) / 2f);
                 colorPalette[matIdx] = new Vector3f(1, 1, 1);
             }
-            if (mat.name.contains("door")) {
+            if (mat.name.endsWith("_door")) {
                 Vector3f size = new Vector3f(1f, 2f, .2f);
                 sizePalette[matIdx] = size;
                 offsetPalette[matIdx] = new Vector3f(0, -.5f, (1 - size.z) / 2f);
+            }
+            if (mat.name.endsWith("_trapdoor")) {
+                Vector3f size = new Vector3f(1f, .2f, 1f);
+                sizePalette[matIdx] = size;
+                offsetPalette[matIdx] = new Vector3f(0, -(1- size.y)/2f, 0);
             }
             if (mat.name.contains("ladder")) {
                 Vector3f size = new Vector3f(1f, 1f, .1f);
