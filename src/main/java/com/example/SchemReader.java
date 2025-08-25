@@ -84,6 +84,23 @@ public class SchemReader {
                             }
                             blockTypeIndicesList.add(materialPaletteIdx);
 
+                            if (mat.name.contains("stairs")) { //add a bottom slab
+                                positions.add(new Vector3f(x + offset.x + gridOffset.x, z + offset.z,
+                                        y + offset.y + gridOffset.y));
+                                Material slab = Material.get(mat.name.replace("stairs", "slab"));
+                                if (Objects.equals(mat.getProperty(HALF), "top")) {
+                                    slab = slab.withProperty(TYPE, "top");
+                                } else {
+                                    slab = slab.withProperty(TYPE, "bottom");
+                                }
+                                if (mat_to_palette_idx.containsKey(slab)) {
+                                    materialPaletteIdx = mat_to_palette_idx.get(slab);
+                                } else {
+                                    materialPaletteIdx = maxColorIdx++;
+                                    mat_to_palette_idx.put(slab, materialPaletteIdx);
+                                }
+                                blockTypeIndicesList.add(materialPaletteIdx);
+                            }
                         }
                     }
                 }
@@ -153,32 +170,32 @@ public class SchemReader {
             }
 
             if (mat.name.contains("banner")) {
-                Vector3f size = new Vector3f(.8f, 2f, .1f);
+                Vector3f size = new Vector3f(.8f, 1.8f, .1f);
                 sizePalette[matIdx] = size;
-                offsetPalette[matIdx] = new Vector3f(0, -.5f, (1-size.z)/2f);
+                offsetPalette[matIdx] = new Vector3f(0, -.5f, (1 - size.z) / 2f);
                 colorPalette[matIdx] = new Vector3f(1, 1, 1);
             }
-            if ( mat.name.contains("door")) {
+            if (mat.name.contains("door")) {
                 Vector3f size = new Vector3f(1f, 2f, .2f);
                 sizePalette[matIdx] = size;
-                offsetPalette[matIdx] = new Vector3f(0, -.5f, (1-size.z)/2f);
+                offsetPalette[matIdx] = new Vector3f(0, -.5f, (1 - size.z) / 2f);
             }
             if (mat.name.contains("ladder")) {
                 Vector3f size = new Vector3f(1f, 1f, .1f);
                 sizePalette[matIdx] = size;
-                offsetPalette[matIdx] = new Vector3f(0, 0, (1-size.z)/2f);
+                offsetPalette[matIdx] = new Vector3f(0, 0, (1 - size.z) / 2f);
             }
 
             if (mat.name.contains("stairs")) {
-                Vector3f size = new Vector3f(1,.5f, .5f);
+                Vector3f size = new Vector3f(1, .5f, .5f);
                 sizePalette[matIdx] = size;
                 if (Objects.equals(mat.getProperty(HALF), "top")) {
-                    offsetPalette[matIdx] = new Vector3f(0, (1-size.y)/2f, -(1-size.z)/2f); //shift up on y
+                    offsetPalette[matIdx] = new Vector3f(0, -(1 - size.y) / 2f, -(1 - size.z) / 2f); //shift up on y
                 } else {
-                    offsetPalette[matIdx] = new Vector3f(0, -(1-size.y)/2f, -(1-size.z)/2f); //shift down on y
+                    offsetPalette[matIdx] = new Vector3f(0, (1 - size.y) / 2f, -(1 - size.z) / 2f); //shift down on y
                 }
-                colorPalette[matIdx] = new Vector3f(1, 1, 1);
             }
+
 
             if (mat.vegetation) {
                 sizePalette[matIdx] = new Vector3f(0.6f, 1f, 0.6f);
@@ -186,13 +203,56 @@ public class SchemReader {
 
             //implicit: no rotation for north
             if (Direction.EAST.equals(mat.getDirection()) || mat.is(EAST)) {
-                rotationPalette[matIdx] = new Vector3f( 0, (float)Math.toRadians(90), 0);
+                rotationPalette[matIdx] = new Vector3f(0, (float) Math.toRadians(90), 0);
             }
             if (Direction.SOUTH.equals(mat.getDirection()) || mat.is(SOUTH)) {
-                rotationPalette[matIdx] = new Vector3f(0, (float)Math.toRadians(180), 0);
+                rotationPalette[matIdx] = new Vector3f(0, (float) Math.toRadians(180), 0);
             }
-            if (Direction.WEST.equals(mat.getDirection())  || mat.is(WEST)) {
-                rotationPalette[matIdx] = new Vector3f(0, (float)Math.toRadians(270), 0);
+            if (Direction.WEST.equals(mat.getDirection()) || mat.is(WEST)) {
+                rotationPalette[matIdx] = new Vector3f(0, (float) Math.toRadians(270), 0);
+            }
+
+            if (mat.name.endsWith("_wall")) {
+                Vector3f size = new Vector3f(0.5f,1,0.5f);
+                Vector3f offset = new Vector3f(0,0,0);
+                Vector3f from = new Vector3f(-.25f,0,-.25f);
+                Vector3f to = new Vector3f(.25f,0,25f);
+                Vector3f rotation = new Vector3f(0, 0, 0);
+
+                boolean north = !Objects.equals(mat.getProperty("north"), "none");
+                boolean south = !Objects.equals(mat.getProperty("south"), "none");
+
+                boolean east = !Objects.equals(mat.getProperty("east"), "none");
+                boolean west = !Objects.equals(mat.getProperty("west"), "none");
+
+                if (east) {
+                    size.x += .25f;
+                    offset.x += .125f;
+                }
+                if (west) {
+                    size.x += .25f;
+                    offset.x -= .125f;
+                }
+                if (south) {
+                    size.z += .25f;
+                    offset.z += .125f;
+                }
+                if (north) {
+                    size.z += .25f;
+                    offset.z -= .125f;
+                }
+
+                if (!(north || south || east || west)) {
+                    size = new Vector3f(0.5f, .7f, 0.5f);
+                }
+                if (mat.is(UP))
+                    size.y = 1;
+
+                offset.y = -(1 - size.y) / 2f;
+
+                sizePalette[matIdx] = size;
+                offsetPalette[matIdx] = offset;
+                rotationPalette[matIdx] = rotation;
             }
         }
 
