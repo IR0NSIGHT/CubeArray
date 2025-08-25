@@ -24,6 +24,42 @@ public class VertexShaderSource {
             // Pass to fragment shader
             out vec3 vColor;
             out vec3 vWorldPos;
+             
+            // Rotation around the X axis
+            mat3 rotationX(float angle) {
+                float sine = sin(angle);
+                float cosine = cos(angle);
+                        
+                return mat3(
+                    1.0,    0.0,     0.0,
+                    0.0, cosine, -sine,
+                    0.0,  sine, cosine
+                );
+            }
+                        
+            // Rotation around the Y axis
+            mat3 rotationY(float angle) {
+                float sine = sin(angle);
+                float cosine = cos(angle);
+                        
+                return mat3(
+                    cosine, 0.0,  sine,
+                    0.0,    1.0,  0.0,
+                   -sine,   0.0, cosine
+                );
+            }
+                        
+            // Rotation around the Z axis
+            mat3 rotationZ(float angle) {
+                float sine = sin(angle);
+                float cosine = cos(angle);
+                        
+                return mat3(
+                    cosine, -sine, 0.0,
+                    sine,   cosine, 0.0,
+                    0.0,     0.0,  1.0
+                );
+            }
                             
             void main()
             {
@@ -36,8 +72,9 @@ public class VertexShaderSource {
              vec3 blockOffset = texture(offsetPaletteTex,  texCoord).rgb;
               
              // Scale + translate block vertex into world space
-             vec3 scaledVertex = aPos * blockSize;
-             vec3 worldPos     = scaledVertex + blockOffset + aInstancePos;
+             vec3 scaledVertex = aPos * blockSize + blockOffset;
+             vec3 rotatedPosition = rotationX(0) * rotationY(radians(45.0)) * rotationZ(0) * scaledVertex;
+             vec3 worldPos     = rotatedPosition + aInstancePos;
                             
              // Outputs
              vColor    = blockColor;

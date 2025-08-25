@@ -106,7 +106,7 @@ public class SchemReader {
         Arrays.fill(offsetPalette, new Vector3f(0, 0, 0));
 
         Vector3f[] rotationPalette = new Vector3f[mat_to_palette_idx.size()];
-        Arrays.fill(offsetPalette, new Vector3f(0, 0, 0));
+        Arrays.fill(rotationPalette, new Vector3f(0, 0, 0));
 
         for (var entry : mat_to_palette_idx.entrySet()) {
             Material mat = entry.getKey();
