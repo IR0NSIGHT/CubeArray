@@ -30,7 +30,7 @@ public class SchemReader {
 
     public static CubeSetup loadNbtFile() throws Exception {
 
-        String europe = "D:\\Repos\\worldpainter_related\\Vanilla_plus_House_Pack-Dannypan\\Schematics\\Desert";
+        String europe = "D:\\Repos\\worldpainter_related\\Vanilla_plus_House_Pack-Dannypan\\Schematics";
         String jerusalem = "C:/Users/Max1M/curseforge/minecraft/Instances/neoforge 1.12.1 camboi " +
                 "shaders/config/worldedit/schematics";
         File dir = new File(europe);
@@ -134,11 +134,14 @@ public class SchemReader {
 
             //ADD size and offset to palette
             if (mat.name.contains("slab") && mat.hasProperty(TYPE)) {
-                if (mat.getProperty(TYPE).equals("top"))
+                if (mat.getProperty(TYPE).equals("top")) {
                     offsetPalette[matIdx] = new Vector3f(0, 0.5f / 2, 0);
-                if (mat.getProperty(TYPE).equals("bottom"))
+                    sizePalette[matIdx] = new Vector3f(1, 0.5f, 1);
+                } else if (mat.getProperty(TYPE).equals("bottom")) {
                     offsetPalette[matIdx] = new Vector3f(0, -0.5f / 2f, 0);
-                sizePalette[matIdx] = new Vector3f(1, 0.5f, 1);
+                    sizePalette[matIdx] = new Vector3f(1, 0.5f, 1);
+                }
+
             } else {
                 sizePalette[matIdx] = new Vector3f(1, 1, 1);
             }
@@ -180,11 +183,7 @@ public class SchemReader {
                 sizePalette[matIdx] = size;
                 offsetPalette[matIdx] = new Vector3f(0, -.5f, (1 - size.z) / 2f);
             }
-            if (mat.name.endsWith("_trapdoor")) {
-                Vector3f size = new Vector3f(1f, .2f, 1f);
-                sizePalette[matIdx] = size;
-                offsetPalette[matIdx] = new Vector3f(0, -(1- size.y)/2f, 0);
-            }
+
             if (mat.name.contains("ladder")) {
                 Vector3f size = new Vector3f(1f, 1f, .1f);
                 sizePalette[matIdx] = size;
@@ -218,10 +217,10 @@ public class SchemReader {
             }
 
             if (mat.name.endsWith("_wall")) {
-                Vector3f size = new Vector3f(0.5f,1,0.5f);
-                Vector3f offset = new Vector3f(0,0,0);
-                Vector3f from = new Vector3f(-.25f,0,-.25f);
-                Vector3f to = new Vector3f(.25f,0,25f);
+                Vector3f size = new Vector3f(0.5f, 1, 0.5f);
+                Vector3f offset = new Vector3f(0, 0, 0);
+                Vector3f from = new Vector3f(-.25f, 0, -.25f);
+                Vector3f to = new Vector3f(.25f, 0, 25f);
                 Vector3f rotation = new Vector3f(0, 0, 0);
 
                 boolean north = !Objects.equals(mat.getProperty("north"), "none");
@@ -254,6 +253,34 @@ public class SchemReader {
                     size.y = 1;
 
                 offset.y = -(1 - size.y) / 2f;
+
+                sizePalette[matIdx] = size;
+                offsetPalette[matIdx] = offset;
+                rotationPalette[matIdx] = rotation;
+            }
+            if (mat.name.endsWith("_trapdoor")) {
+                Vector3f size = new Vector3f(1f, 1f, .2f); //open to north
+                Vector3f offset = new Vector3f(0,0,.4f);
+                Vector3f rotation = new Vector3f(0, 0, 0);
+
+                if (!Objects.equals(mat.getProperty("open"), "true") ) {
+                    size = new Vector3f(1f, .2f, 1f);
+                    offset.z = 0;
+                    if (Objects.equals(mat.getProperty(HALF), "top")) {
+                        offset.y = 0.4f;
+                    } else {
+                        offset.y = -.4f;
+                    }
+                } else
+                if (mat.getProperty(FACING) == Direction.SOUTH) {
+                    rotation.y = (float) Math.toRadians(180);
+                } else if (mat.getProperty(FACING) == Direction.NORTH) {
+                    rotation.y = (float) Math.toRadians(0);
+                } else if (mat.getProperty(FACING) == Direction.EAST) {
+                    rotation.y = (float) Math.toRadians(90);
+                } else if (mat.getProperty(FACING) == Direction.WEST) {
+                    rotation.y = (float) Math.toRadians(270);
+                }
 
                 sizePalette[matIdx] = size;
                 offsetPalette[matIdx] = offset;
