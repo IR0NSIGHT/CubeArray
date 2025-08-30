@@ -12,6 +12,7 @@ import java.nio.*;
 import java.util.*;
 
 import org.joml.*;
+import org.pepsoft.worldpainter.objects.WPObject;
 
 import static org.lwjgl.glfw.Callbacks.*;
 import static org.lwjgl.glfw.GLFW.*;
@@ -32,8 +33,8 @@ public class InstancedCubes {
     float xoffset;
     float yoffset;
     private long window;
-    private int width = 1280;
-    private int height = 720;
+    private int width = 1920;
+    private int height = 1080;
     private int vao, vbo, ebo, instanceVBO;
     private int shaderProgram;
     private double lastMouseX, lastMouseY;
@@ -42,17 +43,24 @@ public class InstancedCubes {
     private Vector3f cameraTarget = new Vector3f(0, 0, 0); // the point the camera looks at
 
     public static void main(String[] args) throws Exception {
-        new InstancedCubes().run();
+
+        var setup = SchemReader.prepareData(SchemReader.loadDefaultObjects());
+
+        new InstancedCubes(setup).run();
+    }
+    private SchemReader.CubeSetup setup;
+    public InstancedCubes(SchemReader.CubeSetup setup) {
+        this.setup = setup;
     }
 
     public void run() throws Exception {
-        init();
+        init(setup);
+
         loop();
         cleanup();
     }
 
-    private void init() throws Exception {
-        var res = SchemReader.loadNbtFile();
+    private void init(SchemReader.CubeSetup res) throws Exception {
         inputData = res;
 
         System.out.println("generating " + inputData.positions.length + " cubes");
@@ -79,10 +87,11 @@ public class InstancedCubes {
         setupBuffers();
     }
 
-    private float autoRotate = 25f;
+    private float autoRotate = 5f;
 
     private void loop() {
         glEnable(GL_DEPTH_TEST);
+        glClearColor(0.53f, 0.81f, 0.92f, 1f);
 
         FloatBuffer projBuffer = BufferUtils.createFloatBuffer(16);
         FloatBuffer viewBuffer = BufferUtils.createFloatBuffer(16);
@@ -130,7 +139,7 @@ public class InstancedCubes {
 
                     // put your action here
                     if (key == GLFW_KEY_SPACE) {
-                        autoRotate = autoRotate == 0 ? 15 : 0;
+                        autoRotate = autoRotate == 0 ? 5 : 0;
                     }
                 }
                 keys[key] = true;
@@ -144,6 +153,8 @@ public class InstancedCubes {
         double lastTime = glfwGetTime();
 
         while (!glfwWindowShouldClose(window)) {
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); //clear screen
+
             double currentTime = glfwGetTime();
             float deltaTime = (float) (currentTime - lastTime);
             lastTime = currentTime;
@@ -193,6 +204,7 @@ public class InstancedCubes {
 
             if (autoRotate != 0) {
                 yaw = (float)Math.toRadians((Math.toDegrees(yaw) + autoRotate * deltaTime + 360f) % 360f);
+                radius += 4 * deltaTime;
             }
 
             // Calculate camera position (orbit style)

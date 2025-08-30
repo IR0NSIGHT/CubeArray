@@ -16,9 +16,9 @@ public class FragmentShaderSource {
                     float diff = max(dot(Normal, -lightDir), 0.0);
                     vec3 diffuse = diff * lightColor;
 
-                    vec3 ambient = vec3(0.3);
+                    vec3 ambient = vec3(1,1,1);
                     //DEBUG: show normals: vec3 result = (Normal + vec3(1,1,1)*vec3(0.5,0.5,0.5));
-                    vec3 result =  (ambient + diffuse) * gColor;
+                    vec3 result =  (vec3(0.6) * ambient + vec3(0.4) *diffuse) * gColor;
                     FragColor = vec4(result, 1.0);
                 }
                 """;

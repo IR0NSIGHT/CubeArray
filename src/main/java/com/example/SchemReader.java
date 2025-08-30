@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.pepsoft.minecraft.Constants.MC_WEST;
 import static org.pepsoft.minecraft.Material.*;
 
 public class SchemReader {
@@ -27,9 +26,7 @@ public class SchemReader {
         Material mat = Material.COBBLESTONE_STAIRS;
         System.out.println(mat);
     }
-
-    public static CubeSetup loadNbtFile() throws Exception {
-
+    public static List<WPObject> loadDefaultObjects() throws IOException {
         String europe = "D:\\Repos\\worldpainter_related\\Vanilla_plus_House_Pack-Dannypan\\Schematics";
         String jerusalem = "C:/Users/Max1M/curseforge/minecraft/Instances/neoforge 1.12.1 camboi " +
                 "shaders/config/worldedit/schematics";
@@ -46,6 +43,11 @@ public class SchemReader {
                 schematics.add(schematic);
             }
         }
+        return schematics;
+    }
+    public static CubeSetup prepareData(List<WPObject> schematics) throws Exception {
+
+
 
 
         List<Vector3f> positions = new ArrayList<>();
