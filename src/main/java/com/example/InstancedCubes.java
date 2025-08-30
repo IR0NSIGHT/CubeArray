@@ -9,11 +9,10 @@ import org.lwjgl.opengl.*;
 
 import java.lang.Math;
 import java.nio.*;
-import java.util.*;
 
 import org.joml.*;
-import org.pepsoft.worldpainter.objects.WPObject;
 
+import static com.example.GlUtils.bind1DTexturePalette;
 import static org.lwjgl.glfw.Callbacks.*;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL33.*;
@@ -41,16 +40,18 @@ public class InstancedCubes {
     private boolean firstMouse = true;
     private SchemReader.CubeSetup inputData;
     private Vector3f cameraTarget = new Vector3f(0, 0, 0); // the point the camera looks at
+    private SchemReader.CubeSetup setup;
+    private float autoRotate = 5f;
+
+    public InstancedCubes(SchemReader.CubeSetup setup) {
+        this.setup = setup;
+    }
 
     public static void main(String[] args) throws Exception {
 
         var setup = SchemReader.prepareData(SchemReader.loadDefaultObjects());
 
         new InstancedCubes(setup).run();
-    }
-    private SchemReader.CubeSetup setup;
-    public InstancedCubes(SchemReader.CubeSetup setup) {
-        this.setup = setup;
     }
 
     public void run() throws Exception {
@@ -86,8 +87,6 @@ public class InstancedCubes {
         setupShaders();
         setupBuffers();
     }
-
-    private float autoRotate = 5f;
 
     private void loop() {
         glEnable(GL_DEPTH_TEST);
@@ -143,8 +142,7 @@ public class InstancedCubes {
                     }
                 }
                 keys[key] = true;
-            }
-            else if (action == GLFW_RELEASE) {
+            } else if (action == GLFW_RELEASE) {
                 keys[key] = false;
                 System.out.println("Key released: " + key);
             }
@@ -187,11 +185,11 @@ public class InstancedCubes {
             if (movement.length() != 0) movement.normalize().mul(moveSpeedKeys);
 
             boolean rotateCameraByMouse = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
-            boolean moveCameraByMouse   = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
+            boolean moveCameraByMouse = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
 
             if (rotateCameraByMouse) {
                 float sensitivity = .2f * deltaTime; // scaled by delta time
-                yaw   -= xoffset * sensitivity;
+                yaw -= xoffset * sensitivity;
                 pitch -= yoffset * sensitivity;
 
                 // Clamp pitch to avoid flipping
@@ -203,7 +201,7 @@ public class InstancedCubes {
             }
 
             if (autoRotate != 0) {
-                yaw = (float)Math.toRadians((Math.toDegrees(yaw) + autoRotate * deltaTime + 360f) % 360f);
+                yaw = (float) Math.toRadians((Math.toDegrees(yaw) + autoRotate * deltaTime + 360f) % 360f);
                 radius += 4 * deltaTime;
             }
 
@@ -361,73 +359,17 @@ public class InstancedCubes {
         glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
 
         // --- Color palette ---
-        int colorPaletteTexID = glGenTextures();
-        glBindTexture(GL_TEXTURE_1D, colorPaletteTexID);
-        {
-            FloatBuffer colorBuffer = BufferUtils.createFloatBuffer(inputData.colorPalette.length * 3);
-            for (Vector3f c : inputData.colorPalette) colorBuffer.put(c.x).put(c.y).put(c.z);
-            colorBuffer.flip();
+        int colorPaletteTexID = bind1DTexturePalette(inputData.colorPalette, "colorPaletteTex", GL_TEXTURE0,
+                shaderProgram);
+        int sizePaletteTexID = bind1DTexturePalette(inputData.sizePalette, "sizePaletteTex", GL_TEXTURE1,
+                shaderProgram);
 
-            glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, inputData.colorPalette.length, 0, GL_RGB, GL_FLOAT, colorBuffer);
-            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        }
-
-// --- Size palette ---
-        int sizePaletteTexID = glGenTextures();
-        glBindTexture(GL_TEXTURE_1D, sizePaletteTexID);
-        {
-            FloatBuffer sizeBuffer = BufferUtils.createFloatBuffer(inputData.sizePalette.length * 3);
-            for (Vector3f s : inputData.sizePalette) sizeBuffer.put(s.x).put(s.y).put(s.z);
-            sizeBuffer.flip();
-
-            glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, inputData.sizePalette.length, 0, GL_RGB, GL_FLOAT, sizeBuffer);
-            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        }
-
-// --- Offset palette ---
-        int offsetPaletteTexID = glGenTextures();
-        glBindTexture(GL_TEXTURE_1D, offsetPaletteTexID);
-
-        {
-            FloatBuffer offsetBuffer = BufferUtils.createFloatBuffer(inputData.offsetPalette.length * 3);
-            for (Vector3f s : inputData.offsetPalette) offsetBuffer.put(s.x).put(s.y).put(s.z);
-            offsetBuffer.flip();
-
-            glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, inputData.offsetPalette.length, 0, GL_RGB, GL_FLOAT,
-                    offsetBuffer);
-            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        }
+        int offsetPaletteTexID= bind1DTexturePalette(inputData.offsetPalette, "offsetPaletteTex", GL_TEXTURE2,
+                shaderProgram);
 
         // --- Offset palette ---
-        int rotationPaletteTexID = glGenTextures();
-        {
-            glBindTexture(GL_TEXTURE_1D, rotationPaletteTexID);
-
-            FloatBuffer buffer = BufferUtils.createFloatBuffer(inputData.rotationPalette.length * 3);
-            for (Vector3f s : inputData.rotationPalette) buffer.put(s.x).put(s.y).put(s.z);
-            buffer.flip();
-
-            glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, inputData.rotationPalette.length, 0, GL_RGB, GL_FLOAT, buffer);
-            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        }
-
-// bind to texture units
-        int colorLoc = glGetUniformLocation(shaderProgram, "colorPaletteTex");
-        glUniform1i(colorLoc, 0);
-        int sizeLoc = glGetUniformLocation(shaderProgram, "sizePaletteTex");
-        glUniform1i(sizeLoc, 1);
-        int offsetLoc = glGetUniformLocation(shaderProgram, "offsetPaletteTex");
-        glUniform1i(offsetLoc, 2);
-        int rotationLoc = glGetUniformLocation(shaderProgram, "rotationPaletteTex");
-        glUniform1i(rotationLoc, 3);
+        int rotationPaletteTexID =bind1DTexturePalette(inputData.rotationPalette, "rotationPaletteTex", GL_TEXTURE3,
+                shaderProgram);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_1D, colorPaletteTexID);
