@@ -61,6 +61,10 @@ public class VertexShaderSource {
                     0.0,     0.0,  1.0
                 );
             }
+                   
+            float rand(float n) {
+                return fract(sin(n) * 43758.5453123);
+            }
                             
             void main()
             {
@@ -73,12 +77,15 @@ public class VertexShaderSource {
              vec3 blockOffset = texture(offsetPaletteTex,  texCoord).rgb;
              vec3 blockRotation = texture(rotationPaletteTex,  texCoord).rgb;
              // Scale + translate block vertex into world space
+     
+             
              vec3 scaledVertex = aPos * blockSize + blockOffset;
              vec3 rotatedPosition =  rotationY(blockRotation.y) * scaledVertex;
              vec3 worldPos     = rotatedPosition + aInstancePos;
                             
              // Outputs
-             vColor    = blockColor;
+             float r = rand(gl_InstanceID) * 0.025;
+             vColor    = blockColor + vec3(r);
              vWorldPos = worldPos;
                             
              gl_Position = projection * view * vec4(worldPos, 1.0);
