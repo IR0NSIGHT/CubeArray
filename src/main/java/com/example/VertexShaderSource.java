@@ -8,9 +8,11 @@ public class VertexShaderSource {
             layout(location = 0) in vec3 aPos;
                             
             // Per-instance attributes
-            layout(location = 1) in vec3 aInstancePos;
-            layout(location = 2) in int  aInstanceColorIndex;
-                            
+            layout(location = 1) in vec2 vertexUV;
+            layout(location = 2) in vec3 aInstancePos;
+            layout(location = 3) in int  aInstanceColorIndex;
+      
+            
             // Camera transforms
             uniform mat4 projection;
             uniform mat4 view;
@@ -25,7 +27,8 @@ public class VertexShaderSource {
             // Pass to fragment shader
             out vec3 vColor;
             out vec3 vWorldPos;
-             
+            out vec2 UV;
+            
             // Rotation around the X axis
             mat3 rotationX(float angle) {
                 float sine = sin(angle);
@@ -87,7 +90,8 @@ public class VertexShaderSource {
              float r = rand(gl_InstanceID) * 0.025;
              vColor    = blockColor + vec3(r);
              vWorldPos = worldPos;
-                            
+             
+             UV = vertexUV;
              gl_Position = projection * view * vec4(worldPos, 1.0);
             }
             """;

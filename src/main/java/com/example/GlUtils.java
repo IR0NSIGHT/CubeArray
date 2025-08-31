@@ -3,12 +3,12 @@ package com.example;
 import org.joml.Vector3f;
 import org.lwjgl.BufferUtils;
 
+import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL11.GL_NEAREST;
 import static org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE;
-import static org.lwjgl.opengl.GL13.glActiveTexture;
 import static org.lwjgl.opengl.GL13C.GL_TEXTURE0;
 import static org.lwjgl.opengl.GL20.glGetUniformLocation;
 import static org.lwjgl.opengl.GL20.glUniform1i;
@@ -37,5 +37,43 @@ public class GlUtils {
      //   glBindTexture(GL_TEXTURE_1D, colorPaletteTexID);
 
         return colorPaletteTexID;
+    }
+
+    public static int createSimple2DTexture(int width, int height, byte[] pixelData) {
+        // Generate texture ID
+        int textureId = glGenTextures();
+
+        // Bind it to GL_TEXTURE_2D target
+        glBindTexture(GL_TEXTURE_2D, textureId);
+
+        // Wrap modes (edge behavior)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        // Filtering (nearest = pixelated look)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+        // Upload pixel data
+        ByteBuffer buffer = BufferUtils.createByteBuffer(pixelData.length);
+        buffer.put(pixelData).flip();
+
+        // Assume pixelData is RGBA (4 bytes per pixel)
+        glTexImage2D(
+                GL_TEXTURE_2D,
+                0,              // mipmap level
+                GL_RGBA,        // internal format (on GPU)
+                width,
+                height,
+                0,              // border (must be 0)
+                GL_RGBA,        // format of your data
+                GL_UNSIGNED_BYTE,
+                buffer
+        );
+
+        // Unbind (safety)
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        return textureId;
     }
 }

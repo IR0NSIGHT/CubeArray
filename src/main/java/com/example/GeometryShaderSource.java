@@ -8,11 +8,13 @@ public class GeometryShaderSource {
 
                 in vec3 vColor[3];
                 in vec3 vWorldPos[3];
-
+                in vec2 UV[3];
+                
                 out vec3 gColor;
                 flat out vec3 Normal;
                 out vec3 FragPos;
-
+                out vec2 fragUV;
+                
                 void main() {
                     vec3 edge1 = vWorldPos[0] - vWorldPos[1];
                     vec3 edge2 = vWorldPos[2] - vWorldPos[1];
@@ -21,8 +23,10 @@ public class GeometryShaderSource {
                     for (int i = 0; i < 3; ++i) {
                         FragPos = vWorldPos[i];
                         Normal = faceNormal;   // same for all verts (flat shading)
+                        fragUV = UV[i];
                         gColor = vColor[i];
                         gl_Position = gl_in[i].gl_Position;
+        
                         EmitVertex();
                     }
                     EndPrimitive();

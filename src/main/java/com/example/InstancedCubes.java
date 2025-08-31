@@ -9,6 +9,7 @@ import org.lwjgl.opengl.*;
 
 import java.lang.Math;
 import java.nio.*;
+import java.util.Arrays;
 
 import org.joml.*;
 
@@ -274,18 +275,21 @@ public class InstancedCubes {
     private void setupBuffers() {
         // --- Cube geometry ---
         float[] cubeVertices = {
-                0, 0, 0,
-                1, 0, 0,
-                1, 0, 1,
-                0, 0, 1,
+                0, 0, 0,    0.5f,0.5f,
+                1, 0, 0,    1.5f,0.5f,
+                1, 0, 1,    1.5f,1.5f,
+                0, 0, 1,    0.5f,1.5f,
 
-                0, 1, 0,
-                1, 1, 0,
-                1, 1, 1,
-                0, 1, 1,
+                0, 1, 0,    0.5f,0.5f,
+                1, 1, 0,    1.5f,0.5f,
+                1, 1, 1,    1.5f,1.5f,
+                0, 1, 1,    0.5f,1.5f,
         };
         for (int i = 0; i < cubeVertices.length; i++) {
             cubeVertices[i] -= 0.5f;
+        }
+        for (float f: cubeVertices){
+            assert f >= -1 && f <= 1 : "out of range " + f;
         }
 
         int[] cubeIndices = {
@@ -312,17 +316,26 @@ public class InstancedCubes {
         vao = glGenVertexArrays();
         glBindVertexArray(vao);
 
-        // --- Vertex buffer ---
-        vbo = glGenBuffers();
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, cubeVertices, GL_STATIC_DRAW);
-        glVertexAttribPointer(0, 3, GL_FLOAT, false, 3 * Float.BYTES, 0);
-        glEnableVertexAttribArray(0);
-
         // --- Element buffer ---
         ebo = glGenBuffers();
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, cubeIndices, GL_STATIC_DRAW);
+
+        // --- Vertex buffer ---
+        vbo = glGenBuffers();
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, cubeVertices, GL_STATIC_DRAW);
+        final int attribIndexVERTEXPOS = 0;
+        final int attribIndexUVPOS = 1;
+        final int attribIndexINSTANCEPOS = 2;
+        final int attribIndexCOLORINDEX = 3;
+        glVertexAttribPointer(attribIndexVERTEXPOS, 3, GL_FLOAT, false, 5 * Float.BYTES, 0);
+        glEnableVertexAttribArray(attribIndexVERTEXPOS);
+
+        glVertexAttribPointer(attribIndexUVPOS, 2, GL_FLOAT, false, 5 * Float.BYTES, 3 * Float.BYTES);
+        glEnableVertexAttribArray(attribIndexUVPOS);
+
+
 
         // --- Instance positions ---
         FloatBuffer instancePositionsFlat = BufferUtils.createFloatBuffer(inputData.positions.length * 3);
@@ -332,9 +345,9 @@ public class InstancedCubes {
         instanceVBO = glGenBuffers();
         glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
         glBufferData(GL_ARRAY_BUFFER, instancePositionsFlat, GL_STATIC_DRAW);
-        glVertexAttribPointer(1, 3, GL_FLOAT, false, 3 * Float.BYTES, 0);
-        glEnableVertexAttribArray(1);
-        glVertexAttribDivisor(1, 1);
+        glVertexAttribPointer(attribIndexINSTANCEPOS, 3, GL_FLOAT, false, 3 * Float.BYTES, 0);
+        glEnableVertexAttribArray(attribIndexINSTANCEPOS);
+        glVertexAttribDivisor(attribIndexINSTANCEPOS, 1);
 
         // --- Instance color indices ---
         IntBuffer colorIndexData = BufferUtils.createIntBuffer(inputData.colorIndices.length);
@@ -343,9 +356,9 @@ public class InstancedCubes {
         int colorIndexVBO = glGenBuffers();
         glBindBuffer(GL_ARRAY_BUFFER, colorIndexVBO);
         glBufferData(GL_ARRAY_BUFFER, colorIndexData, GL_STATIC_DRAW);
-        glVertexAttribIPointer(2, 1, GL_INT, Integer.BYTES, 0);
-        glEnableVertexAttribArray(2);
-        glVertexAttribDivisor(2, 1);
+        glVertexAttribIPointer(attribIndexCOLORINDEX, 1, GL_INT, Integer.BYTES, 0);
+        glEnableVertexAttribArray(attribIndexCOLORINDEX);
+        glVertexAttribDivisor(attribIndexCOLORINDEX, 1);
 
         glBindVertexArray(0);
 
@@ -364,11 +377,11 @@ public class InstancedCubes {
         int sizePaletteTexID = bind1DTexturePalette(inputData.sizePalette, "sizePaletteTex", GL_TEXTURE1,
                 shaderProgram);
 
-        int offsetPaletteTexID= bind1DTexturePalette(inputData.offsetPalette, "offsetPaletteTex", GL_TEXTURE2,
+        int offsetPaletteTexID = bind1DTexturePalette(inputData.offsetPalette, "offsetPaletteTex", GL_TEXTURE2,
                 shaderProgram);
 
         // --- Offset palette ---
-        int rotationPaletteTexID =bind1DTexturePalette(inputData.rotationPalette, "rotationPaletteTex", GL_TEXTURE3,
+        int rotationPaletteTexID = bind1DTexturePalette(inputData.rotationPalette, "rotationPaletteTex", GL_TEXTURE3,
                 shaderProgram);
 
         glActiveTexture(GL_TEXTURE0);
@@ -383,6 +396,22 @@ public class InstancedCubes {
         glActiveTexture(GL_TEXTURE3);
         glBindTexture(GL_TEXTURE_1D, rotationPaletteTexID);
 
+        // Make a simple 2x2 checkerboard (black/white, RGBA)
+        byte[] pixels = {
+                (byte) 255, (byte) 255, (byte) 255, (byte) 255, 0, 0, 0, (byte) 255,
+                0, 0, 0, (byte) 255, (byte) 255, (byte) 255, (byte) 255, (byte) 255
+        };
+     //   Arrays.fill(pixels,(byte)128);
+
+        int texId = GlUtils.createSimple2DTexture(2, 2, pixels);
+
+        int texUniform = glGetUniformLocation(shaderProgram, "blockTexture");
+        glUniform1i(texUniform, 4);
+
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, texId);
+
+        //-------------
         int paletteSizeLoc = glGetUniformLocation(shaderProgram, "paletteSize");
         glUniform1i(paletteSizeLoc, inputData.offsetPalette.length);
 

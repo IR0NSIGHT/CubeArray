@@ -7,11 +7,15 @@ public class FragmentShaderSource {
 
                 in vec3 gColor;
                 in vec3 FragPos;
+                in vec2 fragUV;
                 flat in vec3 Normal;
 
                 uniform vec3 lightDir;
                 uniform vec3 lightColor;
-
+                
+            
+                uniform sampler2D blockTexture;  // your bound texture
+            
                 void main() {
                     float diff = max(dot(Normal, -lightDir), 0.0);
                     vec3 diffuse = diff * lightColor;
@@ -19,7 +23,7 @@ public class FragmentShaderSource {
                     vec3 ambient = vec3(1,1,1);
                     //DEBUG: show normals: vec3 result = (Normal + vec3(1,1,1)*vec3(0.5,0.5,0.5));
                     vec3 result =  (vec3(0.5) * ambient + vec3(0.5) *diffuse) * gColor;
-                    FragColor = vec4(result, 1.0);
+                    FragColor = texture(blockTexture, fragUV) * vec4(result, 1.0);
                 }
                 """;
 }
