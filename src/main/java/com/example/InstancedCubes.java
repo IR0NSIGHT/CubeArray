@@ -7,11 +7,17 @@ import org.lwjgl.*;
 import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.*;
 
+import java.awt.image.DataBufferByte;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.Math;
 import java.nio.*;
 import java.util.Arrays;
 
 import org.joml.*;
+
+import javax.imageio.ImageIO;
 
 import static com.example.GlUtils.bind1DTexturePalette;
 import static org.lwjgl.glfw.Callbacks.*;
@@ -19,6 +25,7 @@ import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL33.*;
 import static org.lwjgl.system.MemoryUtil.*;
 
+import java.awt.image.BufferedImage;
 
 public class InstancedCubes {
 
@@ -272,45 +279,67 @@ public class InstancedCubes {
         glDeleteShader(fragmentShader);
     }
 
-    private void setupBuffers() {
+    private void setupBuffers() throws IOException {
         // --- Cube geometry ---
+        final float uv_d = 0.5f;
+        final float uv_u = 1.5f;
+        final float uv_l = 0.5f;
+        final float uv_r = 1.5f;
         float[] cubeVertices = {
-                0, 0, 0,    0.5f,0.5f,
-                1, 0, 0,    1.5f,0.5f,
-                1, 0, 1,    1.5f,1.5f,
-                0, 0, 1,    0.5f,1.5f,
+                //TOP QUAD + BOTTOM QUAD
+                0, 0, 0, uv_l, uv_d,
+                1, 0, 0, uv_r, uv_d,
+                1, 0, 1, uv_r, uv_u,
+                0, 0, 1, uv_l, uv_u,
 
-                0, 1, 0,    0.5f,0.5f,
-                1, 1, 0,    1.5f,0.5f,
-                1, 1, 1,    1.5f,1.5f,
-                0, 1, 1,    0.5f,1.5f,
+
+                0, 1, 0, uv_l, uv_d,
+                1, 1, 0, uv_r, uv_d,
+                1, 1, 1, uv_r, uv_u,
+                0, 1, 1, uv_l, uv_u,
+
+                // FRONT + BACK QUAD
+                0, 0, 0, uv_l, uv_u,    //  0
+                1, 0, 0, uv_l, uv_d,    //  1
+                1, 0, 1, uv_l,uv_u,    //  2
+                0, 0, 1, uv_l, uv_d,    //  3
+                0, 1, 0, uv_r, uv_u,    //  4
+                1, 1, 0, uv_r, uv_d,    //  5
+                1, 1, 1, uv_r, uv_u,    //  6
+                0, 1, 1, uv_r, uv_d,    //  7
+
+                // LEFT 0 4 7 3  RIGHT 2 6 5 1
+                0, 0, 0, uv_l, uv_d,    //  0
+                1, 0, 0, uv_l, uv_u,    //  1
+                1, 0, 1, uv_l, uv_d,    //  2
+                0, 0, 1, uv_l, uv_u,    //  3
+                0, 1, 0, uv_r, uv_d,    //  4
+                1, 1, 0, uv_r, uv_u,    //  5
+                1, 1, 1, uv_r, uv_d,    //  6
+                0, 1, 1, uv_r, uv_u,    //  7
         };
         for (int i = 0; i < cubeVertices.length; i++) {
             cubeVertices[i] -= 0.5f;
         }
-        for (float f: cubeVertices){
+        for (float f : cubeVertices) {
             assert f >= -1 && f <= 1 : "out of range " + f;
         }
 
         int[] cubeIndices = {
-                //bottom
-                2, 1, 0,
+                2, 1, 0, //bottom
                 0, 3, 2,
-                //top plane 1
-                5, 6, 7,
+                5, 6, 7,//top plane 1
                 7, 4, 5,
-                //front (in z dir)
-                1, 5, 4,
-                4, 0, 1,
-                //back (-z dir)
-                3, 7, 6,
-                6, 2, 3,
-                //left
-                0, 4, 7,
-                7, 3, 0,
-                //right
-                2, 6, 5,
-                5, 1, 2
+
+                8 + 1, 8 + 5, 8 + 4,//front (in z dir)
+                8 + 4, 8 + 0, 8 + 1,
+                8 + 3, 8 + 7, 8 + 6,//back (-z dir)
+                8 + 6, 8 + 2, 8 + 3,
+
+                16 + 0, 16 + 4, 16 + 7, //left
+                16 + 7, 16 + 3, 16 + 0,
+                16 + 2, 16 + 6, 16 + 5, //right
+                16 + 5, 16 + 1, 16 + 2
         };
 
         vao = glGenVertexArrays();
@@ -334,7 +363,6 @@ public class InstancedCubes {
 
         glVertexAttribPointer(attribIndexUVPOS, 2, GL_FLOAT, false, 5 * Float.BYTES, 3 * Float.BYTES);
         glEnableVertexAttribArray(attribIndexUVPOS);
-
 
 
         // --- Instance positions ---
@@ -396,14 +424,15 @@ public class InstancedCubes {
         glActiveTexture(GL_TEXTURE3);
         glBindTexture(GL_TEXTURE_1D, rotationPaletteTexID);
 
-        // Make a simple 2x2 checkerboard (black/white, RGBA)
-        byte[] pixels = {
-                (byte) 255, (byte) 255, (byte) 255, (byte) 255, 0, 0, 0, (byte) 255,
-                0, 0, 0, (byte) 255, (byte) 255, (byte) 255, (byte) 255, (byte) 255
-        };
-     //   Arrays.fill(pixels,(byte)128);
-
-        int texId = GlUtils.createSimple2DTexture(2, 2, pixels);
+        InputStream is = getClass().getResourceAsStream("/texture.bmp");
+        assert is != null;
+        BufferedImage image = ImageIO.read(is);
+        int width = image.getWidth();
+        int height = image.getHeight();
+        BufferedImage rgba = new BufferedImage(width, height, BufferedImage.TYPE_4BYTE_ABGR);
+        rgba.getGraphics().drawImage(image, 0, 0, null);
+        byte[] pixels = ((DataBufferByte) rgba.getRaster().getDataBuffer()).getData();
+        int texId = GlUtils.createSimple2DTexture(16, 16, pixels);
 
         int texUniform = glGetUniformLocation(shaderProgram, "blockTexture");
         glUniform1i(texUniform, 4);
