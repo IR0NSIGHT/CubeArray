@@ -93,6 +93,10 @@ public class SpriteSheet {
             int y = (i / gridSize) * textureSize;
 
             BufferedImage tex = ImageIO.read(entry.getValue());
+            if (entry.getKey().leafBlock) {
+                tex = colorizeLeaf(tex,entry.getKey().colour);
+            }
+
             g.drawImage(tex, x, y, textureSize, textureSize, null);
 
             float u1 = x / (float) atlasSize;
@@ -107,6 +111,36 @@ public class SpriteSheet {
 
         return atlas;
     }
+    public static BufferedImage colorizeLeaf(BufferedImage leafTexture, int avgColor) {
+        int width = leafTexture.getWidth();
+        int height = leafTexture.getHeight();
+
+        BufferedImage colored = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+
+        int avgR = (avgColor >> 16) & 0xFF;
+        int avgG = (avgColor >> 8) & 0xFF;
+        int avgB = avgColor & 0xFF;
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int pixel = leafTexture.getRGB(x, y);
+
+                int alpha = (pixel >> 24) & 0xFF;
+                int gray  = (pixel >> 16) & 0xFF; // assume grayscale: R=G=B
+
+                // Scale average color by grayscale value
+                int r = (avgR * gray) / 255;
+                int g = (avgG * gray) / 255;
+                int b = (avgB * gray) / 255;
+
+                int newPixel = (alpha << 24) | (r << 16) | (g << 8) | b;
+                colored.setRGB(x, y, newPixel);
+            }
+        }
+
+        return colored;
+    }
+
 
     private File tryFindMatch(String simpleName, HashMap<String, File> nameToFile) {
         if (simpleName.startsWith("stripped_") && simpleName.endsWith("_wood")) //idk why but worldpainter materials

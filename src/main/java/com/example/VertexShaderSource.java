@@ -22,6 +22,7 @@ public class VertexShaderSource {
             uniform sampler1D sizePaletteTex;
             uniform sampler1D offsetPaletteTex;
             uniform sampler1D rotationPaletteTex;
+            uniform sampler1D uvPaletteTex;
             uniform int paletteSize; // total number of entries
                             
             // Pass to fragment shader
@@ -79,6 +80,7 @@ public class VertexShaderSource {
              vec3 blockSize  = texture(sizePaletteTex,  texCoord).rgb;
              vec3 blockOffset = texture(offsetPaletteTex,  texCoord).rgb;
              vec3 blockRotation = texture(rotationPaletteTex,  texCoord).rgb;
+             vec4 uvCoords =  texture(uvPaletteTex, texCoord).rgba;
              // Scale + translate block vertex into world space
      
              
@@ -90,8 +92,10 @@ public class VertexShaderSource {
              float r = rand(gl_InstanceID) * 0.025;
              vColor    = blockColor + vec3(r);
              vWorldPos = worldPos;
+             vec2 uvStart = uvCoords.rg;
+             vec2 uvEnd = uvCoords.ba;
+             UV = (vertexUV * (uvEnd - uvStart)) + uvStart;
              
-             UV = vertexUV;
              gl_Position = projection * view * vec4(worldPos, 1.0);
             }
             """;

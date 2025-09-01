@@ -7,7 +7,9 @@ import org.lwjgl.*;
 import org.lwjgl.glfw.*;
 import org.lwjgl.opengl.*;
 
+import java.awt.*;
 import java.awt.image.DataBufferByte;
+import java.awt.image.DataBufferInt;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -301,7 +303,7 @@ public class InstancedCubes {
                 // FRONT + BACK QUAD
                 0, 0, 0, uv_l, uv_u,    //  0
                 1, 0, 0, uv_l, uv_d,    //  1
-                1, 0, 1, uv_l,uv_u,    //  2
+                1, 0, 1, uv_l, uv_u,    //  2
                 0, 0, 1, uv_l, uv_d,    //  3
                 0, 1, 0, uv_r, uv_u,    //  4
                 1, 1, 0, uv_r, uv_d,    //  5
@@ -399,17 +401,15 @@ public class InstancedCubes {
         glUniform3f(lightDirLoc, lightDir.x, lightDir.y, lightDir.z);
         glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
 
-        // --- Color palette ---
         int colorPaletteTexID = bind1DTexturePalette(inputData.colorPalette, "colorPaletteTex", GL_TEXTURE0,
                 shaderProgram);
         int sizePaletteTexID = bind1DTexturePalette(inputData.sizePalette, "sizePaletteTex", GL_TEXTURE1,
                 shaderProgram);
-
         int offsetPaletteTexID = bind1DTexturePalette(inputData.offsetPalette, "offsetPaletteTex", GL_TEXTURE2,
                 shaderProgram);
-
-        // --- Offset palette ---
         int rotationPaletteTexID = bind1DTexturePalette(inputData.rotationPalette, "rotationPaletteTex", GL_TEXTURE3,
+                shaderProgram);
+        int uvPaletteTexId = bind1DTexturePalette(inputData.uvCoordsPalette, "uvPaletteTex", GL_TEXTURE4,
                 shaderProgram);
 
         glActiveTexture(GL_TEXTURE0);
@@ -424,15 +424,25 @@ public class InstancedCubes {
         glActiveTexture(GL_TEXTURE3);
         glBindTexture(GL_TEXTURE_1D, rotationPaletteTexID);
 
-        InputStream is = getClass().getResourceAsStream("/texture.bmp");
-        assert is != null;
-        BufferedImage image = ImageIO.read(is);
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_1D, uvPaletteTexId);
+
+        BufferedImage image = inputData.textureAtlas;
         int width = image.getWidth();
         int height = image.getHeight();
-        BufferedImage rgba = new BufferedImage(width, height, BufferedImage.TYPE_4BYTE_ABGR);
-        rgba.getGraphics().drawImage(image, 0, 0, null);
-        byte[] pixels = ((DataBufferByte) rgba.getRaster().getDataBuffer()).getData();
-        int texId = GlUtils.createSimple2DTexture(16, 16, pixels);
+        BufferedImage abgr = new BufferedImage(width, height, BufferedImage.TYPE_4BYTE_ABGR);
+        var graphics = abgr.getGraphics();
+        graphics.drawImage(image, 0, 0, null);
+        graphics.dispose();
+        byte[] pixels = ((DataBufferByte) abgr.getRaster().getDataBuffer()).getData();
+        for (int i = 0; i < pixels.length; i += 4) {
+            byte a = pixels[i], b = pixels[i + 1], g = pixels[i + 2], r = pixels[i + 3];
+            pixels[i] = r;
+            pixels[i + 1] = g;
+            pixels[i + 2] = b;
+            pixels[i + 3] = a;
+        }
+        int texId = GlUtils.createSimple2DTexture(abgr.getWidth(), abgr.getHeight(), pixels);
 
         int texUniform = glGetUniformLocation(shaderProgram, "blockTexture");
         glUniform1i(texUniform, 4);
@@ -446,7 +456,6 @@ public class InstancedCubes {
 
         glDisable(GL_CULL_FACE);
     }
-
 
     /**
      * Utility to compile a shader and check for errors.
@@ -474,5 +483,35 @@ public class InstancedCubes {
                 System.err.println(glGetShaderInfoLog(shader));
             }
         }
+    }
+
+    public static ByteBuffer convertImageToRGBA(BufferedImage image) {
+        int width = image.getWidth();
+        int height = image.getHeight();
+
+        // Always convert into a predictable format
+        BufferedImage argbImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = argbImage.createGraphics();
+        g.drawImage(image, 0, 0, null);
+        g.dispose();
+
+        int[] pixels = ((DataBufferInt) argbImage.getRaster().getDataBuffer()).getData();
+
+        ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * 4);
+        // OpenGL expects RGBA
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int argb = pixels[y * width + x];
+
+                byte a = (byte) ((argb >> 24) & 0xFF);
+                byte r = (byte) ((argb >> 16) & 0xFF);
+                byte g2 = (byte) ((argb >> 8) & 0xFF);
+                byte b = (byte) (argb & 0xFF);
+
+                buffer.put(r).put(g2).put(b).put(a);
+            }
+        }
+        buffer.flip();
+        return buffer;
     }
 }

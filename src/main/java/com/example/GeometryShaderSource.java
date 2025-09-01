@@ -19,11 +19,11 @@ public class GeometryShaderSource {
                     vec3 edge1 = vWorldPos[0] - vWorldPos[1];
                     vec3 edge2 = vWorldPos[2] - vWorldPos[1];
                     vec3 faceNormal = normalize(cross(edge1, edge2));
-
+                    
                     for (int i = 0; i < 3; ++i) {
-                        FragPos = vWorldPos[i];
+                        FragPos = gl_in[i].gl_Position.xyz;
                         Normal = faceNormal;   // same for all verts (flat shading)
-                        fragUV = UV[i];
+                        fragUV =UV[i];
                         gColor = vColor[i];
                         gl_Position = gl_in[i].gl_Position;
         
