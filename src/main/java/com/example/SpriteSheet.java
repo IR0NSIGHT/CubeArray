@@ -1,0 +1,155 @@
+package com.example;
+
+import org.joml.Vector4f;
+import org.pepsoft.minecraft.Material;
+
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
+import static java.lang.Math.*;
+
+public class SpriteSheet {
+    private static final String[] EXTENSIONS = {"", "s", "_block", "_top", "_block_top", "_front", "_planks",
+            "_stage7", "_stage3", "_stage2", "_0"}; // Try adding these
+    private static final String[] PREFIXES = {"", "infested_", "smooth_"}; // Try removing these
+    private final BufferedImage textureAtlas;
+    private final HashMap<Material, Vector4f> uvCoords;
+
+    public SpriteSheet(File texturePackDir, Set<Material> materialSet) throws IOException {
+        var nameToFile = nameToFile(texturePackDir);
+        HashMap<Material, File> matToFile = matToFile(nameToFile, materialSet);
+        int textureSize = 16; // FIXME dont hardcode
+        uvCoords = new HashMap<>(materialSet.size());
+        textureAtlas = buildAtlas(matToFile, textureSize, uvCoords);
+    }
+
+    public HashMap<String, File> nameToFile(File texturePackDir) {
+        HashMap<String, File> result = new HashMap<>();
+        if (texturePackDir == null || !texturePackDir.isDirectory()) {
+            return result;
+        }
+
+        // Path inside the texture pack where block textures are stored
+        File blockDir = new File(texturePackDir, "assets/minecraft/textures/block");
+
+        if (!blockDir.exists() || !blockDir.isDirectory()) {
+            return result;
+        }
+
+        File[] files = blockDir.listFiles((dir, name) -> name.toLowerCase().endsWith(".png"));
+        if (files == null) {
+            return result;
+        }
+
+        for (File file : files) {
+            String name = file.getName();
+            if (name.endsWith(".png")) {
+                name = name.substring(0, name.length() - 4); // remove ".png"
+            }
+            result.put(name, file);
+        }
+
+        return result;
+    }
+
+    public HashMap<Material, File> matToFile(HashMap<String, File> nameToFile, Set<Material> materialSet) {
+        HashMap<Material, File> outMap = new HashMap<>();
+        for (Material mat : materialSet) {
+            String name = mat.simpleName;
+            File textureFile = tryFindMatch(name, nameToFile);
+
+            if (textureFile != null) {
+                outMap.put(mat, textureFile);
+            } else {
+                System.err.println("CAN NOT LOCATE TEXTURE FOR: " + mat.simpleName);
+            }
+        }
+        return outMap;
+    }
+
+    public BufferedImage buildAtlas(HashMap<Material, File> matToFile, int textureSize,
+                                    HashMap<Material, Vector4f> uvCoords) throws IOException {
+        int numTextures = matToFile.size();
+        int gridSize = (int) Math.ceil(Math.sqrt(numTextures));
+
+        int atlasSize = 1;
+        while (atlasSize < gridSize * textureSize) {
+            atlasSize *= 2; // round up to next power of two
+        }
+
+        BufferedImage atlas = new BufferedImage(atlasSize, atlasSize, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = atlas.createGraphics();
+
+        int i = 0;
+        for (Map.Entry<Material, File> entry : matToFile.entrySet()) {
+            int x = (i % gridSize) * textureSize;
+            int y = (i / gridSize) * textureSize;
+
+            BufferedImage tex = ImageIO.read(entry.getValue());
+            g.drawImage(tex, x, y, textureSize, textureSize, null);
+
+            float u1 = x / (float) atlasSize;
+            float v1 = y / (float) atlasSize;
+            float u2 = (x + textureSize) / (float) atlasSize;
+            float v2 = (y + textureSize) / (float) atlasSize;
+            uvCoords.put(entry.getKey(), new Vector4f(u1, v1, u2, v2));
+
+            i++;
+        }
+        g.dispose();
+
+        return atlas;
+    }
+
+    private File tryFindMatch(String simpleName, HashMap<String, File> nameToFile) {
+        if (simpleName.startsWith("stripped_") && simpleName.endsWith("_wood")) //idk why but worldpainter materials
+            // list "stripped_..._wood when the texture is called stripped_..._log
+            simpleName = simpleName.replace("_wood", "_log");
+
+        do {
+            for (String prefix : PREFIXES) {
+                String subName = simpleName.startsWith(prefix) ? simpleName.substring(prefix.length()) : simpleName;
+                for (String extension : EXTENSIONS) {
+                    File match = nameToFile.get(subName + extension);
+                    if (match != null) {
+                        return match;
+                    }
+                }
+            }
+            simpleName = simpleName.substring(0, max(simpleName.lastIndexOf('_'), 0));
+        } while (!simpleName.isEmpty());
+        return null;
+    }
+
+    //TESTING
+    public static void main(String[] args) throws IOException {
+        File texturePackDir = new File("C:\\Users\\Max1M\\Downloads\\Faithful 32x - 1.21.7");
+        var spriteSheet = new SpriteSheet(texturePackDir, Set.of());
+
+    }
+
+    public BufferedImage getTextureAtlas() {
+        return textureAtlas;
+    }
+
+    public HashMap<Material, Vector4f> getUvCoords() {
+        return uvCoords;
+    }
+
+    public Vector4f[] getUvCoords(HashMap<Material, Integer> materialToId) {
+       Vector4f[] uvCoordList = new Vector4f[materialToId.size()];
+        for (var entry : materialToId.entrySet()) {
+            var uvCoord = uvCoords.getOrDefault(entry.getKey(), new Vector4f(0,0,0,0));
+            assert uvCoord != null;
+            uvCoordList[entry.getValue()] = uvCoord;
+        }
+        return uvCoordList;
+    }
+}

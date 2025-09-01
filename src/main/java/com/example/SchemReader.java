@@ -1,6 +1,7 @@
 package com.example;
 
 import org.joml.Vector3f;
+import org.joml.Vector4f;
 import org.pepsoft.minecraft.Direction;
 import org.pepsoft.minecraft.Material;
 import org.pepsoft.worldpainter.DefaultCustomObjectProvider;
@@ -8,6 +9,7 @@ import org.pepsoft.worldpainter.objects.WPObject;
 
 import javax.vecmath.Point3i;
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -27,7 +29,7 @@ public class SchemReader {
         System.out.println(mat);
     }
     public static List<WPObject> loadDefaultObjects() throws IOException {
-        String europe = "D:\\Repos\\worldpainter_related\\Vanilla_plus_House_Pack-Dannypan\\Schematics";
+        String europe = "D:\\Repos\\worldpainter_related";
         String jerusalem = "C:/Users/Max1M/curseforge/minecraft/Instances/neoforge 1.12.1 camboi " +
                 "shaders/config/worldedit/schematics";
         File dir = new File(europe);
@@ -172,7 +174,6 @@ public class SchemReader {
             // ADD color to palette
             Color color = new Color(mat.colour);
             colorPalette[matIdx] = new Vector3f(color.getRed() / 255f, color.getGreen() / 255f, color.getBlue() / 255f);
-            System.out.println(mat);
 
             //ADD size and offset to palette
             if (mat.name.contains("slab") && mat.hasProperty(TYPE)) {
@@ -329,13 +330,15 @@ public class SchemReader {
             }
         }
 
+        mat_to_palette_idx.keySet().stream().map(m -> m.name).sorted().forEach(System.out::println);
+        SpriteSheet spriteSheet = new SpriteSheet(new File("C:\\Users\\Max1M\\Downloads\\Faithful 32x - 1.21.7"), mat_to_palette_idx.keySet());
 
         int[] blockTypeIndices = blockTypeIndicesList.stream().mapToInt(i -> i).toArray();
 
         return new CubeSetup(positions.toArray(new Vector3f[0]),
                 blockTypeIndices,
                 colorPalette,
-                sizePalette, offsetPalette, rotationPalette);
+                sizePalette, offsetPalette, rotationPalette, spriteSheet.getUvCoords(mat_to_palette_idx), spriteSheet.getTextureAtlas());
     }
 
     public static List<Path> findAllFiles(Path dir) throws IOException {
@@ -347,24 +350,28 @@ public class SchemReader {
     }
 
     public static class CubeSetup {
-        Vector3f[] positions;
-        int[] colorIndices;
-        //block colors by type
-        Vector3f[] colorPalette;
-        // block dimensions by type
-        Vector3f[] sizePalette;
-        //how to shift blocks from their origin at 0.5 0.5 0.5 (width height depth)
-        Vector3f[] offsetPalette;
-        Vector3f[] rotationPalette;
+        final Vector3f[] positions;
+        final int[] colorIndices;
+         //block colors by type
+        final Vector3f[] colorPalette;
+         // block dimensions by type
+        final Vector3f[] sizePalette;
+         //how to shift blocks from their origin at 0.5 0.5 0.5 (width height depth)
+        final Vector3f[] offsetPalette;
+        final Vector3f[] rotationPalette;
+        final Vector4f[] uvCoordsPalette; //uv1 uv2 for each block type
+        final BufferedImage textureAtlas;
 
         public CubeSetup(Vector3f[] positions, int[] colorIndices, Vector3f[] colorPalette, Vector3f[] sizePalette,
-                         Vector3f[] offsetPalette, Vector3f[] rotationPalette) {
+                         Vector3f[] offsetPalette, Vector3f[] rotationPalette, Vector4f[] uvCoordsPalette, BufferedImage textureAtlas) {
             this.positions = positions;
             this.colorIndices = colorIndices;
             this.colorPalette = colorPalette;
             this.sizePalette = sizePalette;
             this.offsetPalette = offsetPalette;
             this.rotationPalette = rotationPalette;
+            this.uvCoordsPalette = uvCoordsPalette;
+            this.textureAtlas = textureAtlas;
         }
     }
 }
