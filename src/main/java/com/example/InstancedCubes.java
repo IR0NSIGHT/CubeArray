@@ -288,43 +288,38 @@ public class InstancedCubes {
         final float uv_l = 0.5f;
         final float uv_r = 1.5f;
         float[] cubeVertices = {
-                //TOP QUAD + BOTTOM QUAD
-                0, 0, 0, uv_l, uv_d,
-                1, 0, 0, uv_r, uv_d,
-                1, 0, 1, uv_r, uv_u,
-                0, 0, 1, uv_l, uv_u,
-
-
-                0, 1, 0, uv_l, uv_d,
-                1, 1, 0, uv_r, uv_d,
-                1, 1, 1, uv_r, uv_u,
-                0, 1, 1, uv_l, uv_u,
+                //top and bottom have uv shifted one to the right, bc they use a special texture _top
+                0, 1, 0,  uv_d+1,uv_l,
+                1, 1, 0,  uv_d+1,uv_r,
+                1, 1, 1,  uv_u+1,uv_r,
+                0, 1, 1,  uv_u+1,uv_l, // BOTTOM QUAD
+                0, 0, 0,  uv_d+1,uv_l,
+                1, 0, 0,  uv_d+1,uv_r,
+                1, 0, 1,  uv_u+1,uv_r,
+                0, 0, 1,  uv_u+1,uv_l, //TOP QUAD
 
                 // FRONT + BACK QUAD
-                0, 0, 0, uv_l, uv_u,    //  0
-                1, 0, 0, uv_l, uv_d,    //  1
-                1, 0, 1, uv_l, uv_u,    //  2
-                0, 0, 1, uv_l, uv_d,    //  3
-                0, 1, 0, uv_r, uv_u,    //  4
-                1, 1, 0, uv_r, uv_d,    //  5
-                1, 1, 1, uv_r, uv_u,    //  6
-                0, 1, 1, uv_r, uv_d,    //  7
+                0, 1, 0,  uv_u,uv_l,    //  0
+                1, 1, 0,  uv_d,uv_l,    //  1
+                1, 1, 1,  uv_u,uv_l,    //  2
+                0, 1, 1,  uv_d,uv_l,    //  3
+                0, 0, 0,  uv_u,uv_r,    //  4
+                1, 0, 0,  uv_d,uv_r,    //  5
+                1, 0, 1,  uv_u,uv_r,    //  6
+                0, 0, 1,  uv_d,uv_r,    //  7
 
                 // LEFT 0 4 7 3  RIGHT 2 6 5 1
-                0, 0, 0, uv_l, uv_d,    //  0
-                1, 0, 0, uv_l, uv_u,    //  1
-                1, 0, 1, uv_l, uv_d,    //  2
-                0, 0, 1, uv_l, uv_u,    //  3
-                0, 1, 0, uv_r, uv_d,    //  4
-                1, 1, 0, uv_r, uv_u,    //  5
-                1, 1, 1, uv_r, uv_d,    //  6
-                0, 1, 1, uv_r, uv_u,    //  7
+                0, 1, 0,  uv_d,uv_l,    //  0
+                1, 1, 0,  uv_u,uv_l,    //  1
+                1, 1, 1,  uv_d,uv_l,    //  2
+                0, 1, 1,  uv_u,uv_l,    //  3
+                0, 0, 0,  uv_d,uv_r,    //  4
+                1, 0, 0,  uv_u,uv_r,    //  5
+                1, 0, 1,  uv_d,uv_r,    //  6
+                0, 0, 1,  uv_u,uv_r,    //  7
         };
         for (int i = 0; i < cubeVertices.length; i++) {
             cubeVertices[i] -= 0.5f;
-        }
-        for (float f : cubeVertices) {
-            assert f >= -1 && f <= 1 : "out of range " + f;
         }
 
         int[] cubeIndices = {
@@ -455,7 +450,11 @@ public class InstancedCubes {
         glUniform1i(paletteSizeLoc, inputData.offsetPalette.length);
 
         glEnable(GL_CULL_FACE);
-        glCullFace(GL_FRONT);
+        glCullFace(GL_BACK);
+
+        // Enable blending
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     }
 
     /**

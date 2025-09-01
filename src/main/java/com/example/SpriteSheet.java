@@ -27,7 +27,7 @@ public class SpriteSheet {
         HashMap<Material, File> matToFile = matToFile(nameToFile, materialSet);
         int textureSize = 16; // FIXME dont hardcode
         uvCoords = new HashMap<>(materialSet.size());
-        textureAtlas = buildAtlas(matToFile, textureSize, uvCoords);
+        textureAtlas = buildAtlas(matToFile, textureSize, uvCoords, nameToFile);
     }
 
     public HashMap<String, File> nameToFile(File texturePackDir) {
@@ -75,7 +75,7 @@ public class SpriteSheet {
     }
 
     public BufferedImage buildAtlas(HashMap<Material, File> matToFile, int textureSize,
-                                    HashMap<Material, Vector4f> uvCoords) throws IOException {
+                                    HashMap<Material, Vector4f> uvCoords, HashMap<String, File> nameToFile) throws IOException {
         int numTextures = matToFile.size();
         int gridSize = (int) Math.ceil(Math.sqrt(numTextures));
 
@@ -83,7 +83,7 @@ public class SpriteSheet {
         while (atlasSize < gridSize * textureSize) {
             atlasSize *= 2; // round up to next power of two
         }
-
+        atlasSize*=2; // 2 textures per type (one side, one top)
         BufferedImage atlas = new BufferedImage(atlasSize, atlasSize, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = atlas.createGraphics();
 
@@ -92,12 +92,24 @@ public class SpriteSheet {
             int x = (i % gridSize) * textureSize;
             int y = (i / gridSize) * textureSize;
 
-            BufferedImage tex = ImageIO.read(entry.getValue());
-            if (entry.getKey().leafBlock) {
-                tex = colorizeLeaf(tex,entry.getKey().colour);
+            {   //draw side
+                BufferedImage tex = ImageIO.read(entry.getValue());
+                if (entry.getKey().leafBlock) {
+                    tex = colorizeLeaf(tex, entry.getKey().colour);
+                }
+                g.drawImage(tex, x, y, textureSize, textureSize, null);
             }
 
-            g.drawImage(tex, x, y, textureSize, textureSize, null);
+            File topMatFile = nameToFile.getOrDefault(entry.getValue().getName().replace(".png","") + "_top", entry.getValue());
+            {   //draw top
+                BufferedImage tex = ImageIO.read(topMatFile);
+                if (entry.getKey().leafBlock) {
+                    tex = colorizeLeaf(tex, entry.getKey().colour);
+                }
+                g.drawImage(tex, x + textureSize, y, textureSize, textureSize, null);
+            }
+
+
 
             float u1 = x / (float) atlasSize;
             float v1 = y / (float) atlasSize;
@@ -105,7 +117,8 @@ public class SpriteSheet {
             float v2 = (y + textureSize) / (float) atlasSize;
             uvCoords.put(entry.getKey(), new Vector4f(u1, v1, u2, v2));
 
-            i++;
+
+            i+=2;
         }
         g.dispose();
 

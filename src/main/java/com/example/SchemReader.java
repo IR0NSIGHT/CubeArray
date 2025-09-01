@@ -29,10 +29,10 @@ public class SchemReader {
         System.out.println(mat);
     }
     public static List<WPObject> loadDefaultObjects() throws IOException {
-        String europe = "D:\\Repos\\worldpainter_related";
+        String europe = "D:\\Repos\\worldpainter_related\\african-trees-and-layers-e960";
         String jerusalem = "C:/Users/Max1M/curseforge/minecraft/Instances/neoforge 1.12.1 camboi " +
                 "shaders/config/worldedit/schematics";
-        File dir = new File(jerusalem);
+        File dir = new File(europe);
         List<Path> pathList = findAllFiles(dir.toPath());
         ArrayList<WPObject> schematics = new ArrayList<>();
         for (Path path : pathList) {
@@ -224,9 +224,9 @@ public class SchemReader {
                 colorPalette[matIdx] = new Vector3f(1, 1, 1);
             }
             if (mat.name.endsWith("_door")) {
-                Vector3f size = new Vector3f(1f, 2f, .2f);
+                Vector3f size = new Vector3f(1f, 1f, .2f);
                 sizePalette[matIdx] = size;
-                offsetPalette[matIdx] = new Vector3f(0, -.5f, (1 - size.z) / 2f);
+                offsetPalette[matIdx] = new Vector3f(0, 0, (1 - size.z) / 2f);
             }
 
             if (mat.name.contains("ladder")) {
