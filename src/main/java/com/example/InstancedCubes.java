@@ -454,7 +454,8 @@ public class InstancedCubes {
         int paletteSizeLoc = glGetUniformLocation(shaderProgram, "paletteSize");
         glUniform1i(paletteSizeLoc, inputData.offsetPalette.length);
 
-        glDisable(GL_CULL_FACE);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_FRONT);
     }
 
     /**
@@ -485,33 +486,4 @@ public class InstancedCubes {
         }
     }
 
-    public static ByteBuffer convertImageToRGBA(BufferedImage image) {
-        int width = image.getWidth();
-        int height = image.getHeight();
-
-        // Always convert into a predictable format
-        BufferedImage argbImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g = argbImage.createGraphics();
-        g.drawImage(image, 0, 0, null);
-        g.dispose();
-
-        int[] pixels = ((DataBufferInt) argbImage.getRaster().getDataBuffer()).getData();
-
-        ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * 4);
-        // OpenGL expects RGBA
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                int argb = pixels[y * width + x];
-
-                byte a = (byte) ((argb >> 24) & 0xFF);
-                byte r = (byte) ((argb >> 16) & 0xFF);
-                byte g2 = (byte) ((argb >> 8) & 0xFF);
-                byte b = (byte) (argb & 0xFF);
-
-                buffer.put(r).put(g2).put(b).put(a);
-            }
-        }
-        buffer.flip();
-        return buffer;
-    }
 }

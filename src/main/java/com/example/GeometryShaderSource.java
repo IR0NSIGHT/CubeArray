@@ -9,12 +9,13 @@ public class GeometryShaderSource {
                 in vec3 vColor[3];
                 in vec3 vWorldPos[3];
                 in vec2 UV[3];
+                in vec4 viewPos[3];
                 
                 out vec3 gColor;
                 flat out vec3 Normal;
                 out vec3 FragPos;
                 out vec2 fragUV;
-                
+                out vec4 fragViewPos;
                 void main() {
                     vec3 edge1 = vWorldPos[0] - vWorldPos[1];
                     vec3 edge2 = vWorldPos[2] - vWorldPos[1];
@@ -26,7 +27,7 @@ public class GeometryShaderSource {
                         fragUV =UV[i];
                         gColor = vColor[i];
                         gl_Position = gl_in[i].gl_Position;
-        
+                        fragViewPos = viewPos[i];
                         EmitVertex();
                     }
                     EndPrimitive();

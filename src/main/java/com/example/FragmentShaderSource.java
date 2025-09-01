@@ -8,6 +8,7 @@ public class FragmentShaderSource {
                 in vec3 gColor;
                 in vec3 FragPos;
                 in vec2 fragUV;
+                in vec4 fragViewPos;
                 flat in vec3 Normal;
 
                 uniform vec3 lightDir;
@@ -23,7 +24,10 @@ public class FragmentShaderSource {
                     vec3 ambient = vec3(1,1,1);
                     //DEBUG: show normals: vec3 result = (Normal + vec3(1,1,1)*vec3(0.5,0.5,0.5));
                     vec3 result =  (vec3(0.5) * ambient + vec3(0.5) * diffuse);
-                    FragColor/*RGBA*/ = texture(blockTexture, fragUV) * vec4(result.rgb,1); // * vec4(result, 1.0);
+                    float colorStrength = clamp(-fragViewPos.z / 200.0,0,1); //closer: use texture, further: use color
+                    vec4 baseColor = texture(blockTexture, fragUV) * (1-colorStrength) + colorStrength * vec4(gColor,1);
+                    
+                    FragColor/*RGBA*/ = baseColor * vec4(result.rgb,1);
                 }
                 """;
 }

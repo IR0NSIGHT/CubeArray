@@ -29,7 +29,7 @@ public class VertexShaderSource {
             out vec3 vColor;
             out vec3 vWorldPos;
             out vec2 UV;
-            
+            out vec4 viewPos;
             // Rotation around the X axis
             mat3 rotationX(float angle) {
                 float sine = sin(angle);
@@ -95,7 +95,7 @@ public class VertexShaderSource {
              vec2 uvStart = uvCoords.rg;
              vec2 uvEnd = uvCoords.ba;
              UV = (vertexUV * (uvEnd - uvStart)) + uvStart;
-             
+             viewPos = view * vec4(worldPos, 1.0);
              gl_Position = projection * view * vec4(worldPos, 1.0);
             }
             """;
