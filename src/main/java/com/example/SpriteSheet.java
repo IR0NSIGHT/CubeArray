@@ -94,7 +94,7 @@ public class SpriteSheet {
 
             {   //draw side
                 BufferedImage tex = ImageIO.read(entry.getValue());
-                if (entry.getKey().leafBlock) {
+                if (entry.getKey().leafBlock || entry.getKey().vegetation || entry.getKey().name.contains("grass")) {
                     tex = colorizeLeaf(tex, entry.getKey().colour);
                 }
                 g.drawImage(tex, x, y, textureSize, textureSize, null);
@@ -103,7 +103,7 @@ public class SpriteSheet {
             File topMatFile = nameToFile.getOrDefault(entry.getValue().getName().replace(".png","") + "_top", entry.getValue());
             {   //draw top
                 BufferedImage tex = ImageIO.read(topMatFile);
-                if (entry.getKey().leafBlock) {
+                if (entry.getKey().leafBlock || entry.getKey().vegetation || entry.getKey().name.contains("grass")) {
                     tex = colorizeLeaf(tex, entry.getKey().colour);
                 }
                 g.drawImage(tex, x + textureSize, y, textureSize, textureSize, null);

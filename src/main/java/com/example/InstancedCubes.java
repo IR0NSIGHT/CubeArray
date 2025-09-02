@@ -27,7 +27,7 @@ public class InstancedCubes {
     int gridX = 1000;
     int gridY = 10;
     int gridZ = 1000;
-    float radius = java.lang.Math.max(gridX, gridY) * 1.1f;
+    float radius;
     float yaw = (float) java.lang.Math.toRadians(15);
     float pitch = (float) java.lang.Math.toRadians(15);
     float maxRadius = java.lang.Math.max(gridX, gridY);
@@ -42,18 +42,19 @@ public class InstancedCubes {
     private double lastMouseX, lastMouseY;
     private boolean firstMouse = true;
     private SchemReader.CubeSetup inputData;
-    private Vector3f cameraTarget = new Vector3f(0, 0, 0); // the point the camera looks at
+    private Vector3f cameraTarget; // the point the camera looks at
     private SchemReader.CubeSetup setup;
     private float autoRotate = 5f;
 
     public InstancedCubes(SchemReader.CubeSetup setup) {
         this.setup = setup;
+        Vector3f center = new Vector3f(setup.min).add(setup.max).mul(0.5f);
+        cameraTarget = center;
+        radius = new Vector3f(setup.max).sub(setup.min).length() / 2f;
     }
 
     public static void main(String[] args) throws Exception {
-
         var setup = SchemReader.prepareData(SchemReader.loadDefaultObjects());
-
         new InstancedCubes(setup).run();
     }
 
@@ -97,8 +98,6 @@ public class InstancedCubes {
 
         FloatBuffer projBuffer = BufferUtils.createFloatBuffer(16);
         FloatBuffer viewBuffer = BufferUtils.createFloatBuffer(16);
-
-        radius = 5f;
         autoRotate = 0f;
 
         Matrix4f projection = new Matrix4f().perspective((float) java.lang.Math.toRadians(45.0f),

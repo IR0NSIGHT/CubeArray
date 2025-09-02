@@ -18,6 +18,7 @@ import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.zip.ZipException;
 
 import static org.pepsoft.minecraft.Material.*;
 
@@ -29,20 +30,28 @@ public class SchemReader {
         System.out.println(mat);
     }
     public static List<WPObject> loadDefaultObjects() throws IOException {
-        String europe = "D:\\Repos\\worldpainter_related\\4_europe_copy";
+        String self = "D:\\Repos\\cubeArray";
+        String europe = "D:\\Repos\\worldpainter_related\\Market_Stalls_v0_1";
         String jerusalem = "C:/Users/Max1M/curseforge/minecraft/Instances/neoforge 1.12.1 camboi " +
                 "shaders/config/worldedit/schematics";
-        File dir = new File(europe);
+        String dannyHouses = "D:\\Repos\\worldpainter_related\\Vanilla_plus_House_Pack-Dannypan";
+        File dir = new File(self);
         List<Path> pathList = findAllFiles(dir.toPath());
         ArrayList<WPObject> schematics = new ArrayList<>();
         for (Path path : pathList) {
             File file = path.toFile();
             if (file.isFile()) {
                 assert file.exists();
-                if (!file.getPath().toLowerCase().endsWith(".schem"))
-                    continue;
-                WPObject schematic = new DefaultCustomObjectProvider().loadObject(file);
-                schematics.add(schematic);
+                try {
+                    WPObject schematic = new DefaultCustomObjectProvider().loadObject(file);
+                    schematics.add(schematic);
+                } catch (IllegalArgumentException ex) {
+                    System.out.println("ignore non-schem:" + file.getName());
+                } catch (ZipException ex) {
+                    System.err.println("cant load file:" + file.getName());
+                    System.err.println(ex);
+                }
+
             }
         }
         return schematics;
@@ -186,6 +195,11 @@ public class SchemReader {
             } else {
                 sizePalette[matIdx] = new Vector3f(1, 1, 1);
             }
+
+            if (mat.name.contains("torch")) {
+                sizePalette[matIdx] = new Vector3f(0.1f, 0.5f, 0.1f);
+                offsetPalette[matIdx] = new Vector3f(0, 0.25f / 2f, 0);
+            }
             if (mat.name.contains("lantern")) {
                 sizePalette[matIdx] = new Vector3f(0.4f, 0.7f, 0.4f);
                 offsetPalette[matIdx] = new Vector3f(0, 0.3f / 2f, 0);
@@ -228,7 +242,7 @@ public class SchemReader {
             }
 
             if (mat.name.contains("ladder")) {
-                Vector3f size = new Vector3f(1f, 1f, .1f);
+                Vector3f size = new Vector3f(1f, 1f, .01f);
                 sizePalette[matIdx] = size;
                 offsetPalette[matIdx] = new Vector3f(0, 0, (1 - size.z) / 2f);
             }
@@ -243,9 +257,9 @@ public class SchemReader {
                 }
             }
 
-
-            if (mat.vegetation) {
-                sizePalette[matIdx] = new Vector3f(0.6f, 1f, 0.6f);
+            if (mat.name.contains("_grass") || mat.vegetation && !mat.leafBlock)  {
+                sizePalette[matIdx] = new Vector3f(1, 1, 0.0f);
+                rotationPalette[matIdx] = new Vector3f( 0,(float) Math.toRadians(45),0);
             }
 
             //implicit: no rotation for north
@@ -333,10 +347,17 @@ public class SchemReader {
 
         int[] blockTypeIndices = blockTypeIndicesList.stream().mapToInt(i -> i).toArray();
 
+        Vector3f min = new Vector3f(Float.MAX_VALUE,Float.MAX_VALUE,Float.MAX_VALUE);
+        Vector3f max = new Vector3f(Float.MIN_VALUE,Float.MIN_VALUE,Float.MIN_VALUE);
+        positions.stream().forEach(p -> {
+            min.x = Math.min(p.x,min.x); min.y= Math.min(p.y,min.y); min.z = Math.min(p.z,min.z);
+            max.x = Math.max(p.x,max.x); max.y= Math.max(p.y,max.y); max.z = Math.max(p.z,max.z);
+        });
+
         return new CubeSetup(positions.toArray(new Vector3f[0]),
                 blockTypeIndices,
                 colorPalette,
-                sizePalette, offsetPalette, rotationPalette, spriteSheet.getUvCoords(mat_to_palette_idx), spriteSheet.getTextureAtlas());
+                sizePalette, offsetPalette, rotationPalette, spriteSheet.getUvCoords(mat_to_palette_idx), spriteSheet.getTextureAtlas(), min, max);
     }
 
     public static List<Path> findAllFiles(Path dir) throws IOException {
@@ -359,9 +380,11 @@ public class SchemReader {
         final Vector3f[] rotationPalette;
         final Vector4f[] uvCoordsPalette; //uv1 uv2 for each block type
         final BufferedImage textureAtlas;
+        final Vector3f min;
+        final Vector3f max;
 
         public CubeSetup(Vector3f[] positions, int[] colorIndices, Vector3f[] colorPalette, Vector3f[] sizePalette,
-                         Vector3f[] offsetPalette, Vector3f[] rotationPalette, Vector4f[] uvCoordsPalette, BufferedImage textureAtlas) {
+                         Vector3f[] offsetPalette, Vector3f[] rotationPalette, Vector4f[] uvCoordsPalette, BufferedImage textureAtlas, Vector3f min, Vector3f max) {
             this.positions = positions;
             this.colorIndices = colorIndices;
             this.colorPalette = colorPalette;
@@ -370,6 +393,9 @@ public class SchemReader {
             this.rotationPalette = rotationPalette;
             this.uvCoordsPalette = uvCoordsPalette;
             this.textureAtlas = textureAtlas;
+            this.min = min;
+
+            this.max = max;
         }
     }
 }
