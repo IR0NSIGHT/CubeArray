@@ -76,7 +76,7 @@ public class InstancedCubes {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        glfwWindowHint(GLFW.GLFW_SAMPLES, 4); // 4x MSAA
+        glfwWindowHint(GLFW.GLFW_SAMPLES, 8); // 4x MSAA
 
         window = glfwCreateWindow(width, height, "Instanced Cubes", NULL, NULL);
         if (window == NULL) throw new RuntimeException("Failed to create GLFW window");
@@ -393,7 +393,7 @@ public class InstancedCubes {
         // --- Lights ---
         int lightDirLoc = glGetUniformLocation(shaderProgram, "lightDir");
         int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
-        Vector3f lightDir = new Vector3f(-1, -2, -3).normalize();
+        Vector3f lightDir = new Vector3f(-1, 5, -3).normalize();
         glUniform3f(lightDirLoc, lightDir.x, lightDir.y, lightDir.z);
         glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
 
@@ -450,8 +450,8 @@ public class InstancedCubes {
         int paletteSizeLoc = glGetUniformLocation(shaderProgram, "paletteSize");
         glUniform1i(paletteSizeLoc, inputData.offsetPalette.length);
 
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_BACK);
+  //      glEnable(GL_CULL_FACE);
+  //      glCullFace(GL_BACK);
 
         // Enable blending
         glEnable(GL_DEPTH_TEST);
