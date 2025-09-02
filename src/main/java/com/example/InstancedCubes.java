@@ -3,31 +3,24 @@ package com.example;
 // LWJGL Instanced Cube Rendering Example
 // Requires LWJGL 3 and OpenGL 3.3+
 
-import org.lwjgl.*;
-import org.lwjgl.glfw.*;
-import org.lwjgl.opengl.*;
-
-import java.awt.*;
-import java.awt.image.DataBufferByte;
-import java.awt.image.DataBufferInt;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.lang.Math;
-import java.nio.*;
-import java.util.Arrays;
-
-import org.joml.*;
-
-import javax.imageio.ImageIO;
-
-import static com.example.GlUtils.bind1DTexturePalette;
-import static org.lwjgl.glfw.Callbacks.*;
-import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL33.*;
-import static org.lwjgl.system.MemoryUtil.*;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
+import org.lwjgl.BufferUtils;
+import org.lwjgl.glfw.GLFW;
+import org.lwjgl.glfw.GLFWErrorCallback;
+import org.lwjgl.opengl.GL;
 
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferByte;
+import java.io.IOException;
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
+
+import static com.example.GlUtils.bind1DTexturePalette;
+import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
+import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.opengl.GL33.*;
+import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class InstancedCubes {
 
@@ -96,6 +89,7 @@ public class InstancedCubes {
 
         setupShaders();
         setupBuffers();
+
     }
 
     private void loop() {
@@ -104,6 +98,9 @@ public class InstancedCubes {
 
         FloatBuffer projBuffer = BufferUtils.createFloatBuffer(16);
         FloatBuffer viewBuffer = BufferUtils.createFloatBuffer(16);
+
+        radius = 5f;
+        autoRotate = 0f;
 
         Matrix4f projection = new Matrix4f().perspective((float) java.lang.Math.toRadians(45.0f),
                 (float) width / height, .1f, 10000.0f);
@@ -150,6 +147,8 @@ public class InstancedCubes {
                     if (key == GLFW_KEY_SPACE) {
                         autoRotate = autoRotate == 0 ? 5 : 0;
                     }
+                    if (key == GLFW_KEY_V)
+                        radius = radius > 1 ? 0.01f : 100;
                 }
                 keys[key] = true;
             } else if (action == GLFW_RELEASE) {
@@ -166,6 +165,9 @@ public class InstancedCubes {
             double currentTime = glfwGetTime();
             float deltaTime = (float) (currentTime - lastTime);
             lastTime = currentTime;
+
+            renderText("FPS: " + 1f/deltaTime, 10, 30);
+
 
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -455,6 +457,13 @@ public class InstancedCubes {
         // Enable blending
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+
+    }
+
+    public void renderText(String text, float x, float y) {
+        glfwSetWindowTitle(window, text);
+
     }
 
     /**

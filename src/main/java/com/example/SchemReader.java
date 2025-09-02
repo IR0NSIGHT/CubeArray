@@ -29,7 +29,7 @@ public class SchemReader {
         System.out.println(mat);
     }
     public static List<WPObject> loadDefaultObjects() throws IOException {
-        String europe = "D:\\Repos\\worldpainter_related\\african-trees-and-layers-e960";
+        String europe = "D:\\Repos\\worldpainter_related\\4_europe_copy";
         String jerusalem = "C:/Users/Max1M/curseforge/minecraft/Instances/neoforge 1.12.1 camboi " +
                 "shaders/config/worldedit/schematics";
         File dir = new File(europe);
@@ -48,10 +48,6 @@ public class SchemReader {
         return schematics;
     }
     public static CubeSetup prepareData(List<WPObject> schematics) throws Exception {
-
-
-
-
         List<Vector3f> positions = new ArrayList<>();
         List<Integer> blockTypeIndicesList = new ArrayList<>();
 

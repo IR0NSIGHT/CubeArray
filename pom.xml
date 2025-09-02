@@ -31,18 +31,21 @@
         <dependency>
             <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl</artifactId>
+           <version>${lwjgl.version}</version>
         </dependency>
 
         <!-- GLFW for window/context/input -->
         <dependency>
             <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl-glfw</artifactId>
+           <version>${lwjgl.version}</version>
         </dependency>
 
         <!-- OpenGL bindings -->
         <dependency>
             <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl-opengl</artifactId>
+           <version>${lwjgl.version}</version>
         </dependency>
 
         <!-- Native bindings for your OS (choose one or include all) -->
@@ -50,16 +53,19 @@
             <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl</artifactId>
             <classifier>natives-windows</classifier>
+           <version>${lwjgl.version}</version>
         </dependency>
         <dependency>
             <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl-glfw</artifactId>
             <classifier>natives-windows</classifier>
+           <version>${lwjgl.version}</version>
         </dependency>
         <dependency>
             <groupId>org.lwjgl</groupId>
             <artifactId>lwjgl-opengl</artifactId>
             <classifier>natives-windows</classifier>
+           <version>${lwjgl.version}</version>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/org.pepsoft.worldpainter/WPCore -->
