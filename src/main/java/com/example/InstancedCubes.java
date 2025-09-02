@@ -93,7 +93,6 @@ public class InstancedCubes {
     }
 
     private void loop() {
-        glEnable(GL_DEPTH_TEST);
         glClearColor(0.53f, 0.81f, 0.92f, 1f);
 
         FloatBuffer projBuffer = BufferUtils.createFloatBuffer(16);
@@ -166,7 +165,7 @@ public class InstancedCubes {
             float deltaTime = (float) (currentTime - lastTime);
             lastTime = currentTime;
 
-            renderText("FPS: " + 1f/deltaTime, 10, 30);
+            renderText("FPS: " + Math.round(1f/deltaTime), 10, 30);
 
 
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -455,6 +454,7 @@ public class InstancedCubes {
         glCullFace(GL_BACK);
 
         // Enable blending
+        glEnable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 

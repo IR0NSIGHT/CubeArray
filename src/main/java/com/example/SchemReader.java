@@ -71,6 +71,7 @@ public class SchemReader {
                     for (int z = object.getDimensions().z - 1; z >= 0; z--) {
                         Material mat = object.getMaterial(x, y, z);
                         if (mat != null && mat != Material.AIR) {
+                            /*
                             //test neighbours
                             boolean hasNonSolidNeighbour = false;
                             for (int xN = -1; xN <= 1 && !hasNonSolidNeighbour; xN++)
@@ -97,6 +98,7 @@ public class SchemReader {
                                     }
                             if (!hasNonSolidNeighbour)
                                 continue;
+                            */
                             positions.add(new Vector3f(x + offset.x + gridOffset.x, z + offset.z,
                                     y + offset.y + gridOffset.y));
                             int materialPaletteIdx = 0;
