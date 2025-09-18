@@ -30,12 +30,13 @@ public class SchemReader {
         System.out.println(mat);
     }
     public static List<WPObject> loadDefaultObjects() throws IOException {
-        String self = "D:\\Repos\\cubeArray";
+        String self = "D:\\Repos\\cubeArray\\testSchems";
         String europe = "D:\\Repos\\worldpainter_related\\Market_Stalls_v0_1";
         String jerusalem = "C:/Users/Max1M/curseforge/minecraft/Instances/neoforge 1.12.1 camboi " +
                 "shaders/config/worldedit/schematics";
         String dannyHouses = "D:\\Repos\\worldpainter_related\\Vanilla_plus_House_Pack-Dannypan";
-        File dir = new File(self);
+        String server = "D:\\Repos\\mc_server_paper_1_19\\plugins\\WorldEdit\\schematics";
+        File dir = new File(server);
         List<Path> pathList = findAllFiles(dir.toPath());
         ArrayList<WPObject> schematics = new ArrayList<>();
         for (Path path : pathList) {
@@ -51,7 +52,6 @@ public class SchemReader {
                     System.err.println("cant load file:" + file.getName());
                     System.err.println(ex);
                 }
-
             }
         }
         return schematics;
@@ -80,7 +80,7 @@ public class SchemReader {
                     for (int z = object.getDimensions().z - 1; z >= 0; z--) {
                         Material mat = object.getMaterial(x, y, z);
                         if (mat != null && mat != Material.AIR) {
-                            /*
+
                             //test neighbours
                             boolean hasNonSolidNeighbour = false;
                             for (int xN = -1; xN <= 1 && !hasNonSolidNeighbour; xN++)
@@ -107,7 +107,7 @@ public class SchemReader {
                                     }
                             if (!hasNonSolidNeighbour)
                                 continue;
-                            */
+
                             positions.add(new Vector3f(x + offset.x + gridOffset.x, z + offset.z,
                                     y + offset.y + gridOffset.y));
                             int materialPaletteIdx = 0;
@@ -184,10 +184,10 @@ public class SchemReader {
 
             //ADD size and offset to palette
             if (mat.name.contains("slab") && mat.hasProperty(TYPE)) {
-                if (mat.getProperty(TYPE).equals("top")) {
+                if (Objects.equals(mat.getProperty(TYPE),"top")) {
                     offsetPalette[matIdx] = new Vector3f(0, 0.5f / 2, 0);
                     sizePalette[matIdx] = new Vector3f(1, 0.5f, 1);
-                } else if (mat.getProperty(TYPE).equals("bottom")) {
+                } else if (Objects.equals(mat.getProperty(TYPE),"bottom")) {
                     offsetPalette[matIdx] = new Vector3f(0, -0.5f / 2f, 0);
                     sizePalette[matIdx] = new Vector3f(1, 0.5f, 1);
                 }

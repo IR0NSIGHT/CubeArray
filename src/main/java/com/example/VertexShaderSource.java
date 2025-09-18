@@ -92,8 +92,8 @@ public class VertexShaderSource {
              float r = rand(gl_InstanceID) * 0.025;
              vColor    = blockColor + vec3(r);
              vWorldPos = worldPos;
-             vec2 uvStart = uvCoords.rg;
-             vec2 uvEnd = uvCoords.ba;
+             vec2 uvStart = uvCoords.rg + 0.001;
+             vec2 uvEnd = uvCoords.ba - 0.001;
              UV = (vertexUV * (uvEnd - uvStart)) + uvStart;
              viewPos = view * vec4(worldPos, 1.0);
              gl_Position = projection * view * vec4(worldPos, 1.0);
