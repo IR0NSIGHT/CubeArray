@@ -1,5 +1,8 @@
 package com.example;
 
+import com.example.swing.AppContext;
+import com.example.swing.FileRenderApp;
+
 import java.io.IOException;
 
 import static com.example.ResourceUtils.copyResourcesToFile;
@@ -12,9 +15,12 @@ public class CubeArrayMain {
         //prepare files on plate
         copyResourcesToFile(ResourceUtils.SCHEMATICS_ROOT,ResourceUtils.TEXTURE_PACK_ROOT);
 
+        //start swing GUI
+        FileRenderApp.startApp(AppContext.read());
+
         //start rendering app
-        final var schematicsForlder =  getInstallPath().resolve(ResourceUtils.SCHEMATICS_ROOT);
-        var setup = SchemReader.prepareData(SchemReader.loadDefaultObjects(schematicsForlder));
-        new InstancedCubes(setup).run();
+    //    final var schematicsForlder =  getInstallPath().resolve(ResourceUtils.SCHEMATICS_ROOT);
+    //    var setup = SchemReader.prepareData(SchemReader.loadDefaultObjects(schematicsForlder));
+    //    new InstancedCubes(setup).run();
     }
 }
