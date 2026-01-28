@@ -29,14 +29,14 @@ public class SchemReader {
         Material mat = Material.COBBLESTONE_STAIRS;
         System.out.println(mat);
     }
-    public static List<WPObject> loadDefaultObjects() throws IOException {
+    public static List<WPObject> loadDefaultObjects(Path schemFolder) throws IOException {
         String self = "D:\\Repos\\cubeArray\\testSchems";
         String europe = "D:\\Repos\\worldpainter_related\\Market_Stalls_v0_1";
         String jerusalem = "C:/Users/Max1M/curseforge/minecraft/Instances/neoforge 1.12.1 camboi " +
                 "shaders/config/worldedit/schematics";
         String dannyHouses = "D:\\Repos\\worldpainter_related\\Vanilla_plus_House_Pack-Dannypan";
         String server = "D:\\Repos\\mc_server_paper_1_19\\plugins\\WorldEdit\\schematics";
-        File dir = new File(server);
+        File dir = schemFolder.toFile();
         List<Path> pathList = findAllFiles(dir.toPath());
         ArrayList<WPObject> schematics = new ArrayList<>();
         for (Path path : pathList) {

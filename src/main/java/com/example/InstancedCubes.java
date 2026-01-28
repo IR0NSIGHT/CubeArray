@@ -53,11 +53,6 @@ public class InstancedCubes {
         radius = new Vector3f(setup.max).sub(setup.min).length() / 2f;
     }
 
-    public static void main(String[] args) throws Exception {
-        var setup = SchemReader.prepareData(SchemReader.loadDefaultObjects());
-        new InstancedCubes(setup).run();
-    }
-
     public void run() throws Exception {
         init(setup);
 
