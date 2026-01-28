@@ -50,3 +50,9 @@ its not raytracing, and i dont not calculate any shadows. The only lightsource i
 
 ### editing
 its not a schematic editor. its a viewer.
+
+## technical details
+- scratch build in java using openGL bindings
+- uses worldpainter code to import schematic files into the program
+- uses textures from Faithful 32x - 1.21.7 resource pack: https://faithfulpack.net/
+
