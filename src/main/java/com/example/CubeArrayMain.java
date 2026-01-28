@@ -15,6 +15,6 @@ public class CubeArrayMain {
         //start rendering app
         final var schematicsForlder =  getInstallPath().resolve(ResourceUtils.SCHEMATICS_ROOT);
         var setup = SchemReader.prepareData(SchemReader.loadDefaultObjects(schematicsForlder));
-    //    new InstancedCubes(setup).run();
+        new InstancedCubes(setup).run();
     }
 }
