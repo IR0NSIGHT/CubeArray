@@ -9,10 +9,15 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class AppContext implements Serializable {
+    AppContext() {
+
+    }
     final HashMap<File, Long> filesAndTimestamps = new HashMap<>();
     final Set<File> activeFiles = new HashSet<>();
     File lastSearchPath = new File(System.getProperty("user.home"));
     Rectangle guiBounds = new Rectangle(0,0,400,400);
+
+    boolean neverBeforeUsed = true;
 
     public static File getSaveFile() {
         File file = new File(ResourceUtils.getInstallPath().toFile(), "app.context");
@@ -23,7 +28,8 @@ public class AppContext implements Serializable {
     public static AppContext read() {
         File file = getSaveFile();
         if (!file.exists()) {
-            return new AppContext(); // empty context
+            AppContext context = new AppContext(); // empty context
+            return context;
         }
 
         try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {

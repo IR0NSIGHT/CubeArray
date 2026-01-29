@@ -11,10 +11,16 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.ironsight.CubeArray.InstancedCubes;
 
@@ -37,9 +43,16 @@ public class FileRenderApp {
     }
     final JFrame frame;
     public FileRenderApp(final AppContext context) {
+        this.context = context;
+        if (context.neverBeforeUsed) {
+            // add default schematics on very first use
+            ResourceUtils.getDefaultSchematics().forEach(s -> context.filesAndTimestamps.put(s.toFile(),System.currentTimeMillis()));
+            context.neverBeforeUsed = false;
+            contextDirtyFlag = true;
+        }
+
         CubeArrayMain.periodicChecker.addCallback(this::onPeriodicCheck);
 
-        this.context = context;
         frame = new JFrame("File Renderer");
         frame.setSize(context.guiBounds.width, context.guiBounds.height);
         frame.setLocation(context.guiBounds.x, context.guiBounds.y);
@@ -156,7 +169,7 @@ public class FileRenderApp {
             @Override
             public boolean accept(File f) {
                 for (String type : ResourceUtils.SUPPORTED_FILE_TYPES) {
-                    if (f.getPath().endsWith(type))
+                    if (f.isDirectory() || f.getPath().endsWith(type))
                         return true;
                 }
                 return false;
@@ -172,9 +185,8 @@ public class FileRenderApp {
 
     private void removeSelectedFiles() {
         int[] viewRows = fileTable.getSelectedRows();
-        for (int viewRow : viewRows) {
-            int modelRow = fileTable.convertRowIndexToModel(viewRow);
-            File f = tableModel.getFileAt(modelRow);
+        List<File> files = Arrays.stream(viewRows).map(fileTable::convertRowIndexToModel).mapToObj(tableModel::getFileAt).toList();
+        for (File f : files) {
             context.filesAndTimestamps.remove(f);
             tableModel.removeFile(f);
         }

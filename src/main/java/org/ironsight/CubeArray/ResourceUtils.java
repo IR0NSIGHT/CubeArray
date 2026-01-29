@@ -11,6 +11,8 @@ import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.net.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.zip.ZipFile;
 
 public class ResourceUtils {
@@ -24,7 +26,66 @@ public class ResourceUtils {
             ));
     public static String TEXTURE_RESOURCES = "textures/";
     public static String TEXTURE_PACK_ROOT = "textures/Faithful_32x_1_21_7/";
-    public static String SCHEMATICS_ROOT, SCHEMATIC_RESOURCES = "schematics/";
+    public static String SCHEMATICS_ROOT = "schematics/", SCHEMATIC_RESOURCES = "schematics/";
+
+    public static List<Path> getDefaultSchematics() {
+        Path defaultSchematicsDir = ResourceUtils.getInstallPath().resolve(ResourceUtils.SCHEMATICS_ROOT);
+        if (Files.exists(defaultSchematicsDir)) {
+            try (Stream<Path> paths = Files.walk(defaultSchematicsDir)) {
+                return paths
+                        .filter(Files::isRegularFile)
+                        .filter(f -> SUPPORTED_FILE_TYPES.stream().anyMatch(e -> f.getFileName().toString().toLowerCase().endsWith(e.toLowerCase())))
+                        .collect(Collectors.toList());
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to scan schematics directory", e);
+            }
+        }
+        return List.of();
+    }
+
+    public static Path getInstallPath() {
+        String os = System.getProperty("os.name").toLowerCase();
+        Path base;
+
+        if (os.contains("win")) {
+            String localAppData = System.getenv("LOCALAPPDATA");
+            if (localAppData != null) {
+                base = Paths.get(localAppData);
+            } else {
+                base = Paths.get(System.getProperty("user.home"), "AppData", "Local");
+            }
+
+        } else if (os.contains("mac")) {
+            base = Paths.get(
+                    System.getProperty("user.home"),
+                    "Library", "Application Support"
+            );
+
+        } else {
+            // Linux / Unix
+            String xdg = System.getenv("XDG_DATA_HOME");
+            if (xdg != null && !xdg.isEmpty()) {
+                base = Paths.get(xdg);
+            } else {
+                base = Paths.get(
+                        System.getProperty("user.home"),
+                        ".local", "share"
+                );
+            }
+        }
+
+        Path installPath = base.resolve(CubeArrayMain.APP_NAME);
+
+        try {
+            Files.createDirectories(installPath);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to create install directory", e);
+        }
+        if (installPath == null)
+            throw new RuntimeException("Failed to get installpath.");
+
+        return installPath;
+    }
 
     // Example usage
     public static void main(String[] args) throws IOException {
@@ -130,48 +191,6 @@ public class ResourceUtils {
         }
 
         return folder;
-    }
-
-    public static Path getInstallPath() {
-        String os = System.getProperty("os.name").toLowerCase();
-        Path base;
-
-        if (os.contains("win")) {
-            String localAppData = System.getenv("LOCALAPPDATA");
-            if (localAppData != null) {
-                base = Paths.get(localAppData);
-            } else {
-                base = Paths.get(System.getProperty("user.home"), "AppData", "Local");
-            }
-
-        } else if (os.contains("mac")) {
-            base = Paths.get(
-                    System.getProperty("user.home"),
-                    "Library", "Application Support"
-            );
-
-        } else {
-            // Linux / Unix
-            String xdg = System.getenv("XDG_DATA_HOME");
-            if (xdg != null && !xdg.isEmpty()) {
-                base = Paths.get(xdg);
-            } else {
-                base = Paths.get(
-                        System.getProperty("user.home"),
-                        ".local", "share"
-                );
-            }
-        }
-
-        Path installPath = base.resolve(CubeArrayMain.APP_NAME);
-
-        try {
-            Files.createDirectories(installPath);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to create install directory", e);
-        }
-
-        return installPath;
     }
 
     private static void unzip(Path zipPath) {

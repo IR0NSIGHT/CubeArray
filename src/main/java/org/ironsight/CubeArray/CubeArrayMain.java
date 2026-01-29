@@ -8,8 +8,6 @@ public class CubeArrayMain {
     public static final String APP_NAME = "CubeArray";
     public static final PeriodicChecker periodicChecker = new PeriodicChecker();
     public static void main(String[] args) throws Exception {
-        System.out.println("Hello world!");
-
         //copy files that are required to run the application
         ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
 

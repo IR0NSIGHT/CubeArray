@@ -41,14 +41,17 @@ class FileTableModel extends AbstractTableModel {
     }
 
     public void addFile(File f) {
-        files.add(f);
-        fireTableRowsInserted(files.size() - 1, files.size() - 1);
+        if (!files.contains(f)) {
+            files.add(f);
+            fireTableRowsInserted(files.size() - 1, files.size() - 1);
+        }
     }
 
     public void removeFile(File f) {
         int i = files.indexOf(f);
         if (i >= 0) fireTableRowsDeleted(i, i);
         files.remove(f);
+        assert !files.contains(f);
     }
 
     public List<File> getFiles(int[] rows) {
