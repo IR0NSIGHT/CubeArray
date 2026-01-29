@@ -3,17 +3,19 @@ package com.example;
 import com.example.swing.AppContext;
 import com.example.swing.FileRenderApp;
 
-import java.io.IOException;
-
 import static com.example.ResourceUtils.copyResourcesToFile;
-import static com.example.ResourceUtils.getInstallPath;
+
 
 public class CubeArrayMain {
-    public static String APP_NAME = "CubeArray";
+    public static final String APP_NAME = "CubeArray";
+    public static final PeriodicChecker periodicChecker = new PeriodicChecker();
     public static void main(String[] args) throws Exception {
         System.out.println("Hello world!");
         //prepare files on plate
         copyResourcesToFile(ResourceUtils.SCHEMATICS_ROOT,ResourceUtils.TEXTURE_PACK_ROOT);
+
+        // background task for periodic checks
+        periodicChecker.startPeriodicTask();
 
         //start swing GUI
         FileRenderApp.startApp(AppContext.read());
@@ -23,4 +25,7 @@ public class CubeArrayMain {
     //    var setup = SchemReader.prepareData(SchemReader.loadDefaultObjects(schematicsForlder));
     //    new InstancedCubes(setup).run();
     }
+
+
+
 }

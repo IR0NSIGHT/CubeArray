@@ -1,15 +1,21 @@
 package com.example.swing;
 
+import com.example.CubeArrayMain;
+import com.example.SchemReader;
+
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
 import java.util.List;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import com.example.InstancedCubes;
 
 public class FileRenderApp {
     // main data structure
     private final AppContext context;
+    //is context dirty and needs to be saved?
+    private boolean contextDirtyFlag;
 
     // UI model
     private final DefaultListModel<File> listModel = new DefaultListModel<>();
@@ -20,6 +26,8 @@ public class FileRenderApp {
     }
 
     public FileRenderApp(final AppContext context) {
+        CubeArrayMain.periodicChecker.addCallback(this::onPeriodicCheck);
+
         this.context = context;
         JFrame frame = new JFrame("File Renderer");
         frame.setSize(context.guiBounds.width, context.guiBounds.height);
@@ -30,18 +38,15 @@ public class FileRenderApp {
             @Override
             public void componentResized(ComponentEvent e) {
                 Rectangle bounds = frame.getBounds();
-                System.out.println("Resized: " + bounds.width + "x" + bounds.height);
                 context.guiBounds = bounds;
-                SwingUtilities.invokeLater(()->AppContext.write(context));
+                contextDirtyFlag = true;
             }
 
             @Override
             public void componentMoved(ComponentEvent e) {
                 Rectangle bounds = frame.getBounds();
-                System.out.println("Moved: " + bounds.x + "," + bounds.y);
                 context.guiBounds = bounds;
-                SwingUtilities.invokeLater(()->AppContext.write(context));
-
+                contextDirtyFlag = true;
             }
         });
 
@@ -100,7 +105,7 @@ public class FileRenderApp {
             }
         }
         context.lastSearchPath = chooser.getCurrentDirectory();
-        AppContext.write(context);
+        contextDirtyFlag = true;
     }
 
     private void removeSelectedFiles() {
@@ -109,14 +114,14 @@ public class FileRenderApp {
             context.filesAndTimestamps.remove(f);
             listModel.removeElement(f);
         }
-        AppContext.write(context);
+        contextDirtyFlag = true;
     }
 
     private void renderSelectedFiles() {
         List<File> selected = fileList.getSelectedValuesList();
         context.activeFiles.clear();
         context.activeFiles.addAll(selected);
-        AppContext.write(context);
+        contextDirtyFlag = true;
 
         if (selected.isEmpty()) {
             JOptionPane.showMessageDialog(null, "No files selected.");
@@ -131,6 +136,23 @@ public class FileRenderApp {
         System.out.println("Rendering files:");
         for (File f : selectedFiles) {
             System.out.println(" - " + f.getAbsolutePath());
+        }
+
+        try {
+            var setup = SchemReader.prepareData(SchemReader.loadDefaultObjects(selectedFiles.stream().map(File::toPath).toList()));
+            new InstancedCubes(setup).run();
+        } catch (Exception ex) {
+            System.out.println("Error: " + ex.getMessage());
+        }
+
+    }
+
+    void onPeriodicCheck() {
+        // WARNING: this runs on the background thread NOT the gui thread!
+        if (contextDirtyFlag) {
+            contextDirtyFlag = false;
+            System.out.println("WRITE CONTEXT TO FILE");
+            AppContext.write(this.context);
         }
     }
 }
