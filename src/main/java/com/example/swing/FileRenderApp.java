@@ -7,6 +7,8 @@ import com.example.SchemReader;
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.File;
 import java.util.List;
 import java.awt.event.ComponentAdapter;
@@ -68,6 +70,20 @@ public class FileRenderApp {
             }
             return label;
         });
+
+        fileList.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
+                    int index = fileList.locationToIndex(e.getPoint());
+                    if (index >= 0) {
+                        File file = fileList.getModel().getElementAt(index);
+                        renderSelectedFiles();
+                    }
+                }
+            }
+        });
+
 
         JScrollPane scrollPane = new JScrollPane(fileList);
 
