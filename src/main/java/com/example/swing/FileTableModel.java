@@ -14,17 +14,26 @@ class FileTableModel extends AbstractTableModel {
 
     @Override
     public int getColumnCount() {
-        return 1;
+        return 2;  // now 2 columns: "File" + "Path"
     }
 
     @Override
     public String getColumnName(int column) {
-        return "File";
+        return switch (column) {
+            case 0 -> "File";        // just name
+            case 1 -> "Path";        // full path
+            default -> "";
+        };
     }
 
     @Override
     public Object getValueAt(int row, int col) {
-        return files.get(row);
+        File f = files.get(row);
+        return switch (col) {
+            case 0 -> f.getName();   // display name
+            case 1 -> f.getAbsolutePath(); // full path
+            default -> null;
+        };
     }
 
     public File getFileAt(int row) {
@@ -38,10 +47,8 @@ class FileTableModel extends AbstractTableModel {
 
     public void removeFile(File f) {
         int i = files.indexOf(f);
-        if (i >= 0) {
-            files.remove(i);
-            fireTableRowsDeleted(i, i);
-        }
+        if (i >= 0) fireTableRowsDeleted(i, i);
+        files.remove(f);
     }
 
     public List<File> getFiles(int[] rows) {

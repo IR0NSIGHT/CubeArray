@@ -27,6 +27,7 @@ public class FileRenderApp {
     // UI model
     private final FileTableModel tableModel = new FileTableModel();
     private final JTable fileTable = new JTable(tableModel);
+
     private final TableRowSorter<FileTableModel> rowSorter =
             new TableRowSorter<>(tableModel);
 
@@ -65,18 +66,6 @@ public class FileRenderApp {
         fileTable.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
         fileTable.setRowSorter(rowSorter);
 
-// show only file name
-        fileTable.setDefaultRenderer(Object.class, (table, value, selected, focused, row, col) -> {
-            JLabel label = new JLabel(((File) value).getName());
-            if (selected) {
-                label.setOpaque(true);
-                label.setBackground(table.getSelectionBackground());
-                label.setForeground(table.getSelectionForeground());
-            }
-            return label;
-        });
-
-
         fileTable.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -89,6 +78,29 @@ public class FileRenderApp {
             }
         });
 
+        JTextField searchField = new JTextField(20);
+        searchField.setText("Search");
+        searchField.putClientProperty("JTextField.placeholderText", "Search...");
+        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            private void update() {
+                String text = searchField.getText().trim();
+                if (text.isEmpty()) {
+                    rowSorter.setRowFilter(null);
+                } else {
+                    rowSorter.setRowFilter(new RowFilter<>() {
+                        @Override
+                        public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
+                            return (entry.getValue(0) instanceof String name && name.toLowerCase().contains(text.toLowerCase()) ||
+                                    (entry.getValue(1) instanceof String fullPath && fullPath.toLowerCase().contains(text.toLowerCase())));
+                        }
+                    });
+                }
+            }
+
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { update(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { update(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { update(); }
+        });
 
 
         JScrollPane scrollPane = new JScrollPane(fileTable);
@@ -104,6 +116,9 @@ public class FileRenderApp {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         topPanel.add(addBtn);
         topPanel.add(removeBtn);
+        //topPanel.add(new JLabel("Search:"));
+        topPanel.add(searchField);
+
 
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         bottomPanel.add(renderBtn);
