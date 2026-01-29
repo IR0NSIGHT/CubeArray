@@ -343,7 +343,8 @@ public class SchemReader {
         }
 
         mat_to_palette_idx.keySet().stream().map(m -> m.name).sorted().forEach(System.out::println);
-        SpriteSheet spriteSheet = new SpriteSheet(new File("C:\\Users\\Max1M\\Downloads\\Faithful 32x - 1.21.7"), mat_to_palette_idx.keySet());
+
+        SpriteSheet spriteSheet = new SpriteSheet(ResourceUtils.getInstallPath().resolve(ResourceUtils.TEXTURE_PACK_ROOT).toFile(), mat_to_palette_idx.keySet());
 
         int[] blockTypeIndices = blockTypeIndicesList.stream().mapToInt(i -> i).toArray();
 

@@ -139,8 +139,16 @@ public class FileRenderApp {
         }
 
         try {
-            var setup = SchemReader.prepareData(SchemReader.loadDefaultObjects(selectedFiles.stream().map(File::toPath).toList()));
-            new InstancedCubes(setup).run();
+            Thread glThread = new Thread(() -> {
+                try {
+                    SchemReader.CubeSetup setup = SchemReader.prepareData(SchemReader.loadDefaultObjects(selectedFiles.stream().map(File::toPath).toList()));
+                    new InstancedCubes(setup).run();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            glThread.start();
+
         } catch (Exception ex) {
             System.out.println("Error: " + ex.getMessage());
         }

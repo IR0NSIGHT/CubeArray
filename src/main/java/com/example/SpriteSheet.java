@@ -23,6 +23,7 @@ public class SpriteSheet {
     private final HashMap<Material, Vector4f> uvCoords;
 
     public SpriteSheet(File texturePackDir, Set<Material> materialSet) throws IOException {
+        assert texturePackDir != null && texturePackDir.exists() && texturePackDir.isDirectory();
         var nameToFile = nameToFile(texturePackDir);
         HashMap<Material, File> matToFile = matToFile(nameToFile, materialSet);
         int textureSize = 16; // FIXME dont hardcode
@@ -30,22 +31,22 @@ public class SpriteSheet {
         textureAtlas = buildAtlas(matToFile, textureSize, uvCoords, nameToFile);
     }
 
-    public HashMap<String, File> nameToFile(File texturePackDir) {
+    public HashMap<String, File> nameToFile(File texturePackDir) throws IOException {
         HashMap<String, File> result = new HashMap<>();
         if (texturePackDir == null || !texturePackDir.isDirectory()) {
-            return result;
+            throw new IOException("texture pack not found: " + texturePackDir);
         }
 
         // Path inside the texture pack where block textures are stored
         File blockDir = new File(texturePackDir, "assets/minecraft/textures/block");
 
         if (!blockDir.exists() || !blockDir.isDirectory()) {
-            return result;
+            throw new IOException("texture pack block directory not found: " + blockDir);
         }
 
         File[] files = blockDir.listFiles((dir, name) -> name.toLowerCase().endsWith(".png"));
         if (files == null) {
-            return result;
+            throw new IOException("texture pack does not contain any png files. " + blockDir);
         }
 
         for (File file : files) {
