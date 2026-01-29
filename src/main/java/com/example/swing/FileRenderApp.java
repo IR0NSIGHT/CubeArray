@@ -1,14 +1,18 @@
 package com.example.swing;
 
 import com.example.CubeArrayMain;
+import com.example.ResourceUtils;
 import com.example.SchemReader;
 
 import javax.swing.*;
+import javax.swing.filechooser.FileFilter;
 import java.awt.*;
 import java.io.File;
 import java.util.List;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.util.stream.Collectors;
+
 import com.example.InstancedCubes;
 
 public class FileRenderApp {
@@ -24,12 +28,12 @@ public class FileRenderApp {
     public static void startApp(final AppContext context) {
         SwingUtilities.invokeLater(()-> new FileRenderApp(context));
     }
-
+    final JFrame frame;
     public FileRenderApp(final AppContext context) {
         CubeArrayMain.periodicChecker.addCallback(this::onPeriodicCheck);
 
         this.context = context;
-        JFrame frame = new JFrame("File Renderer");
+        frame = new JFrame("File Renderer");
         frame.setSize(context.guiBounds.width, context.guiBounds.height);
         frame.setLocation(context.guiBounds.x, context.guiBounds.y);
 
@@ -92,10 +96,7 @@ public class FileRenderApp {
     }
 
     private void addFiles(Component parent) {
-        JFileChooser chooser = new JFileChooser();
-        chooser.setCurrentDirectory(context.lastSearchPath);
-        chooser.setMultiSelectionEnabled(true);
-
+        JFileChooser chooser = getFileChooser();
         if (chooser.showOpenDialog(parent) == JFileChooser.APPROVE_OPTION) {
             for (File f : chooser.getSelectedFiles()) {
                 if (!context.filesAndTimestamps.containsKey(f)) {
@@ -106,6 +107,28 @@ public class FileRenderApp {
         }
         context.lastSearchPath = chooser.getCurrentDirectory();
         contextDirtyFlag = true;
+    }
+
+    private JFileChooser getFileChooser() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setCurrentDirectory(context.lastSearchPath);
+        chooser.setMultiSelectionEnabled(true);
+        chooser.setFileFilter(new FileFilter() {
+            @Override
+            public boolean accept(File f) {
+                for (String type : ResourceUtils.SUPPORTED_FILE_TYPES) {
+                    if (f.getPath().endsWith(type))
+                        return true;
+                }
+                return false;
+            }
+
+            @Override
+            public String getDescription() {
+                return ResourceUtils.SUPPORTED_FILE_TYPES.stream().sorted().collect(Collectors.joining(", "));
+            }
+        });
+        return chooser;
     }
 
     private void removeSelectedFiles() {
@@ -141,7 +164,13 @@ public class FileRenderApp {
         try {
             Thread glThread = new Thread(() -> {
                 try {
-                    SchemReader.CubeSetup setup = SchemReader.prepareData(SchemReader.loadDefaultObjects(selectedFiles.stream().map(File::toPath).toList()));
+                    SchemReader.CubeSetup setup = SchemReader.prepareData(SchemReader.loadSchematics(selectedFiles.stream().map(File::toPath).toList()));
+                    if (setup == null) {
+                        SwingUtilities.invokeLater(()->{
+                            JOptionPane.showMessageDialog(frame, "Error: unable to load schematics from selected files. Maybe the file type is not supported or does not exist anymore?");
+                        });
+                        return;
+                    }
                     new InstancedCubes(setup).run();
                 } catch (Exception e) {
                     throw new RuntimeException(e);

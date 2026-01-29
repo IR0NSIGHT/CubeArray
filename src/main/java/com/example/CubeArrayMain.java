@@ -11,8 +11,12 @@ public class CubeArrayMain {
     public static final PeriodicChecker periodicChecker = new PeriodicChecker();
     public static void main(String[] args) throws Exception {
         System.out.println("Hello world!");
-        //prepare files on plate
-        copyResourcesToFile(ResourceUtils.SCHEMATICS_ROOT,ResourceUtils.TEXTURE_PACK_ROOT);
+
+        //copy files that are required to run the application
+        copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
+
+        //background copying for less improtant stuff
+        periodicChecker.copyDefaultSchematics();
 
         // background task for periodic checks
         periodicChecker.startPeriodicTask();

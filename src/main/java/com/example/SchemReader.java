@@ -29,15 +29,7 @@ public class SchemReader {
         Material mat = Material.COBBLESTONE_STAIRS;
         System.out.println(mat);
     }
-    public static List<WPObject> loadDefaultObjects(List<Path> pathList) throws IOException {
-        String self = "D:\\Repos\\cubeArray\\testSchems";
-        String europe = "D:\\Repos\\worldpainter_related\\Market_Stalls_v0_1";
-        String jerusalem = "C:/Users/Max1M/curseforge/minecraft/Instances/neoforge 1.12.1 camboi " +
-                "shaders/config/worldedit/schematics";
-        String dannyHouses = "D:\\Repos\\worldpainter_related\\Vanilla_plus_House_Pack-Dannypan";
-        String server = "D:\\Repos\\mc_server_paper_1_19\\plugins\\WorldEdit\\schematics";
-       // File dir = schemFolder.toFile();
-       // List<Path> pathList = findAllFiles(dir.toPath());
+    public static List<WPObject> loadSchematics(List<Path> pathList) throws IOException {
         ArrayList<WPObject> schematics = new ArrayList<>();
         for (Path path : pathList) {
             File file = path.toFile();
@@ -57,6 +49,8 @@ public class SchemReader {
         return schematics;
     }
     public static CubeSetup prepareData(List<WPObject> schematics) throws Exception {
+        if (schematics.isEmpty())
+            return null;
         List<Vector3f> positions = new ArrayList<>();
         List<Integer> blockTypeIndicesList = new ArrayList<>();
 

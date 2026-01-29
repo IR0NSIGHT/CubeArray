@@ -1,9 +1,25 @@
 package com.example;
 
+import java.io.IOException;
 import java.util.ArrayList;
+
+import static com.example.ResourceUtils.copyResourcesToFile;
 
 public class PeriodicChecker {
     private ArrayList<Runnable> callbacks = new ArrayList<>();
+
+    public void copyDefaultSchematics() {
+        Thread t = new Thread(() -> {
+            //prepare files on plate
+            try {
+                copyResourcesToFile(ResourceUtils.SCHEMATIC_RESOURCES);
+                System.out.println("finished copying all schematics");
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        t.start();
+    }
     public void startPeriodicTask() {
         Thread t = new Thread(() -> {
             while (true) {

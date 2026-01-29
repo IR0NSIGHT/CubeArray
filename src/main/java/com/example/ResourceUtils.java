@@ -1,19 +1,31 @@
 package com.example;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.JarURLConnection;
 import java.net.URISyntaxException;
 import java.nio.file.*;
-import java.util.Enumeration;
+import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.net.*;
+import java.util.zip.ZipFile;
 
 public class ResourceUtils {
+    public static String TEXTURE_RESOURCES = "textures/";
     public static String TEXTURE_PACK_ROOT = "textures/Faithful_32x_1_21_7/";
-    public static String SCHEMATICS_ROOT = "schematics/";
+    public static String SCHEMATICS_ROOT, SCHEMATIC_RESOURCES = "schematics/";
+
+    public static final Set<String> SUPPORTED_FILE_TYPES =
+            new HashSet<>(Arrays.asList(
+                    ".bo2",
+                    ".bo3",
+                    ".nbt",
+                    ".schematic",
+                    ".schem"
+            ));
 
     public static Path getInstallPath() {
         String os = System.getProperty("os.name").toLowerCase();
@@ -56,8 +68,32 @@ public class ResourceUtils {
 
         return installPath;
     }
+
+    private static void unzip(Path zipPath) {
+        try (ZipFile zip = new ZipFile(zipPath.toFile())) {
+            zip.stream().parallel().forEach(entry -> {
+                try {
+                    Path out = zipPath.getParent().resolve(entry.getName());
+                    if (entry.isDirectory()) {
+                        Files.createDirectories(out);
+                        return;
+                    }
+                    Files.createDirectories(out.getParent());
+                    try (InputStream in = zip.getInputStream(entry)) {
+                        Files.copy(in, out, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+            System.out.println("unzip item: " + zipPath);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     /**
-     * Creates a temporary folder and copies the given resources into it.
+     * copies the given resources into it the install folder on plate, unzips all zips.
      *
      * @param resourcePaths Array of resource paths relative to classpath (e.g., "data/config.json")
      * @return Path to the temporary folder
@@ -79,6 +115,8 @@ public class ResourceUtils {
             }
 
             try {
+                List<File> copiedFiles = new LinkedList<>();
+
                 if ("file".equals(url.getProtocol())) {
                     // IDE / exploded resources
                     Path sourcePath = Paths.get(url.toURI());
@@ -88,19 +126,21 @@ public class ResourceUtils {
                             Path target = folder.resolve(resourcePath)
                                     .resolve(sourcePath.relativize(path).toString());
 
-
                             if (Files.isDirectory(path)) {
                                 Files.createDirectories(target);
-                            } else {
+                            } else if (!target.toFile().exists()) {
                                 Files.createDirectories(target.getParent());
-                                Files.copy(path, target, StandardCopyOption.REPLACE_EXISTING);
+                                Files.copy(path, target);
+                                copiedFiles.add(target.toFile());
                             }
+                        } catch (FileAlreadyExistsException ignored) {
                         } catch (IOException e) {
                             throw new UncheckedIOException(e);
                         }
                     });
 
-                } else if ("jar".equals(url.getProtocol())) {
+                } else
+                    if ("jar".equals(url.getProtocol())) {
                     // Running from JAR
                     JarURLConnection conn = (JarURLConnection) url.openConnection();
                     JarFile jar = conn.getJarFile();
@@ -123,7 +163,11 @@ public class ResourceUtils {
                         } else {
                             Files.createDirectories(target.getParent());
                             try (InputStream in = jar.getInputStream(entry)) {
-                                Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+                                Files.copy(in, target);
+                                copiedFiles.add(target.toFile());
+                            } catch (FileAlreadyExistsException ignored) {
+                            } catch (IOException e) {
+                                throw new UncheckedIOException(e);
                             }
                         }
                     }
@@ -131,6 +175,9 @@ public class ResourceUtils {
                 } else {
                     throw new IOException("Unsupported protocol: " + url.getProtocol());
                 }
+                    System.out.println(getInstallPath());
+                    System.out.println(copiedFiles);
+                    copiedFiles.stream().filter(f -> f.getPath().endsWith(".zip")).forEach(f -> unzip(f.toPath()));
             } catch (URISyntaxException e) {
                 throw new IOException(e);
             }
