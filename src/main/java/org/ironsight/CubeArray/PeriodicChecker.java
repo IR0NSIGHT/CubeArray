@@ -1,9 +1,9 @@
-package com.example;
+package org.ironsight.CubeArray;
 
 import java.io.IOException;
 import java.util.ArrayList;
 
-import static com.example.ResourceUtils.copyResourcesToFile;
+import static org.ironsight.CubeArray.ResourceUtils.copyResourcesToFile;
 
 public class PeriodicChecker {
     private ArrayList<Runnable> callbacks = new ArrayList<>();

@@ -1,4 +1,4 @@
-package com.example;
+package org.ironsight.CubeArray;
 
 public class GeometryShaderSource {
     public static final String source =  """

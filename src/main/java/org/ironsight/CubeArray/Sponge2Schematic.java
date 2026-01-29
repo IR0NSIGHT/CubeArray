@@ -1,4 +1,4 @@
-package com.example;
+package org.ironsight.CubeArray;
 
 import org.jnbt.*;
 import org.pepsoft.minecraft.AbstractNBTItem;

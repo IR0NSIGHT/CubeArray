@@ -1,4 +1,4 @@
-package com.example;
+package org.ironsight.CubeArray;
 
 import java.io.File;
 import java.io.IOException;
@@ -14,10 +14,6 @@ import java.net.*;
 import java.util.zip.ZipFile;
 
 public class ResourceUtils {
-    public static String TEXTURE_RESOURCES = "textures/";
-    public static String TEXTURE_PACK_ROOT = "textures/Faithful_32x_1_21_7/";
-    public static String SCHEMATICS_ROOT, SCHEMATIC_RESOURCES = "schematics/";
-
     public static final Set<String> SUPPORTED_FILE_TYPES =
             new HashSet<>(Arrays.asList(
                     ".bo2",
@@ -26,6 +22,115 @@ public class ResourceUtils {
                     ".schematic",
                     ".schem"
             ));
+    public static String TEXTURE_RESOURCES = "textures/";
+    public static String TEXTURE_PACK_ROOT = "textures/Faithful_32x_1_21_7/";
+    public static String SCHEMATICS_ROOT, SCHEMATIC_RESOURCES = "schematics/";
+
+    // Example usage
+    public static void main(String[] args) throws IOException {
+        Path tmpFolder = copyResourcesToFile("textures/texture.bmp", SCHEMATICS_ROOT);
+        System.out.println("Resources copied to: " + tmpFolder);
+
+        // You can now use them as normal files:
+        Path configFile = tmpFolder.resolve("textures/texture.bmp");
+        System.out.println("Config exists: " + Files.exists(configFile));
+    }
+
+    /**
+     * copies the given resources into it the install folder on plate, unzips all zips.
+     *
+     * @param resourcePaths Array of resource paths relative to classpath (e.g., "data/config.json")
+     * @return Path to the temporary folder
+     * @throws IOException if an I/O error occurs
+     */
+
+
+    public static Path copyResourcesToFile(String... resourcePaths)
+            throws IOException {
+
+        Path folder = getInstallPath();
+        ClassLoader cl = ResourceUtils.class.getClassLoader();
+
+        for (String resourcePath : resourcePaths) {
+            URL url = cl.getResource(resourcePath);
+
+            if (url == null) {
+                throw new IOException("Resource not found: " + resourcePath);
+            }
+
+            try {
+                List<File> copiedFiles = new LinkedList<>();
+
+                if ("file".equals(url.getProtocol())) {
+                    // IDE / exploded resources
+                    Path sourcePath = Paths.get(url.toURI());
+
+                    Files.walk(sourcePath).forEach(path -> {
+                        try {
+                            Path target = folder.resolve(resourcePath)
+                                    .resolve(sourcePath.relativize(path).toString());
+
+                            if (Files.isDirectory(path)) {
+                                Files.createDirectories(target);
+                            } else if (!target.toFile().exists()) {
+                                Files.createDirectories(target.getParent());
+                                Files.copy(path, target);
+                                copiedFiles.add(target.toFile());
+                            }
+                        } catch (FileAlreadyExistsException ignored) {
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    });
+
+                } else if ("jar".equals(url.getProtocol())) {
+                    JarURLConnection conn = (JarURLConnection) url.openConnection();
+                    JarFile jar = conn.getJarFile();
+                    String prefix = conn.getEntryName();
+                    if (prefix == null) prefix = "";
+                    if (!prefix.isEmpty() && !prefix.endsWith("/")) {
+                        prefix += "/";
+                    }
+
+                    Enumeration<JarEntry> entries = jar.entries();
+                    while (entries.hasMoreElements()) {
+                        JarEntry entry = entries.nextElement();
+                        String name = entry.getName();
+
+                        if (!name.startsWith(prefix)) continue;
+
+                        String relativePath = name.substring(prefix.length());
+                        if (relativePath.isEmpty()) continue; // skip the root itself
+
+                        // FIX: prepend resourcePath to preserve top-level folder
+                        Path target = folder.resolve(resourcePath).resolve(relativePath.replace("/", File.separator));
+
+                        if (entry.isDirectory()) {
+                            Files.createDirectories(target);
+                        } else {
+                            Files.createDirectories(target.getParent());
+                            try (InputStream in = jar.getInputStream(entry)) {
+                                Files.copy(in, target);
+                                copiedFiles.add(target.toFile());
+                            } catch (FileAlreadyExistsException ignored) {
+                            } catch (IOException e) {
+                                throw new UncheckedIOException(e);
+                            }
+                        }
+                    }
+                } else {
+                    throw new IOException("Unsupported protocol: " + url.getProtocol());
+                }
+                System.out.println(getInstallPath());
+                System.out.println(copiedFiles);
+                copiedFiles.stream().filter(f -> f.getPath().endsWith(".zip")).forEach(f -> unzip(f.toPath()));
+            } catch (URISyntaxException e) {
+                throw new IOException(e);
+            }
+        }
+
+        return folder;
+    }
 
     public static Path getInstallPath() {
         String os = System.getProperty("os.name").toLowerCase();
@@ -90,110 +195,5 @@ public class ResourceUtils {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    /**
-     * copies the given resources into it the install folder on plate, unzips all zips.
-     *
-     * @param resourcePaths Array of resource paths relative to classpath (e.g., "data/config.json")
-     * @return Path to the temporary folder
-     * @throws IOException if an I/O error occurs
-     */
-
-
-    public static Path copyResourcesToFile(String... resourcePaths)
-            throws IOException {
-
-        Path folder = getInstallPath();
-        ClassLoader cl = ResourceUtils.class.getClassLoader();
-
-        for (String resourcePath : resourcePaths) {
-            URL url = cl.getResource(resourcePath);
-
-            if (url == null) {
-                throw new IOException("Resource not found: " + resourcePath);
-            }
-
-            try {
-                List<File> copiedFiles = new LinkedList<>();
-
-                if ("file".equals(url.getProtocol())) {
-                    // IDE / exploded resources
-                    Path sourcePath = Paths.get(url.toURI());
-
-                    Files.walk(sourcePath).forEach(path -> {
-                        try {
-                            Path target = folder.resolve(resourcePath)
-                                    .resolve(sourcePath.relativize(path).toString());
-
-                            if (Files.isDirectory(path)) {
-                                Files.createDirectories(target);
-                            } else if (!target.toFile().exists()) {
-                                Files.createDirectories(target.getParent());
-                                Files.copy(path, target);
-                                copiedFiles.add(target.toFile());
-                            }
-                        } catch (FileAlreadyExistsException ignored) {
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    });
-
-                } else
-                    if ("jar".equals(url.getProtocol())) {
-                    // Running from JAR
-                    JarURLConnection conn = (JarURLConnection) url.openConnection();
-                    JarFile jar = conn.getJarFile();
-                    String prefix = conn.getEntryName();
-
-                    Enumeration<JarEntry> entries = jar.entries();
-                    while (entries.hasMoreElements()) {
-                        JarEntry entry = entries.nextElement();
-
-                        if (!entry.getName().startsWith(prefix)) {
-                            continue;
-                        }
-
-                        Path target = folder.resolve(
-                                entry.getName().substring(prefix.length())
-                        );
-
-                        if (entry.isDirectory()) {
-                            Files.createDirectories(target);
-                        } else {
-                            Files.createDirectories(target.getParent());
-                            try (InputStream in = jar.getInputStream(entry)) {
-                                Files.copy(in, target);
-                                copiedFiles.add(target.toFile());
-                            } catch (FileAlreadyExistsException ignored) {
-                            } catch (IOException e) {
-                                throw new UncheckedIOException(e);
-                            }
-                        }
-                    }
-
-                } else {
-                    throw new IOException("Unsupported protocol: " + url.getProtocol());
-                }
-                    System.out.println(getInstallPath());
-                    System.out.println(copiedFiles);
-                    copiedFiles.stream().filter(f -> f.getPath().endsWith(".zip")).forEach(f -> unzip(f.toPath()));
-            } catch (URISyntaxException e) {
-                throw new IOException(e);
-            }
-        }
-
-        return folder;
-    }
-
-
-    // Example usage
-    public static void main(String[] args) throws IOException {
-        Path tmpFolder = copyResourcesToFile("textures/texture.bmp", SCHEMATICS_ROOT);
-        System.out.println("Resources copied to: " + tmpFolder);
-
-        // You can now use them as normal files:
-        Path configFile = tmpFolder.resolve("textures/texture.bmp");
-        System.out.println("Config exists: " + Files.exists(configFile));
     }
 }

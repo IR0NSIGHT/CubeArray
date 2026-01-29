@@ -1,9 +1,7 @@
-package com.example;
+package org.ironsight.CubeArray;
 
-import com.example.swing.AppContext;
-import com.example.swing.FileRenderApp;
-
-import static com.example.ResourceUtils.copyResourcesToFile;
+import org.ironsight.CubeArray.swing.AppContext;
+import org.ironsight.CubeArray.swing.FileRenderApp;
 
 
 public class CubeArrayMain {
@@ -13,7 +11,7 @@ public class CubeArrayMain {
         System.out.println("Hello world!");
 
         //copy files that are required to run the application
-        copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
+        ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
 
         //background copying for less improtant stuff
         periodicChecker.copyDefaultSchematics();

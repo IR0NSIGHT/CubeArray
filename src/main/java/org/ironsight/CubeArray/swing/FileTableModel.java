@@ -1,4 +1,4 @@
-package com.example.swing;
+package org.ironsight.CubeArray.swing;
 
 import javax.swing.table.AbstractTableModel;
 import java.io.File;

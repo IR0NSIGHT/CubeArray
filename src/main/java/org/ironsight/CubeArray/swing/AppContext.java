@@ -1,6 +1,6 @@
-package com.example.swing;
+package org.ironsight.CubeArray.swing;
 
-import com.example.ResourceUtils;
+import org.ironsight.CubeArray.ResourceUtils;
 
 import java.awt.*;
 import java.io.*;
@@ -11,7 +11,7 @@ import java.util.Set;
 public class AppContext implements Serializable {
     final HashMap<File, Long> filesAndTimestamps = new HashMap<>();
     final Set<File> activeFiles = new HashSet<>();
-    File lastSearchPath = ResourceUtils.getInstallPath().resolve(ResourceUtils.SCHEMATICS_ROOT).toFile();
+    File lastSearchPath = new File(System.getProperty("user.home"));
     Rectangle guiBounds = new Rectangle(0,0,400,400);
 
     public static File getSaveFile() {

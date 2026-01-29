@@ -1,8 +1,8 @@
-package com.example.swing;
+package org.ironsight.CubeArray.swing;
 
-import com.example.CubeArrayMain;
-import com.example.ResourceUtils;
-import com.example.SchemReader;
+import org.ironsight.CubeArray.CubeArrayMain;
+import org.ironsight.CubeArray.ResourceUtils;
+import org.ironsight.CubeArray.SchemReader;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
@@ -16,7 +16,7 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.util.stream.Collectors;
 
-import com.example.InstancedCubes;
+import org.ironsight.CubeArray.InstancedCubes;
 
 public class FileRenderApp {
     // main data structure
@@ -77,6 +77,8 @@ public class FileRenderApp {
                 }
             }
         });
+        fileTable.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
+
 
         JTextField searchField = new JTextField(20);
         searchField.setText("Search");

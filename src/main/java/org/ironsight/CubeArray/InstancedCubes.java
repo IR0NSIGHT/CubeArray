@@ -1,4 +1,4 @@
-package com.example;
+package org.ironsight.CubeArray;
 
 // LWJGL Instanced Cube Rendering Example
 // Requires LWJGL 3 and OpenGL 3.3+
@@ -16,7 +16,7 @@ import java.io.IOException;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 
-import static com.example.GlUtils.bind1DTexturePalette;
+import static org.ironsight.CubeArray.GlUtils.bind1DTexturePalette;
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL33.*;
@@ -391,15 +391,15 @@ public class InstancedCubes {
         glUniform3f(lightDirLoc, lightDir.x, lightDir.y, lightDir.z);
         glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
 
-        int colorPaletteTexID = bind1DTexturePalette(inputData.colorPalette, "colorPaletteTex", GL_TEXTURE0,
+        int colorPaletteTexID = GlUtils.bind1DTexturePalette(inputData.colorPalette, "colorPaletteTex", GL_TEXTURE0,
                 shaderProgram);
-        int sizePaletteTexID = bind1DTexturePalette(inputData.sizePalette, "sizePaletteTex", GL_TEXTURE1,
+        int sizePaletteTexID = GlUtils.bind1DTexturePalette(inputData.sizePalette, "sizePaletteTex", GL_TEXTURE1,
                 shaderProgram);
-        int offsetPaletteTexID = bind1DTexturePalette(inputData.offsetPalette, "offsetPaletteTex", GL_TEXTURE2,
+        int offsetPaletteTexID = GlUtils.bind1DTexturePalette(inputData.offsetPalette, "offsetPaletteTex", GL_TEXTURE2,
                 shaderProgram);
-        int rotationPaletteTexID = bind1DTexturePalette(inputData.rotationPalette, "rotationPaletteTex", GL_TEXTURE3,
+        int rotationPaletteTexID = GlUtils.bind1DTexturePalette(inputData.rotationPalette, "rotationPaletteTex", GL_TEXTURE3,
                 shaderProgram);
-        int uvPaletteTexId = bind1DTexturePalette(inputData.uvCoordsPalette, "uvPaletteTex", GL_TEXTURE4,
+        int uvPaletteTexId = GlUtils.bind1DTexturePalette(inputData.uvCoordsPalette, "uvPaletteTex", GL_TEXTURE4,
                 shaderProgram);
 
         glActiveTexture(GL_TEXTURE0);

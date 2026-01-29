@@ -1,4 +1,4 @@
-package com.example;
+package org.ironsight.CubeArray;
 
 import org.joml.Vector4f;
 import org.pepsoft.minecraft.Material;
@@ -8,7 +8,6 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
