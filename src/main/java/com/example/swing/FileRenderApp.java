@@ -6,6 +6,7 @@ import com.example.SchemReader;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -24,8 +25,11 @@ public class FileRenderApp {
     private boolean contextDirtyFlag;
 
     // UI model
-    private final DefaultListModel<File> listModel = new DefaultListModel<>();
-    private final JList<File> fileList = new JList<>(listModel);
+    private final FileTableModel tableModel = new FileTableModel();
+    private final JTable fileTable = new JTable(tableModel);
+    private final TableRowSorter<FileTableModel> rowSorter =
+            new TableRowSorter<>(tableModel);
+
 
     public static void startApp(final AppContext context) {
         SwingUtilities.invokeLater(()-> new FileRenderApp(context));
@@ -58,26 +62,27 @@ public class FileRenderApp {
 
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        fileList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+        fileTable.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+        fileTable.setRowSorter(rowSorter);
 
-        // Show only file names
-        fileList.setCellRenderer((list, value, index, isSelected, cellHasFocus) -> {
-            JLabel label = new JLabel(value.getName());
-            if (isSelected) {
+// show only file name
+        fileTable.setDefaultRenderer(Object.class, (table, value, selected, focused, row, col) -> {
+            JLabel label = new JLabel(((File) value).getName());
+            if (selected) {
                 label.setOpaque(true);
-                label.setBackground(list.getSelectionBackground());
-                label.setForeground(list.getSelectionForeground());
+                label.setBackground(table.getSelectionBackground());
+                label.setForeground(table.getSelectionForeground());
             }
             return label;
         });
 
-        fileList.addMouseListener(new MouseAdapter() {
+
+        fileTable.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
-                    int index = fileList.locationToIndex(e.getPoint());
-                    if (index >= 0) {
-                        File file = fileList.getModel().getElementAt(index);
+                    int viewRow = fileTable.rowAtPoint(e.getPoint());
+                    if (viewRow >= 0) {
                         renderSelectedFiles();
                     }
                 }
@@ -85,7 +90,8 @@ public class FileRenderApp {
         });
 
 
-        JScrollPane scrollPane = new JScrollPane(fileList);
+
+        JScrollPane scrollPane = new JScrollPane(fileTable);
 
         JButton addBtn = new JButton("Add");
         JButton removeBtn = new JButton("Remove");
@@ -106,7 +112,7 @@ public class FileRenderApp {
         frame.add(scrollPane, BorderLayout.CENTER);
         frame.add(bottomPanel, BorderLayout.SOUTH);
 
-        listModel.addAll(context.filesAndTimestamps.keySet());
+        context.filesAndTimestamps.keySet().forEach(tableModel::addFile);
 
         frame.setVisible(true);
     }
@@ -116,7 +122,7 @@ public class FileRenderApp {
         if (chooser.showOpenDialog(parent) == JFileChooser.APPROVE_OPTION) {
             for (File f : chooser.getSelectedFiles()) {
                 if (!context.filesAndTimestamps.containsKey(f)) {
-                    listModel.addElement(f);
+                    tableModel.addFile(f);
                     context.filesAndTimestamps.put(f,System.currentTimeMillis());
                 }
             }
@@ -148,16 +154,23 @@ public class FileRenderApp {
     }
 
     private void removeSelectedFiles() {
-        List<File> selected = fileList.getSelectedValuesList();
-        for (File f : selected) {
+        int[] viewRows = fileTable.getSelectedRows();
+        for (int viewRow : viewRows) {
+            int modelRow = fileTable.convertRowIndexToModel(viewRow);
+            File f = tableModel.getFileAt(modelRow);
             context.filesAndTimestamps.remove(f);
-            listModel.removeElement(f);
+            tableModel.removeFile(f);
         }
         contextDirtyFlag = true;
     }
 
     private void renderSelectedFiles() {
-        List<File> selected = fileList.getSelectedValuesList();
+        int[] viewRows = fileTable.getSelectedRows();
+        List<File> selected = java.util.Arrays.stream(viewRows)
+                .map(fileTable::convertRowIndexToModel)
+                .mapToObj(tableModel::getFileAt)
+                .toList();
+
         context.activeFiles.clear();
         context.activeFiles.addAll(selected);
         contextDirtyFlag = true;
