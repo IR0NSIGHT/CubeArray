@@ -2,3 +2,5 @@
 hs_err_*.log
 /.idea/
 /dist/
+CubeArray.iml
+dependency-reduced-pom.xml
