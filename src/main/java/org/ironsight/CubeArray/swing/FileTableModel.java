@@ -84,8 +84,9 @@ class FileTableModel extends AbstractTableModel {
     public void removeFile(File... files) {
         for (File file : files) {
             int i = this.files.indexOf(file);
-            if (i >= 0) fireTableRowsDeleted(i, i);
             this.files.remove(file);
+
+            if (i >= 0) fireTableRowsDeleted(i, i);
             assert !this.files.contains(file);
         }
     }
