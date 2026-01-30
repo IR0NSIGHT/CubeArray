@@ -12,16 +12,13 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.ironsight.CubeArray.InstancedCubes;
 
@@ -35,6 +32,8 @@ public class FileRenderApp {
 
     private final TableRowSorter<FileTableModel> rowSorter =
             new TableRowSorter<>(tableModel);
+    private final JButton renderBtn;
+    private final Set<Thread> loadingThreads = new HashSet<>();
     //is context dirty and needs to be saved?
     private boolean contextDirtyFlag;
 
@@ -47,8 +46,8 @@ public class FileRenderApp {
             contextDirtyFlag = true;
         }
 
-        CubeArrayMain.periodicChecker.addCallback(this::onPeriodicCheck);
-
+        CubeArrayMain.periodicChecker.addCallback(this::checkContextSaving);
+        CubeArrayMain.periodicChecker.addCallback(this::checkLoadingThreads);
         frame = new JFrame("File Renderer");
         frame.setSize(context.guiBounds.width, context.guiBounds.height);
         frame.setLocation(context.guiBounds.x, context.guiBounds.y);
@@ -138,7 +137,7 @@ public class FileRenderApp {
 
         JButton addBtn = new JButton("Add");
         JButton removeBtn = new JButton("Remove");
-        JButton renderBtn = new JButton("Render");
+        renderBtn = new JButton("Render");
 
         addBtn.addActionListener(e -> addFiles(frame));
         removeBtn.addActionListener(e -> removeSelectedFiles());
@@ -163,7 +162,7 @@ public class FileRenderApp {
         frame.setVisible(true);
     }
 
-    void onPeriodicCheck() {
+    void checkContextSaving() {
         // WARNING: this runs on the background thread NOT the gui thread!
         if (contextDirtyFlag) {
             contextDirtyFlag = false;
@@ -172,7 +171,21 @@ public class FileRenderApp {
         }
     }
 
+    private void checkLoadingThreads() {
+        synchronized (loadingThreads) {
+            loadingThreads.removeIf(t -> !t.isAlive());
+        }
+        SwingUtilities.invokeLater(() -> {
+            renderBtn.setVisible(loadingThreads.isEmpty());
+        });
+
+    }
+
     private void renderSelectedFiles() {
+        if (!loadingThreads.isEmpty()) {
+            return;
+        }
+
         int[] viewRows = fileTable.getSelectedRows();
         List<File> selected = java.util.Arrays.stream(viewRows)
                 .map(fileTable::convertRowIndexToModel)
@@ -250,6 +263,12 @@ public class FileRenderApp {
                 }
             });
             glThread.start();
+
+            // add to watchlist and update gui
+            synchronized (loadingThreads) {
+                loadingThreads.add(glThread);
+            }
+            checkLoadingThreads();
 
         } catch (Exception ex) {
             System.out.println("Error: " + ex.getMessage());

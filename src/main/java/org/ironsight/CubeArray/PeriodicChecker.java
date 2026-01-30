@@ -36,7 +36,7 @@ public class PeriodicChecker {
                     }
 
                     // wait 5 seconds
-                    Thread.sleep(2000);
+                    Thread.sleep(1000);
                 } catch (InterruptedException e) {
                     // Exit if the thread is interrupted
                     break;
