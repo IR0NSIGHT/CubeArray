@@ -47,7 +47,9 @@ public class InstancedCubes {
     private float autoRotate = 5f;
     private CameraState orbitCamera;
     private CameraState initialPos;
-    private CameraState fixPos_0, fixPos_1,fixPos_2,fixPos_3,fixPos_4,fixPos_5,fixPos_6,fixPos_7,fixPos_8,fixPos_9;
+    private CameraState fixPos_0, fixPos_1, fixPos_2, fixPos_3, fixPos_4, fixPos_5, fixPos_6, fixPos_7, fixPos_8, fixPos_9;
+    private boolean isFPV = false;
+    private CameraTransition transition;
 
     public InstancedCubes(SchemReader.CubeSetup setup) {
         this.setup = setup;
@@ -116,6 +118,9 @@ public class InstancedCubes {
                 initialPos.radius
         );
 
+        transition = new CameraTransition(
+                fixPos_2, fixPos_3, System.currentTimeMillis(), System.currentTimeMillis() + 1000
+        );
     }
 
     // entry point to directly render a schematic
@@ -166,7 +171,7 @@ public class InstancedCubes {
         setupBuffers();
 
     }
-    private boolean isFPV = false;
+
     private void loop() {
         glClearColor(0.53f, 0.81f, 0.92f, 1f);
 
@@ -188,13 +193,7 @@ public class InstancedCubes {
 
         // Scroll callback for zoom
         glfwSetScrollCallback(window, (win, xoffset, yoffset) -> {
-            float newRadius = java.lang.Math.max(0.0f, java.lang.Math.min(maxRadius, cameraState.radius() * (float) Math.pow(0.85, yoffset))); // clamp zoom
-            cameraState = new CameraState(
-                    cameraState.target(),
-                    cameraState.yaw(),
-                    cameraState.pitch(),
-                    newRadius // new radius
-            );
+            cameraState = zoom(cameraState, (float)yoffset);
         });
 
         // Mouse click callback
@@ -232,20 +231,20 @@ public class InstancedCubes {
                     // put your action here
                     if (key == GLFW_KEY_SPACE) {
                         autoRotate = autoRotate == 0 ? 5 : 0;
-                    }
-                    else if (key == GLFW_KEY_V) {
+                    } else if (key == GLFW_KEY_V) {
+                        CameraState newState;
                         //toggle orbit and FPV camera
                         if (!isFPV) {
                             /*is orbit*/
                             orbitCamera = cameraState; //save for later
-                            cameraState = new CameraState(
+                            newState = new CameraState(
                                     cameraState.target(),
                                     cameraState.yaw(),
                                     cameraState.pitch(),
                                     0.1f // new radius
                             );
                         } else {
-                            cameraState = new CameraState(
+                            newState = new CameraState(
                                     cameraState.target(),
                                     cameraState.yaw(),
                                     cameraState.pitch(),
@@ -253,33 +252,55 @@ public class InstancedCubes {
                             );
                         }
                         isFPV = !isFPV;
-                    }
-                    else if (key == GLFW_KEY_KP_0) {
-                        cameraState = fixPos_0;
-                    }
-                    else if (key == GLFW_KEY_KP_1) {
-                        cameraState = fixPos_1;
-                    }        else if (key == GLFW_KEY_KP_2) {
-                        cameraState = fixPos_2;
-                    }
-                    else if (key == GLFW_KEY_KP_3) {
-                        cameraState = fixPos_3;
-                    }
-                    else if (key == GLFW_KEY_KP_4) {
-                        cameraState = fixPos_4;
-                    }
-                    else if (key == GLFW_KEY_KP_5) {
-                        cameraState = fixPos_5;
-                    }
-                    else if (key == GLFW_KEY_KP_6) {
-                        cameraState = fixPos_6;
-                    }
-                    else if (key == GLFW_KEY_KP_7) {
-                        cameraState = fixPos_7;
-                    }        else if (key == GLFW_KEY_KP_8) {
-                        cameraState = fixPos_8;
-                    }        else if (key == GLFW_KEY_KP_9) {
-                        cameraState = fixPos_9;
+                        transition = new CameraTransition(
+                                cameraState, newState, System.currentTimeMillis(), System.currentTimeMillis() + 500
+                        );
+                    } else if (key == GLFW_KEY_KP_0) {
+                        transition = new CameraTransition(
+                                cameraState, fixPos_0, System.currentTimeMillis(), System.currentTimeMillis() + 500
+                        );
+                    } else if (key == GLFW_KEY_KP_1) {
+                        transition = new CameraTransition(
+                                cameraState, fixPos_1, System.currentTimeMillis(), System.currentTimeMillis() + 500
+                        );
+                    } else if (key == GLFW_KEY_KP_2) {
+                        transition = new CameraTransition(
+                                cameraState, fixPos_2, System.currentTimeMillis(), System.currentTimeMillis() + 500
+                        );
+                    } else if (key == GLFW_KEY_KP_3) {
+                        transition = new CameraTransition(
+                                cameraState, fixPos_3, System.currentTimeMillis(), System.currentTimeMillis() + 500
+                        );
+                    } else if (key == GLFW_KEY_KP_4) {
+                        transition = new CameraTransition(
+                                cameraState, fixPos_4, System.currentTimeMillis(), System.currentTimeMillis() + 500
+                        );
+                    } else if (key == GLFW_KEY_KP_5) {
+                        transition = new CameraTransition(
+                                cameraState, fixPos_5, System.currentTimeMillis(), System.currentTimeMillis() + 500
+                        );
+                    } else if (key == GLFW_KEY_KP_6) {
+                        transition = new CameraTransition(
+                                cameraState, fixPos_6, System.currentTimeMillis(), System.currentTimeMillis() + 500
+                        );
+                    } else if (key == GLFW_KEY_KP_7) {
+                        transition = new CameraTransition(
+                                cameraState, fixPos_7, System.currentTimeMillis(), System.currentTimeMillis() + 500
+                        );
+                    } else if (key == GLFW_KEY_KP_8) {
+                        transition = new CameraTransition(
+                                cameraState, fixPos_8, System.currentTimeMillis(), System.currentTimeMillis() + 500
+                        );
+                    } else if (key == GLFW_KEY_KP_9) {
+                        transition = new CameraTransition(
+                                cameraState, fixPos_9, System.currentTimeMillis(), System.currentTimeMillis() + 500
+                        );
+                    } else if (key == GLFW_KEY_KP_ADD) {
+                        // zoom in
+                        cameraState = zoom(cameraState,2);
+                    } else if (key == GLFW_KEY_KP_SUBTRACT) {
+                        // zoom out
+                        cameraState = zoom(cameraState,-2);
                     }
                 }
                 keys[key] = true;
@@ -337,7 +358,7 @@ public class InstancedCubes {
                 float pitch = cameraState.pitch - yoffset * sensitivity;
 
                 // Clamp pitch to avoid flipping
-                 pitch = Math.max(-1.5f, Math.min(1.5f, pitch));
+                pitch = Math.max(-1.5f, Math.min(1.5f, pitch));
                 cameraState = new CameraState(
                         cameraState.target(),
                         yaw,
@@ -366,22 +387,30 @@ public class InstancedCubes {
             float camZ = (float) (cameraState.radius() * Math.cos(cameraState.pitch()) * Math.cos(cameraState.yaw()));
 
             Vector3f cameraPos = new Vector3f(camX, camY, camZ);
-
+            // apply movement
             if (movement.length() != 0) {
                 cameraState = new CameraState(
                         new Vector3f(cameraState.target).add(movement),
-                        cameraState .yaw(),
-                        cameraState .pitch,
-                        cameraState .radius // new radius
+                        cameraState.yaw(),
+                        cameraState.pitch,
+                        cameraState.radius // new radius
                 );
             }
-            cameraPos.add(cameraState.target);
-
             if (movement.length() != 0) {
                 System.out.println("dimension=" + new Vector3f(setup.max).sub(setup.min));
                 System.out.printf("camera state=%s\n", cameraState.toString());
             }
 
+
+            if (transition != null) {
+                cameraState = transition.getStateAt(System.currentTimeMillis());
+                if (System.currentTimeMillis() > transition.timeEnd())
+                    transition = null;
+            }
+
+
+            // CALCULATE POSITIONS - DO NOT CHANGE CAMERA STATE AFTER THIS
+            cameraPos.add(cameraState.target);
             Matrix4f view = new Matrix4f().lookAt(cameraPos, cameraState.target(), new Vector3f(0, 1, 0));
 
             // reset mouse offsets
@@ -403,6 +432,16 @@ public class InstancedCubes {
             glfwPollEvents();
         }
 
+    }
+
+    private CameraState zoom(CameraState cameraState, float factor) {
+        float newRadius = java.lang.Math.max(0.0f, java.lang.Math.min(maxRadius, cameraState.radius() * (float) Math.pow(0.85, factor))); // clamp zoom
+        return new CameraState(
+                cameraState.target(),
+                cameraState.yaw(),
+                cameraState.pitch(),
+                newRadius // new radius
+        );
     }
 
     private void cleanup() {
@@ -650,19 +689,57 @@ public class InstancedCubes {
         }
     }
 
+    public record CameraTransition(
+            CameraState start,
+            CameraState end,
+            long timeStart,
+            long timeEnd
+    ) {
+        CameraState getStateAt(long time) {
+            float delta = (float) (time - timeStart) / (timeEnd - timeStart);
+            delta = Math.min(1,Math.max(0,delta));
+            return start.multiply(1 - delta).add(end.multiply(delta));
+        }
+    }
+
     public record CameraState(
             Vector3f target,
             float yaw,
             float pitch,
             float radius
     ) {
+        /**
+         * Component-wise addition with another CameraState
+         */
+        public CameraState add(CameraState other) {
+            return new CameraState(
+                    new Vector3f(this.target).add(other.target), // create new Vector3f to keep immutability
+                    this.yaw + other.yaw,
+                    this.pitch + other.pitch,
+                    this.radius + other.radius
+            );
+        }
+
+        /**
+         * Scale all numeric components by a factor
+         */
+        public CameraState multiply(float factor) {
+            return new CameraState(
+                    new Vector3f(this.target).mul(factor), // multiply vector
+                    this.yaw * factor,
+                    this.pitch * factor,
+                    this.radius * factor
+            );
+        }
+
         @Override
         public String toString() {
             return String.format(
                     "CameraState[x=%.2f, y=%.2f, z=%.2f, yaw=%.1f°, pitch=%.1f°, radius=%.2f]",
-                    target.x, target.y, target.z, toDegrees( yaw), toDegrees(pitch), radius
+                    target.x, target.y, target.z, toDegrees(yaw), toDegrees(pitch), radius
             );
         }
     }
+
 
 }
