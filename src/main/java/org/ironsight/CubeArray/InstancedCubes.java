@@ -12,9 +12,11 @@ import org.lwjgl.opengl.GL;
 
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
+import java.io.File;
 import java.io.IOException;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.util.List;
 
 import static org.ironsight.CubeArray.GlUtils.bind1DTexturePalette;
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
@@ -46,6 +48,22 @@ public class InstancedCubes {
     private SchemReader.CubeSetup setup;
     private float autoRotate = 5f;
 
+    // entry point to directly render a schematic
+    public static void main(String[] args) throws Exception {
+        File schemFile = new File("src/main/resources/schematics/ir0nsight/survivalTown.schem");
+        if (!schemFile.exists()) {
+            throw new RuntimeException("File not found: " + schemFile.getAbsolutePath());
+        }
+        System.out.println("File path: " + schemFile.getAbsolutePath());
+
+        SchemReader.CubeSetup setup = SchemReader.prepareData(SchemReader.loadSchematics(List.of(schemFile.toPath())));
+        if (setup == null) {
+            throw new RuntimeException("could not load schematic into cube setup");
+        } else {
+            new InstancedCubes(setup).run();
+        }
+    }
+
     public InstancedCubes(SchemReader.CubeSetup setup) {
         this.setup = setup;
         Vector3f center = new Vector3f(setup.min).add(setup.max).mul(0.5f);
@@ -54,15 +72,14 @@ public class InstancedCubes {
     }
 
     public void run() throws Exception {
-        init(setup);
+        inputData = setup;
+        init();
 
         loop();
         cleanup();
     }
 
-    private void init(SchemReader.CubeSetup res) throws Exception {
-        inputData = res;
-
+    private void init() throws Exception {
         System.out.println("generating " + inputData.positions.length + " cubes");
 
         GLFWErrorCallback.createPrint(System.err).set();
