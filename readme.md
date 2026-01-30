@@ -1,6 +1,9 @@
-# cubeArray
-cubeArray is a tool to 3d render minecraft schematic files, like .schem sponge formats.
+# CubeArray
+CubeArray is a tool to 3d render minecraft schematic files, like .schem sponge formats.
 You can fly through the landscape in FPV or view it from further away.
+
+[Github repository](https://github.com/IR0NSIGHT/CubeArray)  
+[Download latest release](https://github.com/IR0NSIGHT/CubeArray/releases)
 
 ![](./images/showcase_3pv_01.png)
 ![](./images/showcase_fpv_01.png)
@@ -15,16 +18,20 @@ Download the program and execute it. Select and load a schematic file.
 A window will appear that shows your schematic. 
 
 ### Keybindings
-rotate: Left click + drag
-horizontal move: Right click + drag, A/W/S/D
-vertical move: Q/E
-fast move: move and hold left ctrl
-zoom: Mouse wheel to zoom
-spacebar: toggle autorotation
-switch 3rd person/1st person: v
+- rotate: Left click + drag
+- horizontal move: Right click + drag, A/W/S/D
+- vertical move: Q/E
+- fast move: move and hold left ctrl
+- zoom: Mouse wheel to zoom
+- spacebar: toggle autorotation
+- switch 3rd person/1st person: v
 
 ## Supported schematic formats
-.schem
+1. .bo2
+2. .bo3
+3. .nbt
+4. .schematic
+5. .schem
 
 ## Requirements
 ### Java installation
@@ -39,6 +46,9 @@ The program was developed on windows 10, thats really all i can tell you.
 Usually the java JVM should shield the program from OS specific quirks, but i really dont have enough experience with cross OS developement to judge if this will hold.
 
 ## Limitations
+### entities
+can not display villagers, animals, etc. i think beds work? not sure.
+
 ### non-cubic block
 normal 1x1x1m blocks for very well, but most special blocks like torches, fences, etc blocks will suffer and will not be displayed correctly.
 
@@ -51,8 +61,15 @@ its not raytracing, and i dont not calculate any shadows. The only lightsource i
 ### editing
 its not a schematic editor. its a viewer.
 
+## FAQ
+- Where can i report bugs? 
+  - Discord DM or make an issue https://github.com/IR0NSIGHT/CubeArray/issues
+- I clicked "render" and nothing happened.
+  - Its loading your schematic, but if the schematic is huge and your pc a potatoe, it will take some time. Wait at most 5 minutes.
+
 ## technical details
 - scratch build in java using openGL bindings
-- uses worldpainter code to import schematic files into the program
+- uses worldpainter as a library to import schematic files into the program
 - uses textures from Faithful 32x - 1.21.7 resource pack: https://faithfulpack.net/
-
+- front end is Java Swing
+- 10% vibecoded. expect bugs
