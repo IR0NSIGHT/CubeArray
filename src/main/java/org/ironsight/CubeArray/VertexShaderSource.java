@@ -92,8 +92,14 @@ public class VertexShaderSource {
              float r = rand(gl_InstanceID) * 0.025;
              vColor    = blockColor + vec3(r);
              vWorldPos = worldPos;
-             vec2 uvStart = uvCoords.rg + 0.001;
-             vec2 uvEnd = uvCoords.ba - 0.001;
+             
+             vec2 uvStart = uvCoords.rg;
+             vec2 uvEnd = uvCoords.ba;
+             if (uvCoords != vec4(0,0,0,0)) { // make the texture square slightly smaller, so the edges dont flicker in the render. skip for 0,0,0,0 uvs which have no texture
+                uvStart = uvCoords.rg + 0.001;
+                uvEnd = uvCoords.ba - 0.001;
+             }
+             
              UV = (vertexUV * (uvEnd - uvStart)) + uvStart;
              viewPos = view * vec4(worldPos, 1.0);
              gl_Position = projection * view * vec4(worldPos, 1.0);

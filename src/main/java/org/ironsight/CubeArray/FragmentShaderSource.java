@@ -28,9 +28,13 @@ public class FragmentShaderSource {
             
                 // --- Texture + vertex color blending ---
                 float colorStrength = clamp(-fragViewPos.z / 200.0, 0.0, 1.0);
+                if (fragUV.x == 0) { //materials without a texture have UV(0,0)
+                    colorStrength = 1;
+                }
+                //colorStrength = 1; //DEBUG
                 vec4 texColor = texture(blockTexture, fragUV);
                 vec4 baseColor = mix(texColor, vec4(gColor, 1.0), colorStrength);
-            
+                
                 // --- Transparency discard ---
                 if(baseColor.a < 0.01 || (baseColor.a != 1.0 && baseColor.a < colorStrength * 5.0))
                     discard;
