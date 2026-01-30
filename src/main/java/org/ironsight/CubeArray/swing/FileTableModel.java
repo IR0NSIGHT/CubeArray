@@ -35,6 +35,18 @@ class FileTableModel extends AbstractTableModel {
         };
     }
 
+    @Override
+    public Class<?> getColumnClass(int col) {
+        return switch (col) {
+            case 0, 1 -> String.class;
+            case 2 -> Date.class;
+            case 3 -> String.class;
+            case 4 -> Long.class;
+            default -> null;
+        };
+    }
+
+
     private static long getSizeBytes(File f) {
         try {
             if (!f.isFile()) {
@@ -52,10 +64,6 @@ class FileTableModel extends AbstractTableModel {
         return (dot > 0 && dot < name.length() - 1)
                 ? name.substring(dot + 1).toLowerCase()
                 : "";
-    }
-
-    private static double bytesToMB(long bytes) {
-        return Math.round((bytes / (1024.0 * 1024.0)) * 100.0) / 100.0;
     }
 
     @Override
