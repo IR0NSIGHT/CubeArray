@@ -6,6 +6,7 @@ import org.ironsight.CubeArray.SchemReader;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -25,28 +26,23 @@ import java.util.stream.Stream;
 import org.ironsight.CubeArray.InstancedCubes;
 
 public class FileRenderApp {
+    final JFrame frame;
     // main data structure
     private final AppContext context;
-    //is context dirty and needs to be saved?
-    private boolean contextDirtyFlag;
-
     // UI model
     private final FileTableModel tableModel = new FileTableModel();
     private final JTable fileTable = new JTable(tableModel);
 
     private final TableRowSorter<FileTableModel> rowSorter =
             new TableRowSorter<>(tableModel);
+    //is context dirty and needs to be saved?
+    private boolean contextDirtyFlag;
 
-
-    public static void startApp(final AppContext context) {
-        SwingUtilities.invokeLater(()-> new FileRenderApp(context));
-    }
-    final JFrame frame;
     public FileRenderApp(final AppContext context) {
         this.context = context;
         if (context.neverBeforeUsed) {
             // add default schematics on very first use
-            ResourceUtils.getDefaultSchematics().forEach(s -> context.filesAndTimestamps.put(s.toFile(),System.currentTimeMillis()));
+            ResourceUtils.getDefaultSchematics().forEach(s -> context.filesAndTimestamps.put(s.toFile(), System.currentTimeMillis()));
             context.neverBeforeUsed = false;
             contextDirtyFlag = true;
         }
@@ -92,11 +88,27 @@ public class FileRenderApp {
         });
         fileTable.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
 
+        fileTable.getColumnModel().getColumn(4)
+                .setCellRenderer(new DefaultTableCellRenderer() {
+                    @Override
+                    protected void setValue(Object value) {
+                        if (value instanceof Long bytes) {
+                            setText(formatSize(bytes));
+                        } else {
+                            setText("");
+                        }
+                    }
+                });
+
 
         JTextField searchField = new JTextField(20);
         searchField.setText("Search");
         searchField.putClientProperty("JTextField.placeholderText", "Search...");
         searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                update();
+            }
+
             private void update() {
                 String text = searchField.getText().trim();
                 if (text.isEmpty()) {
@@ -112,9 +124,13 @@ public class FileRenderApp {
                 }
             }
 
-            public void insertUpdate(javax.swing.event.DocumentEvent e) { update(); }
-            public void removeUpdate(javax.swing.event.DocumentEvent e) { update(); }
-            public void changedUpdate(javax.swing.event.DocumentEvent e) { update(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                update();
+            }
+
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                update();
+            }
         });
 
 
@@ -147,18 +163,98 @@ public class FileRenderApp {
         frame.setVisible(true);
     }
 
+    void onPeriodicCheck() {
+        // WARNING: this runs on the background thread NOT the gui thread!
+        if (contextDirtyFlag) {
+            contextDirtyFlag = false;
+            System.out.println("WRITE CONTEXT TO FILE");
+            AppContext.write(this.context);
+        }
+    }
+
+    private void renderSelectedFiles() {
+        int[] viewRows = fileTable.getSelectedRows();
+        List<File> selected = java.util.Arrays.stream(viewRows)
+                .map(fileTable::convertRowIndexToModel)
+                .mapToObj(tableModel::getFileAt)
+                .toList();
+
+        context.activeFiles.clear();
+        context.activeFiles.addAll(selected);
+        contextDirtyFlag = true;
+
+        if (selected.isEmpty()) {
+            JOptionPane.showMessageDialog(null, "No files selected.");
+        } else {
+            // Your action goes here
+            renderFiles(selected);
+        }
+    }
+
+    private static String formatSize(long bytes) {
+        double kb = bytes / 1024.0;
+        if (kb < 1024) return String.format("%.1f KB", kb);
+
+        double mb = kb / 1024.0;
+        if (mb < 1024) return String.format("%.1f MB", mb);
+
+        double gb = mb / 1024.0;
+        return String.format("%.1f GB", gb);
+    }
+
     private void addFiles(Component parent) {
         JFileChooser chooser = getFileChooser();
         if (chooser.showOpenDialog(parent) == JFileChooser.APPROVE_OPTION) {
             for (File f : chooser.getSelectedFiles()) {
                 if (!context.filesAndTimestamps.containsKey(f)) {
                     tableModel.addFile(f);
-                    context.filesAndTimestamps.put(f,System.currentTimeMillis());
+                    context.filesAndTimestamps.put(f, System.currentTimeMillis());
                 }
             }
         }
         context.lastSearchPath = chooser.getCurrentDirectory();
         contextDirtyFlag = true;
+    }
+
+    private void removeSelectedFiles() {
+        int[] viewRows = fileTable.getSelectedRows();
+        File[] files = Arrays.stream(viewRows).map(fileTable::convertRowIndexToModel).mapToObj(tableModel::getFileAt).toArray(File[]::new);
+
+        Arrays.stream(files).forEach(context.filesAndTimestamps::remove);
+        tableModel.removeFile(files);
+
+        contextDirtyFlag = true;
+    }
+
+    private void renderFiles(List<File> selectedFiles) {
+        // Placeholder logic
+        System.out.println("Rendering files:");
+        for (File f : selectedFiles) {
+            System.out.println(" - " + f.getAbsolutePath());
+        }
+
+        try {
+            Thread glThread = new Thread(() -> {
+                try {
+                    SchemReader.CubeSetup setup = SchemReader.prepareData(SchemReader.loadSchematics(selectedFiles.stream().map(File::toPath).toList()));
+                    if (setup == null) {
+                        SwingUtilities.invokeLater(() -> {
+                            JOptionPane.showMessageDialog(frame, "Error: unable to load schematics from selected files. Maybe the file type is not supported or does not exist " +
+                                    "anymore?");
+                        });
+                        return;
+                    }
+                    new InstancedCubes(setup).run();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            glThread.start();
+
+        } catch (Exception ex) {
+            System.out.println("Error: " + ex.getMessage());
+        }
+
     }
 
     private JFileChooser getFileChooser() {
@@ -183,71 +279,7 @@ public class FileRenderApp {
         return chooser;
     }
 
-    private void removeSelectedFiles() {
-        int[] viewRows = fileTable.getSelectedRows();
-        List<File> files = Arrays.stream(viewRows).map(fileTable::convertRowIndexToModel).mapToObj(tableModel::getFileAt).toList();
-        for (File f : files) {
-            context.filesAndTimestamps.remove(f);
-            tableModel.removeFile(f);
-        }
-        contextDirtyFlag = true;
-    }
-
-    private void renderSelectedFiles() {
-        int[] viewRows = fileTable.getSelectedRows();
-        List<File> selected = java.util.Arrays.stream(viewRows)
-                .map(fileTable::convertRowIndexToModel)
-                .mapToObj(tableModel::getFileAt)
-                .toList();
-
-        context.activeFiles.clear();
-        context.activeFiles.addAll(selected);
-        contextDirtyFlag = true;
-
-        if (selected.isEmpty()) {
-            JOptionPane.showMessageDialog(null, "No files selected.");
-        } else {
-            // Your action goes here
-            renderFiles(selected);
-        }
-    }
-
-    private void renderFiles(List<File> selectedFiles) {
-        // Placeholder logic
-        System.out.println("Rendering files:");
-        for (File f : selectedFiles) {
-            System.out.println(" - " + f.getAbsolutePath());
-        }
-
-        try {
-            Thread glThread = new Thread(() -> {
-                try {
-                    SchemReader.CubeSetup setup = SchemReader.prepareData(SchemReader.loadSchematics(selectedFiles.stream().map(File::toPath).toList()));
-                    if (setup == null) {
-                        SwingUtilities.invokeLater(()->{
-                            JOptionPane.showMessageDialog(frame, "Error: unable to load schematics from selected files. Maybe the file type is not supported or does not exist anymore?");
-                        });
-                        return;
-                    }
-                    new InstancedCubes(setup).run();
-                } catch (Exception e) {
-                    throw new RuntimeException(e);
-                }
-            });
-            glThread.start();
-
-        } catch (Exception ex) {
-            System.out.println("Error: " + ex.getMessage());
-        }
-
-    }
-
-    void onPeriodicCheck() {
-        // WARNING: this runs on the background thread NOT the gui thread!
-        if (contextDirtyFlag) {
-            contextDirtyFlag = false;
-            System.out.println("WRITE CONTEXT TO FILE");
-            AppContext.write(this.context);
-        }
+    public static void startApp(final AppContext context) {
+        SwingUtilities.invokeLater(() -> new FileRenderApp(context));
     }
 }
