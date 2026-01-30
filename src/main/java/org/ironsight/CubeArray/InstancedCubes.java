@@ -18,6 +18,8 @@ import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.List;
 
+import static java.lang.Math.toDegrees;
+import static java.lang.Math.toRadians;
 import static org.ironsight.CubeArray.GlUtils.bind1DTexturePalette;
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
@@ -45,18 +47,75 @@ public class InstancedCubes {
     private float autoRotate = 5f;
     private CameraState orbitCamera;
     private CameraState initialPos;
+    private CameraState fixPos_0, fixPos_1,fixPos_2,fixPos_3,fixPos_4,fixPos_5,fixPos_6,fixPos_7,fixPos_8,fixPos_9;
 
     public InstancedCubes(SchemReader.CubeSetup setup) {
         this.setup = setup;
 
         initialPos = new CameraState(
                 new Vector3f(setup.min).add(setup.max).mul(0.5f), //center
-                (float) java.lang.Math.toRadians(30), //slightly from the side
-                (float) java.lang.Math.toRadians(30), //slightly from above
+                (float) toRadians(30), //slightly from the side
+                (float) toRadians(30), //slightly from above
                 new Vector3f(setup.max).sub(setup.min).length() //diagonal = radius
         );
 
         cameraState = initialPos;
+        fixPos_0 = initialPos;
+        fixPos_1 = new CameraState(
+                initialPos.target,
+                (float) toRadians(-45),
+                initialPos.yaw,
+                initialPos.radius
+        );
+        fixPos_2 = new CameraState(
+                initialPos.target,
+                (float) toRadians(0),
+                initialPos.yaw,
+                initialPos.radius
+        );
+        fixPos_3 = new CameraState(
+                initialPos.target,
+                (float) toRadians(45),
+                initialPos.yaw,
+                initialPos.radius
+        );
+        fixPos_4 = new CameraState(
+                initialPos.target,
+                (float) toRadians(-90),
+                initialPos.yaw,
+                initialPos.radius
+        );
+        fixPos_5 = new CameraState(
+                initialPos.target,
+                (float) toRadians(0),
+                (float) toRadians(89),
+                initialPos.radius
+        );
+        fixPos_6 = new CameraState(
+                initialPos.target,
+                (float) toRadians(90),
+                initialPos.yaw,
+                initialPos.radius
+        );
+        fixPos_7 = new CameraState(
+                initialPos.target,
+                (float) toRadians(-135),
+                initialPos.yaw,
+                initialPos.radius
+        );
+        fixPos_8 = new CameraState(
+                initialPos.target,
+                (float) toRadians(-180),
+                initialPos.yaw,
+                initialPos.radius
+        );
+        fixPos_9 = new CameraState(
+                initialPos.target,
+                (float) toRadians(135),
+                initialPos.yaw,
+                initialPos.radius
+        );
+
     }
 
     // entry point to directly render a schematic
@@ -115,7 +174,7 @@ public class InstancedCubes {
         FloatBuffer viewBuffer = BufferUtils.createFloatBuffer(16);
         autoRotate = 0f;
 
-        Matrix4f projection = new Matrix4f().perspective((float) java.lang.Math.toRadians(45.0f),
+        Matrix4f projection = new Matrix4f().perspective((float) toRadians(45.0f),
                 (float) width / height, .1f, 10000.0f);
         /* TODO add orthographic perspective?
         float aspect = (float) width / height;
@@ -174,7 +233,7 @@ public class InstancedCubes {
                     if (key == GLFW_KEY_SPACE) {
                         autoRotate = autoRotate == 0 ? 5 : 0;
                     }
-                    if (key == GLFW_KEY_V) {
+                    else if (key == GLFW_KEY_V) {
                         //toggle orbit and FPV camera
                         if (!isFPV) {
                             /*is orbit*/
@@ -194,6 +253,33 @@ public class InstancedCubes {
                             );
                         }
                         isFPV = !isFPV;
+                    }
+                    else if (key == GLFW_KEY_KP_0) {
+                        cameraState = fixPos_0;
+                    }
+                    else if (key == GLFW_KEY_KP_1) {
+                        cameraState = fixPos_1;
+                    }        else if (key == GLFW_KEY_KP_2) {
+                        cameraState = fixPos_2;
+                    }
+                    else if (key == GLFW_KEY_KP_3) {
+                        cameraState = fixPos_3;
+                    }
+                    else if (key == GLFW_KEY_KP_4) {
+                        cameraState = fixPos_4;
+                    }
+                    else if (key == GLFW_KEY_KP_5) {
+                        cameraState = fixPos_5;
+                    }
+                    else if (key == GLFW_KEY_KP_6) {
+                        cameraState = fixPos_6;
+                    }
+                    else if (key == GLFW_KEY_KP_7) {
+                        cameraState = fixPos_7;
+                    }        else if (key == GLFW_KEY_KP_8) {
+                        cameraState = fixPos_8;
+                    }        else if (key == GLFW_KEY_KP_9) {
+                        cameraState = fixPos_9;
                     }
                 }
                 keys[key] = true;
@@ -268,7 +354,7 @@ public class InstancedCubes {
             if (autoRotate != 0) {
                 cameraState = new CameraState(
                         cameraState.target(),
-                        (float) Math.toRadians((Math.toDegrees(cameraState.yaw) + autoRotate * deltaTime + 360f) % 360f),
+                        (float) toRadians((toDegrees(cameraState.yaw) + autoRotate * deltaTime + 360f) % 360f),
                         cameraState.pitch,
                         cameraState.radius // new radius
                 );
@@ -570,6 +656,13 @@ public class InstancedCubes {
             float pitch,
             float radius
     ) {
+        @Override
+        public String toString() {
+            return String.format(
+                    "CameraState[x=%.2f, y=%.2f, z=%.2f, yaw=%.1f°, pitch=%.1f°, radius=%.2f]",
+                    target.x, target.y, target.z, toDegrees( yaw), toDegrees(pitch), radius
+            );
+        }
     }
 
 }
