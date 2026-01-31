@@ -51,6 +51,7 @@ public class SchemReader {
     public static CubeSetup prepareData(List<WPObject> schematics) throws Exception {
         if (schematics.isEmpty())
             return null;
+        final String name = schematics.size() == 1 ? schematics.get(0).getName() : "schematics";
         List<Vector3f> positions = new ArrayList<>();
         List<Integer> blockTypeIndicesList = new ArrayList<>();
 
@@ -352,7 +353,7 @@ public class SchemReader {
         return new CubeSetup(positions.toArray(new Vector3f[0]),
                 blockTypeIndices,
                 colorPalette,
-                sizePalette, offsetPalette, rotationPalette, spriteSheet.getUvCoords(mat_to_palette_idx), spriteSheet.getTextureAtlas(), min, max);
+                sizePalette, offsetPalette, rotationPalette, spriteSheet.getUvCoords(mat_to_palette_idx), spriteSheet.getTextureAtlas(), min, max, name);
     }
 
     public static List<Path> findAllFiles(Path dir) throws IOException {
@@ -364,6 +365,7 @@ public class SchemReader {
     }
 
     public static class CubeSetup {
+        final String name;
         final Vector3f[] positions;
         final int[] colorIndices;
          //block colors by type
@@ -379,7 +381,7 @@ public class SchemReader {
         final Vector3f max;
 
         public CubeSetup(Vector3f[] positions, int[] colorIndices, Vector3f[] colorPalette, Vector3f[] sizePalette,
-                         Vector3f[] offsetPalette, Vector3f[] rotationPalette, Vector4f[] uvCoordsPalette, BufferedImage textureAtlas, Vector3f min, Vector3f max) {
+                         Vector3f[] offsetPalette, Vector3f[] rotationPalette, Vector4f[] uvCoordsPalette, BufferedImage textureAtlas, Vector3f min, Vector3f max, String name) {
             this.positions = positions;
             this.colorIndices = colorIndices;
             this.colorPalette = colorPalette;
@@ -389,8 +391,8 @@ public class SchemReader {
             this.uvCoordsPalette = uvCoordsPalette;
             this.textureAtlas = textureAtlas;
             this.min = min;
-
             this.max = max;
+            this.name = name;
         }
     }
 }

@@ -10,10 +10,12 @@ import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
 
+import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.List;
@@ -301,6 +303,8 @@ public class InstancedCubes {
                     } else if (key == GLFW_KEY_KP_SUBTRACT) {
                         // zoom out
                         cameraState = zoom(cameraState,-2);
+                    } else if (key == GLFW_KEY_P) {
+                        saveScreenshot();
                     }
                 }
                 keys[key] = true;
@@ -430,8 +434,41 @@ public class InstancedCubes {
 
             glfwSwapBuffers(window);
             glfwPollEvents();
+
+
+
+
         }
 
+    }
+
+    private void saveScreenshot() {
+        try {
+            File out = ResourceUtils.getScreenshotPath().resolve("screenshot_CubeArray_"+setup.name+ "_" +System.currentTimeMillis()+".png").toFile();
+            if (out.exists())
+                return; //pointless to screenshot the sam ething twice.
+
+            ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * 4);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+
+            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    int i = (x + width * y) * 4;
+                    int r = buffer.get(i) & 0xFF;
+                    int g = buffer.get(i + 1) & 0xFF;
+                    int b = buffer.get(i + 2) & 0xFF;
+                    int a = buffer.get(i + 3) & 0xFF;
+                    image.setRGB(x, height - y - 1, (a<<24)|(r<<16)|(g<<8)|b);
+                }
+            }
+            ImageIO.write(image, "png", out);
+            System.out.println("screenshot saved to " + out);
+        } catch (IOException ex ){
+            System.out.println(ex);
+        }
     }
 
     private CameraState zoom(CameraState cameraState, float factor) {

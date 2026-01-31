@@ -42,7 +42,15 @@ public class ResourceUtils {
         }
         return List.of();
     }
-
+    public static Path getScreenshotPath() {
+        Path main = getInstallPath().resolve("screenshots");
+        try {
+            Files.createDirectories(main);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return main;
+    }
     public static Path getInstallPath() {
         String os = System.getProperty("os.name").toLowerCase();
         Path base;
