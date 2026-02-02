@@ -23,6 +23,7 @@ import java.util.List;
 import static java.lang.Math.toDegrees;
 import static java.lang.Math.toRadians;
 import static org.ironsight.CubeArray.GlUtils.bind1DTexturePalette;
+import static org.ironsight.CubeArray.OpenGl.KeyBinding.*;
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL33.*;
@@ -193,6 +194,14 @@ public class InstancedCubes {
                 0.1f, 10000.0f
         ); */
 
+        GLFW.glfwSetKeyCallback(window, (windowHandle, key, scancode, action, mods) -> {
+            if (action == GLFW.GLFW_PRESS) {
+                String name = GLFW.glfwGetKeyName(key, scancode);
+                System.out.println("############### Pressed: " + name + ", " + scancode);
+            }
+        });
+
+
         // Scroll callback for zoom
         glfwSetScrollCallback(window, (win, xoffset, yoffset) -> {
             cameraState = zoom(cameraState, (float)yoffset);
@@ -231,9 +240,9 @@ public class InstancedCubes {
                     System.out.println("Key pressed once: " + key);
 
                     // put your action here
-                    if (key == GLFW_KEY_SPACE) {
+                    if (key == TOGGLE_AUTOROTATE.key) {
                         autoRotate = autoRotate == 0 ? 5 : 0;
-                    } else if (key == GLFW_KEY_V) {
+                    } else if (key == TOGGLE_FPV.key) {
                         CameraState newState;
                         //toggle orbit and FPV camera
                         if (!isFPV) {
@@ -257,60 +266,60 @@ public class InstancedCubes {
                         transition = new CameraTransition(
                                 cameraState, newState, System.currentTimeMillis(), System.currentTimeMillis() + 500
                         );
-                    } else if (key == GLFW_KEY_KP_0) {
+                    } else if (key == CAM_FIX_POS_0.key) {
                         transition = new CameraTransition(
                                 cameraState, fixPos_0, System.currentTimeMillis(), System.currentTimeMillis() + 500
                         );
-                    } else if (key == GLFW_KEY_KP_1) {
+                    } else if (key == CAM_FIX_POS_1.key) {
                         transition = new CameraTransition(
                                 cameraState, fixPos_1, System.currentTimeMillis(), System.currentTimeMillis() + 500
                         );
-                    } else if (key == GLFW_KEY_KP_2) {
+                    } else if (key == CAM_FIX_POS_2.key) {
                         transition = new CameraTransition(
                                 cameraState, fixPos_2, System.currentTimeMillis(), System.currentTimeMillis() + 500
                         );
-                    } else if (key == GLFW_KEY_KP_3) {
+                    } else if (key == CAM_FIX_POS_3.key) {
                         transition = new CameraTransition(
                                 cameraState, fixPos_3, System.currentTimeMillis(), System.currentTimeMillis() + 500
                         );
-                    } else if (key == GLFW_KEY_KP_4) {
+                    } else if (key == CAM_FIX_POS_4.key) {
                         transition = new CameraTransition(
                                 cameraState, fixPos_4, System.currentTimeMillis(), System.currentTimeMillis() + 500
                         );
-                    } else if (key == GLFW_KEY_KP_5) {
+                    } else if (key == CAM_FIX_POS_5.key) {
                         transition = new CameraTransition(
                                 cameraState, fixPos_5, System.currentTimeMillis(), System.currentTimeMillis() + 500
                         );
-                    } else if (key == GLFW_KEY_KP_6) {
+                    } else if (key == CAM_FIX_POS_6.key) {
                         transition = new CameraTransition(
                                 cameraState, fixPos_6, System.currentTimeMillis(), System.currentTimeMillis() + 500
                         );
-                    } else if (key == GLFW_KEY_KP_7) {
+                    } else if (key == CAM_FIX_POS_7.key) {
                         transition = new CameraTransition(
                                 cameraState, fixPos_7, System.currentTimeMillis(), System.currentTimeMillis() + 500
                         );
-                    } else if (key == GLFW_KEY_KP_8) {
+                    } else if (key == CAM_FIX_POS_8.key) {
                         transition = new CameraTransition(
                                 cameraState, fixPos_8, System.currentTimeMillis(), System.currentTimeMillis() + 500
                         );
-                    } else if (key == GLFW_KEY_KP_9) {
+                    } else if (key == CAM_FIX_POS_9.key) {
                         transition = new CameraTransition(
                                 cameraState, fixPos_9, System.currentTimeMillis(), System.currentTimeMillis() + 500
                         );
-                    } else if (key == GLFW_KEY_KP_ADD) {
+                    } else if (key == ZOOM_IN.key) {
                         // zoom in
                         cameraState = zoom(cameraState,2);
-                    } else if (key == GLFW_KEY_KP_SUBTRACT) {
+                    } else if (key == ZOOM_OUT.key) {
                         // zoom out
                         cameraState = zoom(cameraState,-2);
-                    } else if (key == GLFW_KEY_P) {
+                    } else if (key == DO_SCREENSHOT.key) {
                         saveScreenshot();
                     }
                 }
                 keys[key] = true;
             } else if (action == GLFW_RELEASE) {
                 keys[key] = false;
-                System.out.println("Key released: " + key);
+                System.out.println("Key released: " + key + ", scancode=" + scancode);
             }
         });
 
@@ -344,17 +353,18 @@ public class InstancedCubes {
 
             Vector3f movement = new Vector3f(0, 0, 0);
 
-            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) movement.sub(forward);
-            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) movement.add(forward);
-            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) movement.add(right);
-            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) movement.sub(right);
-            if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) movement.add(up);
-            if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) movement.sub(up);
-            if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) moveSpeedKeys *= 4;
+            if (glfwGetKey(window, MOVE_BACK.key) == GLFW_PRESS) movement.sub(forward);
+            if (glfwGetKey(window, MOVE_FORWARD.key) == GLFW_PRESS) movement.add(forward);
+            if (glfwGetKey(window, MOVE_RIGHT.key) == GLFW_PRESS) movement.add(right);
+            if (glfwGetKey(window, MOVE_LEFT.key) == GLFW_PRESS) movement.sub(right);
+            if (glfwGetKey(window, MOVE_UP.key) == GLFW_PRESS) movement.add(up);
+            if (glfwGetKey(window, MOVE_DOWN.key) == GLFW_PRESS) movement.sub(up);
+
+            if (glfwGetKey(window, MOVE_FAST.key) == GLFW_PRESS) moveSpeedKeys *= 4;
             if (movement.length() != 0) movement.normalize().mul(moveSpeedKeys);
 
-            boolean rotateCameraByMouse = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
-            boolean moveCameraByMouse = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
+            boolean rotateCameraByMouse = (glfwGetMouseButton(window, ROTATE_CAM_MOUSE.key) == GLFW_PRESS);
+            boolean moveCameraByMouse = (glfwGetMouseButton(window, MOVE_CAM_MOUSE.key) == GLFW_PRESS);
 
             if (rotateCameraByMouse) {
                 float sensitivity = .2f * deltaTime; // scaled by delta time
@@ -400,10 +410,11 @@ public class InstancedCubes {
                         cameraState.radius // new radius
                 );
             }
+            /*
             if (movement.length() != 0) {
                 System.out.println("dimension=" + new Vector3f(setup.max).sub(setup.min));
                 System.out.printf("camera state=%s\n", cameraState.toString());
-            }
+            } */
 
 
             if (transition != null) {
@@ -434,10 +445,6 @@ public class InstancedCubes {
 
             glfwSwapBuffers(window);
             glfwPollEvents();
-
-
-
-
         }
 
     }

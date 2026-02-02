@@ -18,13 +18,7 @@ Download the program and execute it. Select and load a schematic file.
 A window will appear that shows your schematic. 
 
 ### Keybindings
-- rotate: Left click + drag
-- horizontal move: Right click + drag, A/W/S/D
-- vertical move: Q/E
-- fast move: move and hold left ctrl
-- zoom: Mouse wheel to zoom
-- spacebar: toggle autorotation
-- switch 3rd person/1st person: v
+See list at [KeyBindings.md](./KeyBindings.md)
 
 ## Supported schematic formats
 1. .bo2
