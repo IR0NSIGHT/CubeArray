@@ -153,10 +153,13 @@ public class FileRenderApp {
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         bottomPanel.add(renderBtn);
 
-        frame.add(topPanel, BorderLayout.NORTH);
-        frame.add(scrollPane, BorderLayout.CENTER);
-        frame.add(bottomPanel, BorderLayout.SOUTH);
+        JPanel fileListPanel = new JPanel(new BorderLayout());
 
+        fileListPanel.add(topPanel, BorderLayout.NORTH);
+        fileListPanel.add(scrollPane, BorderLayout.CENTER);
+        fileListPanel.add(bottomPanel, BorderLayout.SOUTH);
+
+        frame.add(fileListPanel);
         context.filesAndTimestamps.keySet().forEach(tableModel::addFile);
 
         frame.setVisible(true);
