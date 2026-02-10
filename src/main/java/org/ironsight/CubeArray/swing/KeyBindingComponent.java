@@ -37,10 +37,14 @@ public class KeyBindingComponent extends JPanel {
         // Add table to scroll pane
         JScrollPane scrollPane = new JScrollPane(table);
         add(scrollPane, BorderLayout.CENTER);
+
+        for (KeyBinding k: KeyBinding.values()) {
+            this.addKeyBinding(k);
+        }
     }
 
     public void addKeyBinding(KeyBinding keyBinding) {
-        model.addRow(new Object[]{keyBinding.name().replace("_"," "), keyBinding.keyName, ""});
+        model.addRow(new Object[]{keyBinding.name().replace("_"," ").toLowerCase(), keyBinding.keyName, ""});
     }
 
     // Example usage
@@ -48,9 +52,6 @@ public class KeyBindingComponent extends JPanel {
         SwingUtilities.invokeLater(() -> {
             JFrame frame = new JFrame("KeyBindings");
             KeyBindingComponent keyBindingComponent = new KeyBindingComponent();
-            for (KeyBinding k: KeyBinding.values()) {
-                keyBindingComponent.addKeyBinding(k);
-            }
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             frame.setSize(400, 300);
             frame.add(keyBindingComponent);

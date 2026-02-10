@@ -312,7 +312,7 @@ public class InstancedCubes {
                     } else if (key == ZOOM_OUT.key) {
                         // zoom out
                         cameraState = zoom(cameraState,-2);
-                    } else if (key == DO_SCREENSHOT.key) {
+                    } else if (key == SCREENSHOT.key) {
                         saveScreenshot();
                     }
                 }
@@ -353,12 +353,12 @@ public class InstancedCubes {
 
             Vector3f movement = new Vector3f(0, 0, 0);
 
-            if (glfwGetKey(window, MOVE_BACK.key) == GLFW_PRESS) movement.sub(forward);
-            if (glfwGetKey(window, MOVE_FORWARD.key) == GLFW_PRESS) movement.add(forward);
-            if (glfwGetKey(window, MOVE_RIGHT.key) == GLFW_PRESS) movement.add(right);
-            if (glfwGetKey(window, MOVE_LEFT.key) == GLFW_PRESS) movement.sub(right);
-            if (glfwGetKey(window, MOVE_UP.key) == GLFW_PRESS) movement.add(up);
-            if (glfwGetKey(window, MOVE_DOWN.key) == GLFW_PRESS) movement.sub(up);
+            if (glfwGetKey(window, MOVE_BACK.key) == GLFW_PRESS) movement.add(forward); // NOTE: forward and right movement are inverted for some reason.
+            if (glfwGetKey(window, MOVE_FORWARD.key) == GLFW_PRESS) movement.sub(forward);
+            if (glfwGetKey(window, MOVE_RIGHT.key) == GLFW_PRESS) movement.sub(right);
+            if (glfwGetKey(window, MOVE_LEFT.key) == GLFW_PRESS) movement.add(right);
+            if (glfwGetKey(window, MOVE_UP.key) == GLFW_PRESS) movement.sub(up);
+            if (glfwGetKey(window, MOVE_DOWN.key) == GLFW_PRESS) movement.add(up);
 
             if (glfwGetKey(window, MOVE_FAST.key) == GLFW_PRESS) moveSpeedKeys *= 4;
             if (movement.length() != 0) movement.normalize().mul(moveSpeedKeys);

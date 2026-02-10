@@ -1,8 +1,5 @@
 package org.ironsight.CubeArray.OpenGl;
 
-import org.lwjgl.glfw.GLFW;
-
-import java.awt.event.KeyEvent;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,7 +20,7 @@ public enum KeyBinding {
     MOVE_FAST(GLFW_KEY_LEFT_CONTROL, "Left Ctrl"),
     TOGGLE_AUTOROTATE(GLFW_KEY_SPACE, "Space"),
     TOGGLE_FPV(GLFW_KEY_V, "V"),
-    DO_SCREENSHOT(GLFW_KEY_P, "P"),
+    SCREENSHOT(GLFW_KEY_P, "P"),
 
     // Mouse
     MOVE_CAM_MOUSE(GLFW_MOUSE_BUTTON_RIGHT, "Mouse Right"),

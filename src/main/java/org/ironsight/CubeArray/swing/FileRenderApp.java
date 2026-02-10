@@ -154,12 +154,19 @@ public class FileRenderApp {
         bottomPanel.add(renderBtn);
 
         JPanel fileListPanel = new JPanel(new BorderLayout());
+        {
+            fileListPanel.add(topPanel, BorderLayout.NORTH);
+            fileListPanel.add(scrollPane, BorderLayout.CENTER);
+            fileListPanel.add(bottomPanel, BorderLayout.SOUTH);
+        }
 
-        fileListPanel.add(topPanel, BorderLayout.NORTH);
-        fileListPanel.add(scrollPane, BorderLayout.CENTER);
-        fileListPanel.add(bottomPanel, BorderLayout.SOUTH);
+        JPanel keyBindingPanel = new KeyBindingComponent();
 
-        frame.add(fileListPanel);
+        JTabbedPane tabbedPane = new JTabbedPane(SwingConstants.LEFT);
+        tabbedPane.add("File List",fileListPanel);
+        tabbedPane.add("Key Bindings",keyBindingPanel);
+
+        frame.add(tabbedPane);
         context.filesAndTimestamps.keySet().forEach(tableModel::addFile);
 
         frame.setVisible(true);
