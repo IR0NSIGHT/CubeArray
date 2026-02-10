@@ -129,6 +129,7 @@
         </profile>
     </profiles>
     <build>
+        <finalName>CubeArray</finalName>
         <plugins>
             <!-- Maven Compiler Plugin (optional, your Java version) -->
             <plugin>
