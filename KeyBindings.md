@@ -12,7 +12,6 @@
 | cam fix pos 7 | Numpad 7 |
 | cam fix pos 8 | Numpad 8 |
 | cam fix pos 9 | Numpad 9 |
-| do screenshot | P |
 | move back | S |
 | move cam mouse | Mouse Right |
 | move down | E |
@@ -24,6 +23,7 @@
 | rotate cam mouse | Mouse Left |
 | rotate left | Unknown |
 | rotate right | Unknown |
+| screenshot | P |
 | toggle autorotate | Space |
 | toggle fpv | V |
 | zoom in | Numpad + |

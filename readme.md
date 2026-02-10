@@ -39,6 +39,15 @@ I have no idea if AMD cards will work.
 The program was developed on windows 10, thats really all i can tell you.
 Usually the java JVM should shield the program from OS specific quirks, but i really dont have enough experience with cross OS developement to judge if this will hold.
 
+### Screenshots
+in the install folder, you can find your screenshots:
+f.e. C:\Users\MyWindowsUserName\AppData\Local\CubeArray\screenshots
+
+you can probably use this link: [%USERPROFILE%\AppData\Local\CubeArray\screenshots](%USERPROFILE%\AppData\Local\CubeArray\screenshots) in your file explorer.
+
+### Texture Packs
+theoretically (untested) you can replace the texture pack in C:\Users\MyWindowsUser\AppData\Local\CubeArray\textures\Faithful_32x_1_21_7\assets . assuming that the assets follow a standard order, and are 32 pixels size, it should work.
+
 ## Limitations
 ### entities
 can not display villagers, animals, etc. i think beds work? not sure.

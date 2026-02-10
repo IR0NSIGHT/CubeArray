@@ -8,7 +8,7 @@
 
     <groupId>org.ironsight</groupId>
     <artifactId>CubeArray</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.1</version>
     <name>Lightweight minecraft schematic viewer</name>
 
     <properties>
