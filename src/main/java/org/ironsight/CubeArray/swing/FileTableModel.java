@@ -4,6 +4,7 @@ import org.ironsight.CubeArray.PeriodicChecker;
 import org.ironsight.CubeArray.SchemReader;
 import org.joml.Vector3f;
 import org.jspecify.annotations.Nullable;
+import org.pepsoft.minecraft.AbstractNBTItem;
 import org.pepsoft.worldpainter.layers.bo2.Schem;
 import org.pepsoft.worldpainter.objects.WPObject;
 
@@ -13,10 +14,7 @@ import javax.swing.table.DefaultTableCellRenderer;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 class FileTableModel extends AbstractTableModel {
@@ -163,7 +161,7 @@ class FileTableModel extends AbstractTableModel {
                     yield List.of();
                 yield obj.getAllMaterials().stream()
                         .filter(Objects::nonNull)
-                        .map(m ->  m.simpleName)
+                        .map(m -> m.simpleName)
                         .distinct()
                         .sorted()
                         .toList();
@@ -175,6 +173,28 @@ class FileTableModel extends AbstractTableModel {
                 } else {
                     yield List.of();
                 }
+            }
+
+            case ENTITIES -> {
+                if (obj != null && obj.getEntities() != null) {
+                    yield obj.getEntities().stream()
+                            .map(e -> e.getId() + " [" +
+                                    Arrays.stream(e.getPos())
+                                            .mapToLong(Math::round)
+                                            .mapToObj(Long::toString).collect(Collectors.joining(", "))
+                                    + "]"
+                            ).distinct().sorted().toList();
+                } else
+                    yield List.of();
+            }
+
+            case TILE_ENTITIES -> {
+                if (obj != null && obj.getTileEntities() != null) {
+                    yield obj.getTileEntities().stream().map(te ->
+                            te.getId() + "[" + te.getX() + "," + te.getY() + "," + te.getZ() + "]"
+                    ).distinct().sorted().toList();
+                } else
+                    yield List.of();
             }
 
             default -> {
@@ -254,6 +274,8 @@ class FileTableModel extends AbstractTableModel {
         DIMENSION_DIAGONAL("Diagonal", Integer.class, dimensionRenderer, "Diagonal of the schematic from edge to edge (meters)"),
         PATH("Path", String.class, null, "Filepath where the file lives"),
         BLOCKS("Blocks", List.class, stringListRenderer, "Blocktypes that are used in the schematic"),
+        ENTITIES("Entities", List.class, stringListRenderer, "Entities in the schematic"),
+        TILE_ENTITIES("Tile Entities", List.class, stringListRenderer, "Tile Entities in the schematic"),
         ATTRIBUTES("Attributes", HashMap.class, attributesRenderer, "NBT Attributes attached to the schematic"),
         ;
         final String displayName;
