@@ -1,26 +1,24 @@
 package org.ironsight.CubeArray.swing;
 
 import org.ironsight.CubeArray.CubeArrayMain;
+import org.ironsight.CubeArray.InstancedCubes;
 import org.ironsight.CubeArray.ResourceUtils;
 import org.ironsight.CubeArray.SchemReader;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
-import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableRowSorter;
 import java.awt.*;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import org.ironsight.CubeArray.InstancedCubes;
 
 public class FileRenderApp {
     final JFrame frame;
@@ -37,6 +35,39 @@ public class FileRenderApp {
     //is context dirty and needs to be saved?
     private boolean contextDirtyFlag;
 
+    private record TextSearch(
+            String searchString,
+            List<FileTableModel.Column> searchColumns,
+            boolean excludeMatches
+    ) {
+        // provide default values via a compact constructor
+        public TextSearch() {
+            this("", List.of(), false);
+        }
+    }
+    private TextSearch currentSearch = new TextSearch();
+
+    private void updateTextSearch(TextSearch newSearch) {
+        this.currentSearch = newSearch;
+        if (currentSearch.searchString.isEmpty()) {
+            rowSorter.setRowFilter(null);
+        } else {
+
+            rowSorter.setRowFilter(new RowFilter<>() {
+                @Override
+                public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
+                    for (FileTableModel.Column c: FileTableModel.Column.values()) {
+                        if (c.renderer.convertToString(entry.getValue(c.ordinal())).toLowerCase().contains(currentSearch.searchString))
+                            return true;
+                    }
+                    return false;
+                }
+            });
+        }
+        for (FileTableModel.Column c: FileTableModel.Column.values()) {
+            c.renderer.setSearchText(currentSearch.searchString);
+        }
+    }
     public FileRenderApp(final AppContext context) {
         this.context = context;
         if (context.neverBeforeUsed) {
@@ -107,18 +138,8 @@ public class FileRenderApp {
             }
 
             private void update() {
-                String text = searchField.getText().trim();
-                if (text.isEmpty()) {
-                    rowSorter.setRowFilter(null);
-                } else {
-                    rowSorter.setRowFilter(new RowFilter<>() {
-                        @Override
-                        public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
-                            return (entry.getValue(0) instanceof String name && name.toLowerCase().contains(text.toLowerCase()) ||
-                                    (entry.getValue(1) instanceof String fullPath && fullPath.toLowerCase().contains(text.toLowerCase())));
-                        }
-                    });
-                }
+                String text = searchField.getText().trim().toLowerCase();
+                updateTextSearch(new TextSearch(text, currentSearch.searchColumns, currentSearch.excludeMatches));
             }
 
             public void removeUpdate(javax.swing.event.DocumentEvent e) {
