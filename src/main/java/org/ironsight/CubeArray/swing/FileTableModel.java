@@ -4,7 +4,6 @@ import org.ironsight.CubeArray.PeriodicChecker;
 import org.ironsight.CubeArray.SchemReader;
 import org.joml.Vector3f;
 import org.jspecify.annotations.Nullable;
-import org.pepsoft.minecraft.AbstractNBTItem;
 import org.pepsoft.worldpainter.layers.bo2.Schem;
 import org.pepsoft.worldpainter.objects.WPObject;
 
@@ -18,58 +17,57 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 class FileTableModel extends AbstractTableModel {
-    private final static DefaultTableCellRenderer fileSizeRenderer = new DefaultTableCellRenderer() {
+
+    private final static StringConverter defaultRenderer = new StringConverter() {
         @Override
-        protected void setValue(Object value) {
-            if (value instanceof Long bytes) {
-                setText(formatSize(bytes));
-            } else {
-                setText("");
-            }
+        public String convertToString(Object o) {
+            return o.toString();
         }
     };
-
-    private final static DefaultTableCellRenderer stringListRenderer = new DefaultTableCellRenderer() {
+    private final static StringConverter attributesRenderer = new StringConverter() {
         @Override
-        protected void setValue(Object value) {
-            if (value instanceof List<?> list) {
-                setText(list.stream().filter(Objects::nonNull).map(Object::toString).collect(Collectors.joining(", ")));
-            } else {
-                setText("");
-            }
-        }
-    };
-
-    private final static DefaultTableCellRenderer attributesRenderer = new DefaultTableCellRenderer() {
-        @Override
-        protected void setValue(Object value) {
+        public String convertToString(Object value) {
             if (value instanceof HashMap<?, ?> map) {
-                setText(
+                return
                         map.entrySet().stream()
                                 .filter(Objects::nonNull)
                                 .map(entry -> entry.getKey() + "=" + entry.getValue())
                                 .sorted()
                                 .collect(Collectors.joining(", "))
-                );
+                        ;
+            }
+            return super.convertToString(value);
+        }
+    };
+    private static final StringConverter fileSizeRenderer = new StringConverter() {
+
+        @Override
+        public String convertToString(Object value) {
+            if (value instanceof Long bytes) {
+                return formatSize(bytes);
             } else {
-                setText("");
+                return super.convertToString(value);
             }
         }
     };
-
-    public static int NO_VALUE = -1;
-    private final static DefaultTableCellRenderer dimensionRenderer = new DefaultTableCellRenderer() {
-
+    private static final StringConverter stringListRenderer = new StringConverter() {
         @Override
-        protected void setValue(Object value) {
-            if (value instanceof Integer dim) {
-                if (dim == NO_VALUE) {
-                    setText("?");
-                } else {
-                    setText(dim.toString());
-                }
+        public String convertToString(Object value) {
+            if (value instanceof List<?> list) {
+                return list.stream().filter(Objects::nonNull).map(Object::toString).collect(Collectors.joining(", "));
             } else {
-                setText("");
+                return super.convertToString(value);
+            }
+        }
+    };
+    public static int NO_VALUE = -1;
+    private static final StringConverter dimensionRenderer = new StringConverter() {
+        @Override
+        public String convertToString(Object value) {
+            if (value instanceof Integer dim && dim != NO_VALUE) {
+                return dim.toString();
+            } else {
+                return super.convertToString(value);
             }
         }
     };
@@ -264,34 +262,45 @@ class FileTableModel extends AbstractTableModel {
     }
 
     enum Column {
-        FILE("File", String.class, null, "Name of the file"),
-        LAST_CHANGED("Last Changed", Date.class, null, "Date when the file was last modified"),
-        FILE_TYPE("File Type", String.class, null, "File extension"),
+        FILE("File", String.class, defaultRenderer, "Name of the file"),
+        LAST_CHANGED("Last Changed", Date.class, defaultRenderer, "Date when the file was last modified"),
+        FILE_TYPE("File Type", String.class, defaultRenderer, "File extension"),
         FILE_SIZE("File Size (MB)", Long.class, fileSizeRenderer, "Size of the file"),
         DIMENSION_WIDTH("Width", Integer.class, dimensionRenderer, "Width of the schematic (meters)"),
         DIMENSION_HEIGHT("Height", Integer.class, dimensionRenderer, "Height of the schematic (meters)"),
         DIMENSION_DEPTH("Depth", Integer.class, dimensionRenderer, "Depth of the schematic (meters)"),
         DIMENSION_DIAGONAL("Diagonal", Integer.class, dimensionRenderer, "Diagonal of the schematic from edge to edge (meters)"),
-        PATH("Path", String.class, null, "Filepath where the file lives"),
+        PATH("Path", String.class, defaultRenderer, "Filepath where the file lives"),
         BLOCKS("Blocks", List.class, stringListRenderer, "Blocktypes that are used in the schematic"),
         ENTITIES("Entities", List.class, stringListRenderer, "Entities in the schematic"),
         TILE_ENTITIES("Tile Entities", List.class, stringListRenderer, "Tile Entities in the schematic"),
-        ATTRIBUTES("Attributes", HashMap.class, attributesRenderer, "NBT Attributes attached to the schematic"),
+        ATTRIBUTES("Attributes", HashMap.class, defaultRenderer, "NBT Attributes attached to the schematic"),
         ;
         final String displayName;
         final Class<?> clazz;
         final String tooltip;
-        final DefaultTableCellRenderer renderer;
+        final StringConverter renderer;
 
-        private Column(String name, Class<?> clazz, @Nullable DefaultTableCellRenderer renderer, String tooltip) {
+        private Column(String name, Class<?> clazz, StringConverter renderer, String tooltip) {
             this.tooltip = tooltip;
             this.displayName = name;
             this.clazz = clazz;
-            if (renderer == null) {
-                this.renderer = new DefaultTableCellRenderer();
-            } else {
-                this.renderer = renderer;
-            }
+
+            this.renderer = renderer;
+
+        }
+    }
+
+    static abstract class StringConverter extends DefaultTableCellRenderer {
+        @Override
+        protected void setValue(Object value) {
+            setText(convertToString(value));
+        }
+
+        ;
+
+        public String convertToString(Object o) {
+            return "?";
         }
     }
 }

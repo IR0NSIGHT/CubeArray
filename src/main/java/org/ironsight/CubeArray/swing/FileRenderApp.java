@@ -114,8 +114,11 @@ public class FileRenderApp {
                     rowSorter.setRowFilter(new RowFilter<>() {
                         @Override
                         public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
-                            return (entry.getValue(0) instanceof String name && name.toLowerCase().contains(text.toLowerCase()) ||
-                                    (entry.getValue(1) instanceof String fullPath && fullPath.toLowerCase().contains(text.toLowerCase())));
+                            for (FileTableModel.Column c: FileTableModel.Column.values()) {
+                                if (c.renderer.convertToString(entry.getValue(c.ordinal())).toLowerCase().contains(text.toLowerCase()))
+                                    return true;
+                            }
+                            return false;
                         }
                     });
                 }
