@@ -4,18 +4,20 @@ import org.ironsight.CubeArray.PeriodicChecker;
 import org.ironsight.CubeArray.SchemReader;
 import org.joml.Vector3f;
 import org.jspecify.annotations.Nullable;
+import org.pepsoft.worldpainter.layers.bo2.Schem;
 import org.pepsoft.worldpainter.objects.WPObject;
 
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
-import javax.vecmath.Point3i;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 class FileTableModel extends AbstractTableModel {
     private final static DefaultTableCellRenderer fileSizeRenderer = new DefaultTableCellRenderer() {
@@ -28,6 +30,35 @@ class FileTableModel extends AbstractTableModel {
             }
         }
     };
+
+    private final static DefaultTableCellRenderer stringListRenderer = new DefaultTableCellRenderer() {
+        @Override
+        protected void setValue(Object value) {
+            if (value instanceof List<?> list) {
+                setText(list.stream().filter(Objects::nonNull).map(Object::toString).collect(Collectors.joining(", ")));
+            } else {
+                setText("");
+            }
+        }
+    };
+
+    private final static DefaultTableCellRenderer attributesRenderer = new DefaultTableCellRenderer() {
+        @Override
+        protected void setValue(Object value) {
+            if (value instanceof HashMap<?, ?> map) {
+                setText(
+                        map.entrySet().stream()
+                                .filter(Objects::nonNull)
+                                .map(entry -> entry.getKey() + "=" + entry.getValue())
+                                .sorted()
+                                .collect(Collectors.joining(", "))
+                );
+            } else {
+                setText("");
+            }
+        }
+    };
+
     public static int NO_VALUE = -1;
     private final static DefaultTableCellRenderer dimensionRenderer = new DefaultTableCellRenderer() {
 
@@ -127,6 +158,25 @@ class FileTableModel extends AbstractTableModel {
                     yield NO_VALUE;
                 yield Math.round(new Vector3f(obj.getDimensions().x, obj.getDimensions().y, obj.getDimensions().z).length());
             }
+            case BLOCKS -> {
+                if (obj == null)
+                    yield List.of();
+                yield obj.getAllMaterials().stream()
+                        .filter(Objects::nonNull)
+                        .map(m ->  m.simpleName)
+                        .distinct()
+                        .sorted()
+                        .toList();
+            }
+
+            case ATTRIBUTES -> {
+                if (obj instanceof Schem schematic) {
+                    yield schematic.getAttributes();
+                } else {
+                    yield List.of();
+                }
+            }
+
             default -> {
                 assert false : "incomplete enum";
                 yield null;
@@ -194,15 +244,17 @@ class FileTableModel extends AbstractTableModel {
     }
 
     enum Column {
-        FILE("File", String.class, null,"Name of the file"),
-        LAST_CHANGED("Last Changed", Date.class, null,"Date when the file was last modified"),
-        FILE_TYPE("File Type", String.class, null,"File extension"),
-        FILE_SIZE("File Size (MB)", Long.class, fileSizeRenderer,"Size of the file"),
-        DIMENSION_WIDTH("Width", Integer.class, dimensionRenderer,"Width of the schematic (meters)"),
-        DIMENSION_HEIGHT("Height", Integer.class, dimensionRenderer,"Height of the schematic (meters)"),
-        DIMENSION_DEPTH("Depth", Integer.class, dimensionRenderer,"Depth of the schematic (meters)"),
-        DIMENSION_DIAGONAL("Diagonal", Integer.class, dimensionRenderer,"Diagonal of the schematic from edge to edge (meters)"),
-        PATH("Path", String.class, null,"Filepath where the file lives"),
+        FILE("File", String.class, null, "Name of the file"),
+        LAST_CHANGED("Last Changed", Date.class, null, "Date when the file was last modified"),
+        FILE_TYPE("File Type", String.class, null, "File extension"),
+        FILE_SIZE("File Size (MB)", Long.class, fileSizeRenderer, "Size of the file"),
+        DIMENSION_WIDTH("Width", Integer.class, dimensionRenderer, "Width of the schematic (meters)"),
+        DIMENSION_HEIGHT("Height", Integer.class, dimensionRenderer, "Height of the schematic (meters)"),
+        DIMENSION_DEPTH("Depth", Integer.class, dimensionRenderer, "Depth of the schematic (meters)"),
+        DIMENSION_DIAGONAL("Diagonal", Integer.class, dimensionRenderer, "Diagonal of the schematic from edge to edge (meters)"),
+        PATH("Path", String.class, null, "Filepath where the file lives"),
+        BLOCKS("Blocks", List.class, stringListRenderer, "Blocktypes that are used in the schematic"),
+        ATTRIBUTES("Attributes", HashMap.class, attributesRenderer, "NBT Attributes attached to the schematic"),
         ;
         final String displayName;
         final Class<?> clazz;
