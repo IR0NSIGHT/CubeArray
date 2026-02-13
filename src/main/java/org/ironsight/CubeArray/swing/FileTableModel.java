@@ -151,8 +151,8 @@ class FileTableModel extends AbstractTableModel {
             case FILE_TYPE -> getFileExtension(f);
             case LAST_CHANGED -> new Date(f.lastModified());
             case DIMENSION_WIDTH -> obj == null ? NO_VALUE : obj.getDimensions().x;
-            case DIMENSION_HEIGHT -> obj == null ? NO_VALUE : obj.getDimensions().y;
-            case DIMENSION_DEPTH -> obj == null ? NO_VALUE : obj.getDimensions().z;
+            case DIMENSION_HEIGHT -> obj == null ? NO_VALUE : obj.getDimensions().z;
+            case DIMENSION_DEPTH -> obj == null ? NO_VALUE : obj.getDimensions().y;
             case DIMENSION_DIAGONAL -> {
                 if (obj == null)
                     yield NO_VALUE;
