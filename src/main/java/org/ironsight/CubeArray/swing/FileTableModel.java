@@ -28,11 +28,17 @@ class FileTableModel extends AbstractTableModel {
             }
         }
     };
+    public static int NO_VALUE = -1;
     private final static DefaultTableCellRenderer dimensionRenderer = new DefaultTableCellRenderer() {
+
         @Override
         protected void setValue(Object value) {
-            if (value instanceof Point3i dimension) {
-                setText(dimension.x + " x " + dimension.y + " x " + dimension.z);
+            if (value instanceof Integer dim) {
+                if (dim == NO_VALUE) {
+                    setText("?");
+                } else {
+                    setText(dim.toString());
+                }
             } else {
                 setText("");
             }
@@ -113,9 +119,18 @@ class FileTableModel extends AbstractTableModel {
             case FILE_SIZE -> getSizeBytes(f);
             case FILE_TYPE -> getFileExtension(f);
             case LAST_CHANGED -> new Date(f.lastModified());
-            case DIMENSION -> obj == null ? new Vector3f(0, 0, 0) : obj.getDimensions();
-
-            default -> null;
+            case DIMENSION_WIDTH -> obj == null ? NO_VALUE : obj.getDimensions().x;
+            case DIMENSION_HEIGHT -> obj == null ? NO_VALUE : obj.getDimensions().y;
+            case DIMENSION_DEPTH -> obj == null ? NO_VALUE : obj.getDimensions().z;
+            case DIMENSION_DIAGONAL -> {
+                if (obj == null)
+                    yield NO_VALUE;
+                yield Math.round(new Vector3f(obj.getDimensions().x, obj.getDimensions().y, obj.getDimensions().z).length());
+            }
+            default -> {
+                assert false : "incomplete enum";
+                yield null;
+            }
         };
     }
 
@@ -179,18 +194,23 @@ class FileTableModel extends AbstractTableModel {
     }
 
     enum Column {
-        FILE("File", String.class, null),
-        LAST_CHANGED("Last Changed", Date.class, null),
-        FILE_TYPE("File Type", String.class, null),
-        FILE_SIZE("File Size (MB)", Long.class, fileSizeRenderer),
-        DIMENSION("Dimension", Point3i.class, dimensionRenderer),
-        PATH("Path", String.class, null),
+        FILE("File", String.class, null,"Name of the file"),
+        LAST_CHANGED("Last Changed", Date.class, null,"Date when the file was last modified"),
+        FILE_TYPE("File Type", String.class, null,"File extension"),
+        FILE_SIZE("File Size (MB)", Long.class, fileSizeRenderer,"Size of the file"),
+        DIMENSION_WIDTH("Width", Integer.class, dimensionRenderer,"Width of the schematic (meters)"),
+        DIMENSION_HEIGHT("Height", Integer.class, dimensionRenderer,"Height of the schematic (meters)"),
+        DIMENSION_DEPTH("Depth", Integer.class, dimensionRenderer,"Depth of the schematic (meters)"),
+        DIMENSION_DIAGONAL("Diagonal", Integer.class, dimensionRenderer,"Diagonal of the schematic from edge to edge (meters)"),
+        PATH("Path", String.class, null,"Filepath where the file lives"),
         ;
         final String displayName;
         final Class<?> clazz;
+        final String tooltip;
         final DefaultTableCellRenderer renderer;
 
-        private Column(String name, Class<?> clazz, @Nullable DefaultTableCellRenderer renderer) {
+        private Column(String name, Class<?> clazz, @Nullable DefaultTableCellRenderer renderer, String tooltip) {
+            this.tooltip = tooltip;
             this.displayName = name;
             this.clazz = clazz;
             if (renderer == null) {
