@@ -315,7 +315,7 @@ class FileTableModel extends AbstractTableModel {
         private String searchText = "";
 
         public void setSearchText(String searchText) {
-            this.searchText = searchText != null ? searchText.toLowerCase() : "";
+            this.searchText = searchText != null ? searchText : "";
         }
 
         @Override
