@@ -1,26 +1,24 @@
 package org.ironsight.CubeArray.swing;
 
 import org.ironsight.CubeArray.CubeArrayMain;
+import org.ironsight.CubeArray.InstancedCubes;
 import org.ironsight.CubeArray.ResourceUtils;
 import org.ironsight.CubeArray.SchemReader;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
-import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableRowSorter;
 import java.awt.*;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import org.ironsight.CubeArray.InstancedCubes;
 
 public class FileRenderApp {
     final JFrame frame;
@@ -111,6 +109,7 @@ public class FileRenderApp {
                 if (text.isEmpty()) {
                     rowSorter.setRowFilter(null);
                 } else {
+
                     rowSorter.setRowFilter(new RowFilter<>() {
                         @Override
                         public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
@@ -121,6 +120,9 @@ public class FileRenderApp {
                             return false;
                         }
                     });
+                }
+                for (FileTableModel.Column c: FileTableModel.Column.values()) {
+                    c.renderer.setSearchText(text);
                 }
             }
 

@@ -3,17 +3,18 @@ package org.ironsight.CubeArray.swing;
 import org.ironsight.CubeArray.PeriodicChecker;
 import org.ironsight.CubeArray.SchemReader;
 import org.joml.Vector3f;
-import org.jspecify.annotations.Nullable;
 import org.pepsoft.worldpainter.layers.bo2.Schem;
 import org.pepsoft.worldpainter.objects.WPObject;
 
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
+import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.*;
+import java.util.List;
 import java.util.stream.Collectors;
 
 class FileTableModel extends AbstractTableModel {
@@ -274,7 +275,7 @@ class FileTableModel extends AbstractTableModel {
         BLOCKS("Blocks", List.class, stringListRenderer, "Blocktypes that are used in the schematic"),
         ENTITIES("Entities", List.class, stringListRenderer, "Entities in the schematic"),
         TILE_ENTITIES("Tile Entities", List.class, stringListRenderer, "Tile Entities in the schematic"),
-        ATTRIBUTES("Attributes", HashMap.class, defaultRenderer, "NBT Attributes attached to the schematic"),
+        ATTRIBUTES("Attributes", HashMap.class, attributesRenderer, "NBT Attributes attached to the schematic"),
         ;
         final String displayName;
         final Class<?> clazz;
@@ -301,6 +302,61 @@ class FileTableModel extends AbstractTableModel {
 
         public String convertToString(Object o) {
             return "?";
+        }
+
+        private String searchText = "";
+
+        public void setSearchText(String searchText) {
+            this.searchText = searchText != null ? searchText.toLowerCase() : "";
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            if (searchText == null || searchText.isEmpty()) {
+                super.paintComponent(g);
+                return;
+            }
+
+            String text = getText();
+            if (text == null) {
+                super.paintComponent(g);
+                return;
+            }
+
+            String lowerText = text.toLowerCase();
+            int index = lowerText.indexOf(searchText);
+
+            if (index < 0) {
+                super.paintComponent(g);
+                return;
+            }
+
+            // draw a yellow filled rect into the background where the matchign string will be
+            FontMetrics fm = g.getFontMetrics();
+            Insets insets = getInsets();
+
+            int textX = insets.left;
+            int textY = insets.top + fm.getAscent();
+
+            // Measure prefix width
+            String prefix = text.substring(0, index);
+            int prefixWidth = fm.stringWidth(prefix);
+
+            // Measure match width
+            String match = text.substring(index, index + searchText.length());
+            int matchWidth = fm.stringWidth(match);
+
+            int highlightX = textX + prefixWidth;
+            int highlightY = insets.top;
+            int highlightHeight = fm.getHeight();
+
+            // Draw highlight background
+            g.setColor(Color.YELLOW);
+            g.fillRect(highlightX, highlightY, matchWidth, highlightHeight);
+
+            // Draw the default text on top of the highlighted background
+            g.setColor(getForeground());
+            super.paintComponent(g);
         }
     }
 }
