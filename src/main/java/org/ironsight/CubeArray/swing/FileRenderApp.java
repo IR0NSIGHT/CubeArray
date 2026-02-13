@@ -35,6 +35,39 @@ public class FileRenderApp {
     //is context dirty and needs to be saved?
     private boolean contextDirtyFlag;
 
+    private record TextSearch(
+            String searchString,
+            List<FileTableModel.Column> searchColumns,
+            boolean excludeMatches
+    ) {
+        // provide default values via a compact constructor
+        public TextSearch() {
+            this("", List.of(), false);
+        }
+    }
+    private TextSearch currentSearch = new TextSearch();
+
+    private void updateTextSearch(TextSearch newSearch) {
+        this.currentSearch = newSearch;
+        if (currentSearch.searchString.isEmpty()) {
+            rowSorter.setRowFilter(null);
+        } else {
+
+            rowSorter.setRowFilter(new RowFilter<>() {
+                @Override
+                public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
+                    for (FileTableModel.Column c: FileTableModel.Column.values()) {
+                        if (c.renderer.convertToString(entry.getValue(c.ordinal())).toLowerCase().contains(currentSearch.searchString))
+                            return true;
+                    }
+                    return false;
+                }
+            });
+        }
+        for (FileTableModel.Column c: FileTableModel.Column.values()) {
+            c.renderer.setSearchText(currentSearch.searchString);
+        }
+    }
     public FileRenderApp(final AppContext context) {
         this.context = context;
         if (context.neverBeforeUsed) {
@@ -105,25 +138,8 @@ public class FileRenderApp {
             }
 
             private void update() {
-                String text = searchField.getText().trim();
-                if (text.isEmpty()) {
-                    rowSorter.setRowFilter(null);
-                } else {
-
-                    rowSorter.setRowFilter(new RowFilter<>() {
-                        @Override
-                        public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
-                            for (FileTableModel.Column c: FileTableModel.Column.values()) {
-                                if (c.renderer.convertToString(entry.getValue(c.ordinal())).toLowerCase().contains(text.toLowerCase()))
-                                    return true;
-                            }
-                            return false;
-                        }
-                    });
-                }
-                for (FileTableModel.Column c: FileTableModel.Column.values()) {
-                    c.renderer.setSearchText(text);
-                }
+                String text = searchField.getText().trim().toLowerCase();
+                updateTextSearch(new TextSearch(text, currentSearch.searchColumns, currentSearch.excludeMatches));
             }
 
             public void removeUpdate(javax.swing.event.DocumentEvent e) {
