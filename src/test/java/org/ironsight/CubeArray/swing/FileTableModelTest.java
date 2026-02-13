@@ -30,7 +30,7 @@ public class FileTableModelTest {
 
     @Test
     public void addFile() {
-        final var model = new FileTableModel();
+        final var model = new FileTableModel(null);
         var myFile = new File("~/myFile.txt");
         model.addFile(myFile);
         assertEquals(1,model.getRowCount());
@@ -58,7 +58,7 @@ public class FileTableModelTest {
     @Test
     public void removeFile() {
         {   //3 items, delete 1
-            final var model = new FileTableModel();
+            final var model = new FileTableModel(null);
             var myFile = new File("~/myFile.txt");
             model.addFile(myFile);
             model.addFile(new File("~/myFile_2.txt"));
@@ -71,7 +71,7 @@ public class FileTableModelTest {
             assertEquals(2, model.getRowCount());
         }
         {   //3 items, delete all
-            final var model = new FileTableModel();
+            final var model = new FileTableModel(null);
             model.addFile(new File("~/myFile.txt"));
             model.addFile(new File("~/myFile_2.txt"));
             model.addFile(new File("~/myFile_3.txt"));

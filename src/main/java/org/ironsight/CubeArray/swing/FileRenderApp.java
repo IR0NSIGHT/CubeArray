@@ -27,11 +27,11 @@ public class FileRenderApp {
     // main data structure
     private final AppContext context;
     // UI model
-    private final FileTableModel tableModel = new FileTableModel();
-    private final JTable fileTable = new JTable(tableModel);
+    private final FileTableModel tableModel;
+    private final JTable fileTable;
 
-    private final TableRowSorter<FileTableModel> rowSorter =
-            new TableRowSorter<>(tableModel);
+    private final TableRowSorter<FileTableModel> rowSorter;
+
     private final JButton renderBtn;
     private final Set<Thread> loadingThreads = new HashSet<>();
     //is context dirty and needs to be saved?
@@ -48,6 +48,13 @@ public class FileRenderApp {
 
         CubeArrayMain.periodicChecker.addCallback(this::checkContextSaving);
         CubeArrayMain.periodicChecker.addCallback(this::checkLoadingThreads);
+
+        this.tableModel = new FileTableModel(CubeArrayMain.periodicChecker);
+        this.fileTable = new JTable(tableModel);
+        this.rowSorter = new TableRowSorter<>(tableModel);
+
+        // construct UI
+
         frame = new JFrame("File Renderer");
         frame.setSize(context.guiBounds.width, context.guiBounds.height);
         frame.setLocation(context.guiBounds.x, context.guiBounds.y);
@@ -87,18 +94,9 @@ public class FileRenderApp {
         });
         fileTable.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
 
-        fileTable.getColumnModel().getColumn(4)
-                .setCellRenderer(new DefaultTableCellRenderer() {
-                    @Override
-                    protected void setValue(Object value) {
-                        if (value instanceof Long bytes) {
-                            setText(formatSize(bytes));
-                        } else {
-                            setText("");
-                        }
-                    }
-                });
-
+        for (FileTableModel.Column c : FileTableModel.Column.values()) {
+            fileTable.getColumnModel().getColumn(c.ordinal()).setCellRenderer(c.renderer);
+        }
 
         JTextField searchField = new JTextField(20);
         searchField.setText("Search");
@@ -163,8 +161,8 @@ public class FileRenderApp {
         JPanel keyBindingPanel = new KeyBindingComponent();
 
         JTabbedPane tabbedPane = new JTabbedPane(SwingConstants.LEFT);
-        tabbedPane.add("File List",fileListPanel);
-        tabbedPane.add("Key Bindings",keyBindingPanel);
+        tabbedPane.add("File List", fileListPanel);
+        tabbedPane.add("Key Bindings", keyBindingPanel);
 
         frame.add(tabbedPane);
         context.filesAndTimestamps.keySet().forEach(tableModel::addFile);
@@ -214,16 +212,7 @@ public class FileRenderApp {
         }
     }
 
-    private static String formatSize(long bytes) {
-        double kb = bytes / 1024.0;
-        if (kb < 1024) return String.format("%.1f KB", kb);
 
-        double mb = kb / 1024.0;
-        if (mb < 1024) return String.format("%.1f MB", mb);
-
-        double gb = mb / 1024.0;
-        return String.format("%.1f GB", gb);
-    }
 
     private void addFiles(Component parent) {
         JFileChooser chooser = getFileChooser();
