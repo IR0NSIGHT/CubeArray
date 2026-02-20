@@ -4,6 +4,7 @@ import org.ironsight.CubeArray.ResourceUtils;
 
 import java.awt.*;
 import java.io.*;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
@@ -16,11 +17,12 @@ public class AppContext implements Serializable {
     final Set<File> activeFiles = new HashSet<>();
     File lastSearchPath = new File(System.getProperty("user.home"));
     Rectangle guiBounds = new Rectangle(0,0,400,400);
-
     boolean neverBeforeUsed = true;
+    FileTableModel.Column[] displayColumnOrdinals =FileTableModel.Column.values();
 
     public static File getSaveFile() {
         File file = new File(ResourceUtils.getInstallPath().toFile(), "app.context");
+        System.out.println("context savefile at: " + file.getAbsolutePath());
         return file;
     }
 
@@ -41,6 +43,7 @@ public class AppContext implements Serializable {
                 return new AppContext();
             }
         } catch (IOException | ClassNotFoundException e) {
+            System.err.println("app.context is invalid, returning empty context.");
             e.printStackTrace();
             return new AppContext();
         }

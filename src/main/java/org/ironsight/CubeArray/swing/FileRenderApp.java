@@ -33,10 +33,9 @@ public class FileRenderApp {
     //is context dirty and needs to be saved?
     private boolean contextDirtyFlag;
 
-    private HashSet<FileTableModel.Column> activeColumns = new HashSet<>();
+    private HashSet<FileTableModel.Column> activeColumns = new LinkedHashSet<>();
 
     public FileRenderApp(final AppContext context) {
-        activeColumns.addAll(Arrays.asList(FileTableModel.Column.values()));
         this.context = context;
         if (context.neverBeforeUsed) {
             // add default schematics on very first use
@@ -51,16 +50,6 @@ public class FileRenderApp {
         this.tableModel = new FileTableModel(CubeArrayMain.periodicChecker);
         this.fileTable = new JTable(tableModel);
         this.rowSorter = new TableRowSorter<>(tableModel);
-
-        TableColumnModel columnModel = fileTable.getColumnModel();
-
-        for (int i = 0; i < columnModel.getColumnCount(); i++) {
-            TableColumn tc = columnModel.getColumn(i);
-            FileTableModel.Column c = FileTableModel.Column.values()[i];
-            columToTableColumn.put(c, tc);
-        }
-
-
 
         // construct UI
 
@@ -143,9 +132,10 @@ public class FileRenderApp {
         // SELECT WHICH COLUMNS TO DISPLAY
         JComponent columnSettings = new JPanel(new FlowLayout(FlowLayout.LEFT));
         columnSettings.add(new JLabel("Show Columns:"));
+        HashSet<FileTableModel.Column> columns = new HashSet<>(List.of(context.displayColumnOrdinals));
         for (FileTableModel.Column c : FileTableModel.Column.values()) {
             JCheckBox checkBox = new JCheckBox(c.name());
-            checkBox.setSelected(activeColumns.contains(c));
+            checkBox.setSelected(columns.contains(c));
             checkBox.addActionListener(e -> {
                 showColumn(c, checkBox.isSelected());
             });
@@ -188,7 +178,25 @@ public class FileRenderApp {
         frame.add(tabbedPane);
         context.filesAndTimestamps.keySet().forEach(tableModel::addFile);
 
+        initDisplayedColumns(context);
+
         frame.setVisible(true);
+    }
+
+    private void initDisplayedColumns(AppContext context) {
+        // init displayed columns
+        TableColumnModel columnModel = fileTable.getColumnModel();
+        for (int i = 0; i < columnModel.getColumnCount(); i++) {
+            TableColumn tc = columnModel.getColumn(i);
+            FileTableModel.Column c = FileTableModel.Column.values()[i];
+            columToTableColumn.put(c, tc);
+        }
+        for (TableColumn tc: columToTableColumn.values())
+            columnModel.removeColumn(tc);
+        //display only columns from saved context
+        for (FileTableModel.Column column : context.displayColumnOrdinals) {
+            showColumn(column, true);
+        }
     }
 
     private HashMap<FileTableModel.Column, TableColumn> columToTableColumn = new HashMap<>();
@@ -204,7 +212,8 @@ public class FileRenderApp {
             columnModel.removeColumn(columToTableColumn.get(column));
         }
         System.out.println(activeColumns.stream().toList());
-
+        context.displayColumnOrdinals = activeColumns.toArray(new FileTableModel.Column[0]);
+        contextDirtyFlag = true;
     }
 
     void checkContextSaving() {
