@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 class FileTableModel extends AbstractTableModel {
     private final static DefaultTableCellRenderer fileSizeRenderer = new DefaultTableCellRenderer() {
@@ -90,25 +91,28 @@ class FileTableModel extends AbstractTableModel {
             copyFiles = List.copyOf(files);
         }
 
-        // check and load each files schematic if necessary.
-        for (int i = 0; i < copyFiles.size(); i++) {
-            File f = copyFiles.get(i);
-            if (schematicObjects.containsKey(f))
-                continue;
+        IntStream.range(0, copyFiles.size())
+                .mapToObj(i -> Map.entry(i, copyFiles.get(i)))
+                .filter(entry -> !schematicObjects.containsKey(entry.getValue()))
+                .sorted(Comparator.comparingLong(k -> k.getValue().length()))
+                .forEach(entry -> {
+                    int i = entry.getKey();
+                    File f = entry.getValue();
+                    System.out.println("Loading " + f.getName() + " size=" + f.length());
 
-            try {
-                var schems = SchemReader.loadSchematics(List.of(f.toPath()));
-                for (WPObject schem : schems)
-                    schematicObjects.put(f, schem);
-                final int ii = i;
-                SwingUtilities.invokeLater(() -> {
-                    fireTableRowsUpdated(ii, ii);
+                    // check and load each files schematic if necessary.
+                    try {
+                        var schems = SchemReader.loadSchematics(List.of(f.toPath()));
+                        for (WPObject schem : schems)
+                            schematicObjects.put(f, schem);
+                        final int ii = i;
+                        SwingUtilities.invokeLater(() -> {
+                            fireTableRowsUpdated(ii, ii);
+                        });
+                    } catch (IOException | InvalidPathException ex) {
+                        System.err.println("unable to load schematic from file: " + f);
+                    }
                 });
-            } catch (IOException | InvalidPathException ex) {
-                System.err.println("unable to load schematic from file: " + f);
-            }
-        }
-
     }
 
     private static String formatSize(long bytes) {
