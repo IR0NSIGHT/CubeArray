@@ -6,18 +6,14 @@ import org.ironsight.CubeArray.SchemReader;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
-import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.TableColumn;
+import javax.swing.table.TableColumnModel;
 import javax.swing.table.TableRowSorter;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.event.*;
 import java.io.File;
-import java.util.Arrays;
-import java.util.HashSet;
+import java.util.*;
 import java.util.List;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.ironsight.CubeArray.InstancedCubes;
@@ -37,7 +33,10 @@ public class FileRenderApp {
     //is context dirty and needs to be saved?
     private boolean contextDirtyFlag;
 
+    private HashSet<FileTableModel.Column> activeColumns = new HashSet<>();
+
     public FileRenderApp(final AppContext context) {
+        activeColumns.addAll(Arrays.asList(FileTableModel.Column.values()));
         this.context = context;
         if (context.neverBeforeUsed) {
             // add default schematics on very first use
@@ -52,6 +51,16 @@ public class FileRenderApp {
         this.tableModel = new FileTableModel(CubeArrayMain.periodicChecker);
         this.fileTable = new JTable(tableModel);
         this.rowSorter = new TableRowSorter<>(tableModel);
+
+        TableColumnModel columnModel = fileTable.getColumnModel();
+
+        for (int i = 0; i < columnModel.getColumnCount(); i++) {
+            TableColumn tc = columnModel.getColumn(i);
+            FileTableModel.Column c = FileTableModel.Column.values()[i];
+            columToTableColumn.put(c, tc);
+        }
+
+
 
         // construct UI
 
@@ -131,6 +140,19 @@ public class FileRenderApp {
         });
 
 
+        // SELECT WHICH COLUMNS TO DISPLAY
+        JComponent columnSettings = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        columnSettings.add(new JLabel("Show Columns:"));
+        for (FileTableModel.Column c : FileTableModel.Column.values()) {
+            JCheckBox checkBox = new JCheckBox(c.name());
+            checkBox.setSelected(activeColumns.contains(c));
+            checkBox.addActionListener(e -> {
+                showColumn(c, checkBox.isSelected());
+            });
+            columnSettings.add(checkBox);
+        }
+
+        fileTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF); // allows wide table + horizontal scrolling
         JScrollPane scrollPane = new JScrollPane(fileTable);
 
         JButton addBtn = new JButton("Add");
@@ -144,7 +166,6 @@ public class FileRenderApp {
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         topPanel.add(addBtn);
         topPanel.add(removeBtn);
-        //topPanel.add(new JLabel("Search:"));
         topPanel.add(searchField);
 
 
@@ -163,11 +184,27 @@ public class FileRenderApp {
         JTabbedPane tabbedPane = new JTabbedPane(SwingConstants.LEFT);
         tabbedPane.add("File List", fileListPanel);
         tabbedPane.add("Key Bindings", keyBindingPanel);
-
+        tabbedPane.add("⚙\uFE0F", columnSettings); // SETTINGS
         frame.add(tabbedPane);
         context.filesAndTimestamps.keySet().forEach(tableModel::addFile);
 
         frame.setVisible(true);
+    }
+
+    private HashMap<FileTableModel.Column, TableColumn> columToTableColumn = new HashMap<>();
+
+    void showColumn(FileTableModel.Column column, boolean show) {
+        var columnModel = fileTable.getColumnModel();
+        if (show) {
+            activeColumns.add(column);
+            columnModel.addColumn(columToTableColumn.get(column));
+        }
+        else {
+            activeColumns.remove(column);
+            columnModel.removeColumn(columToTableColumn.get(column));
+        }
+        System.out.println(activeColumns.stream().toList());
+
     }
 
     void checkContextSaving() {
