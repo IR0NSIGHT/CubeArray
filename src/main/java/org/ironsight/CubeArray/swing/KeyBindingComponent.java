@@ -36,6 +36,7 @@ public class KeyBindingComponent extends JPanel {
 
         // Add table to scroll pane
         JScrollPane scrollPane = new JScrollPane(table);
+        add(new JLabel("3d Viewer Keybindings"),BorderLayout.NORTH);
         add(scrollPane, BorderLayout.CENTER);
 
         for (KeyBinding k: KeyBinding.values()) {

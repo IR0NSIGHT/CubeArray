@@ -6,6 +6,7 @@ import org.ironsight.CubeArray.SchemReader;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
+import javax.swing.plaf.basic.BasicBorders;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 import javax.swing.table.TableRowSorter;
@@ -14,6 +15,7 @@ import java.awt.event.*;
 import java.io.File;
 import java.util.*;
 import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 import org.ironsight.CubeArray.InstancedCubes;
@@ -129,18 +131,7 @@ public class FileRenderApp {
         });
 
 
-        // SELECT WHICH COLUMNS TO DISPLAY
-        JComponent columnSettings = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        columnSettings.add(new JLabel("Show Columns:"));
-        HashSet<FileTableModel.Column> columns = new HashSet<>(List.of(context.displayColumnOrdinals));
-        for (FileTableModel.Column c : FileTableModel.Column.values()) {
-            JCheckBox checkBox = new JCheckBox(c.name());
-            checkBox.setSelected(columns.contains(c));
-            checkBox.addActionListener(e -> {
-                showColumn(c, checkBox.isSelected());
-            });
-            columnSettings.add(checkBox);
-        }
+
 
         fileTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF); // allows wide table + horizontal scrolling
         JScrollPane scrollPane = new JScrollPane(fileTable);
@@ -169,12 +160,12 @@ public class FileRenderApp {
             fileListPanel.add(bottomPanel, BorderLayout.SOUTH);
         }
 
-        JPanel keyBindingPanel = new KeyBindingComponent();
+
+
 
         JTabbedPane tabbedPane = new JTabbedPane(SwingConstants.LEFT);
         tabbedPane.add("File List", fileListPanel);
-        tabbedPane.add("Key Bindings", keyBindingPanel);
-        tabbedPane.add("⚙\uFE0F", columnSettings); // SETTINGS
+        tabbedPane.add("⚙\uFE0F", getSettingsComponent(context.displayColumnOrdinals, this::showColumn)); // SETTINGS
         frame.add(tabbedPane);
         context.filesAndTimestamps.keySet().forEach(tableModel::addFile);
 
@@ -182,6 +173,45 @@ public class FileRenderApp {
 
         frame.setVisible(true);
     }
+
+    public static void main(String[] args) {
+        JFrame frame = new JFrame();
+        frame.setSize(new Dimension(500,600));
+        JComponent comp =getSettingsComponent(FileTableModel.Column.values(), (column, aBoolean) -> {
+            System.out.println("show " + column + "=" + aBoolean);
+        });
+        frame.add(comp);
+        frame.setVisible(true);
+    }
+
+    private static JComponent getSettingsComponent(FileTableModel.Column[] initialColumns, BiConsumer<FileTableModel.Column, Boolean> showColumnCallback) {
+        // SELECT WHICH COLUMNS TO DISPLAY
+        JComponent columnSettings = new JPanel(new GridLayout(0,1));
+        columnSettings.add(new JLabel("Show Columns:"));
+        HashSet<FileTableModel.Column> columns = new HashSet<>(List.of(initialColumns));
+        for (FileTableModel.Column c : Arrays.stream(FileTableModel.Column.values()).sorted(Comparator.comparing(c -> c.displayName)).toList()) {
+            JCheckBox checkBox = new JCheckBox(c.displayName);
+            checkBox.setToolTipText(c.tooltip);
+            checkBox.setSelected(columns.contains(c));
+            checkBox.addActionListener(e -> {
+                showColumnCallback.accept (c, checkBox.isSelected());
+            });
+            columnSettings.add(checkBox);
+        }
+
+        JScrollPane settingsPanel = new JScrollPane();
+        {
+            settingsPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+            JPanel settingsContentPane = new JPanel();
+            settingsContentPane.setLayout(new GridLayout(0, 1));
+            settingsContentPane.add(columnSettings);
+            settingsContentPane.add(new KeyBindingComponent());
+            settingsPanel.setViewportView(settingsContentPane);
+        };
+        return settingsPanel;
+    }
+
 
     private void initDisplayedColumns(AppContext context) {
         // init displayed columns
