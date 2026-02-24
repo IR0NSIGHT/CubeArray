@@ -5,6 +5,7 @@ package org.ironsight.CubeArray;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+import org.joml.Vector4f;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallback;
@@ -128,8 +129,11 @@ public class InstancedCubes {
 
     // entry point to directly render a schematic
     public static void main(String[] args) throws Exception {
-        File schemFile = new File("src/main/resources/schematics/ir0nsight/survivalTown.schem");
+        File schemFile = new File("src/main/resources/schematics/" +
+                "Ir0nsight/jerusalem_tower_pretty_I.schem");
         if (!schemFile.exists()) {
+            System.out.println("working dir = " + new File("").getAbsolutePath());
+
             throw new RuntimeException("File not found: " + schemFile.getAbsolutePath());
         }
         System.out.println("File path: " + schemFile.getAbsolutePath());
@@ -138,6 +142,17 @@ public class InstancedCubes {
         if (setup == null) {
             throw new RuntimeException("could not load schematic into cube setup");
         } else {
+            Vector3f[] positions = new Vector3f[]{ new Vector3f(0,0,0), new Vector3f(0,2,0)};
+            int[] colorIdcs = new int[]{0,1};
+
+            // two 1m cube types: red and green
+            Vector3f[] colorPalette = new Vector3f[]{new Vector3f(1,0,0), new Vector3f(0,1,0)};
+            Vector3f[] sizePalette = new Vector3f[]{ new Vector3f(1,1,1), new Vector3f(1,1,1)};
+            Vector3f[] offSetPalette = new Vector3f[]{ new Vector3f(0,0,0), new Vector3f(0,0,0)};
+            Vector3f[] rotationPalette = new Vector3f[]{ new Vector3f(0,0,0), new Vector3f(0,0,0)};
+            Vector4f[] uvPalette = new Vector4f[]{ new Vector4f(0,0,0,0), new Vector4f(0,0,0,0)};
+            setup = new SchemReader.CubeSetup(positions,colorIdcs,colorPalette,sizePalette,offSetPalette, rotationPalette, uvPalette, new BufferedImage(32,32, BufferedImage.TYPE_INT_RGB),new Vector3f(0,0,0), new Vector3f(0,2,0), "test setup");
+
             new InstancedCubes(setup).run();
         }
     }
