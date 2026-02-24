@@ -5,6 +5,10 @@ import org.ironsight.CubeArray.ResourceUtils;
 import org.ironsight.CubeArray.SchemReader;
 
 import javax.swing.*;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.TableColumnModelEvent;
+import javax.swing.event.TableColumnModelListener;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.plaf.basic.BasicBorders;
 import javax.swing.table.TableColumn;
@@ -16,7 +20,9 @@ import java.io.File;
 import java.util.*;
 import java.util.List;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.ironsight.CubeArray.InstancedCubes;
 
@@ -35,8 +41,6 @@ public class FileRenderApp {
     //is context dirty and needs to be saved?
     private boolean contextDirtyFlag;
 
-    private HashSet<FileTableModel.Column> activeColumns = new LinkedHashSet<>();
-
     public FileRenderApp(final AppContext context) {
         this.context = context;
         if (context.neverBeforeUsed) {
@@ -52,6 +56,36 @@ public class FileRenderApp {
         this.tableModel = new FileTableModel(CubeArrayMain.periodicChecker);
         this.fileTable = new JTable(tableModel);
         this.rowSorter = new TableRowSorter<>(tableModel);
+
+        fileTable.getColumnModel().addColumnModelListener(
+                new TableColumnModelListener() {
+
+                    @Override
+                    public void columnAdded(TableColumnModelEvent e) {
+                        updateContextColumns(fileTable.getColumnModel());
+                    }
+
+                    @Override
+                    public void columnRemoved(TableColumnModelEvent e) {
+                        updateContextColumns(fileTable.getColumnModel());
+                    }
+
+                    @Override
+                    public void columnMoved(TableColumnModelEvent e) {
+                        updateContextColumns(fileTable.getColumnModel());
+                    }
+
+                    @Override
+                    public void columnMarginChanged(ChangeEvent e) {
+                        // Optional: track width changes
+                    }
+
+                    @Override
+                    public void columnSelectionChanged(ListSelectionEvent e) {
+                        // Usually ignore
+                    }
+                }
+        );
 
         // construct UI
 
@@ -160,12 +194,9 @@ public class FileRenderApp {
             fileListPanel.add(bottomPanel, BorderLayout.SOUTH);
         }
 
-
-
-
         JTabbedPane tabbedPane = new JTabbedPane(SwingConstants.LEFT);
         tabbedPane.add("File List", fileListPanel);
-        tabbedPane.add("⚙\uFE0F", getSettingsComponent(context.displayColumnOrdinals, this::showColumn)); // SETTINGS
+        tabbedPane.add("⚙\uFE0F", getSettingsComponent(context.displayColumnOrdinals)); // SETTINGS
         frame.add(tabbedPane);
         context.filesAndTimestamps.keySet().forEach(tableModel::addFile);
 
@@ -174,30 +205,36 @@ public class FileRenderApp {
         frame.setVisible(true);
     }
 
-    public static void main(String[] args) {
-        JFrame frame = new JFrame();
-        frame.setSize(new Dimension(500,600));
-        JComponent comp =getSettingsComponent(FileTableModel.Column.values(), (column, aBoolean) -> {
-            System.out.println("show " + column + "=" + aBoolean);
-        });
-        frame.add(comp);
-        frame.setVisible(true);
-    }
-
-    private static JComponent getSettingsComponent(FileTableModel.Column[] initialColumns, BiConsumer<FileTableModel.Column, Boolean> showColumnCallback) {
+    private JComponent getSettingsComponent(ArrayList<FileTableModel.Column> initialColumns) {
         // SELECT WHICH COLUMNS TO DISPLAY
         JComponent columnSettings = new JPanel(new GridLayout(0,1));
         columnSettings.add(new JLabel("Show Columns:"));
-        HashSet<FileTableModel.Column> columns = new HashSet<>(List.of(initialColumns));
-        for (FileTableModel.Column c : Arrays.stream(FileTableModel.Column.values()).sorted(Comparator.comparing(c -> c.displayName)).toList()) {
-            JCheckBox checkBox = new JCheckBox(c.displayName);
-            checkBox.setToolTipText(c.tooltip);
-            checkBox.setSelected(columns.contains(c));
-            checkBox.addActionListener(e -> {
-                showColumnCallback.accept (c, checkBox.isSelected());
-            });
-            columnSettings.add(checkBox);
-        }
+        HashSet<FileTableModel.Column> columns = new HashSet<>(initialColumns);
+
+        FileTableModel.Column[] columnSet = FileTableModel.Column.values();
+
+        IntStream.range(0, columnSet.length)
+                .mapToObj(i -> new AbstractMap.SimpleEntry<>(i, columnSet[i]))
+                .sorted(Comparator.comparing(e -> e.getValue().displayName))
+                .forEach(
+                        entry -> {
+                            var c = entry.getValue();
+                            JCheckBox checkBox = new JCheckBox(c.displayName);
+                            checkBox.setToolTipText(c.tooltip);
+                            checkBox.setSelected(columns.contains(c));
+                            checkBox.addActionListener(e -> {
+                                boolean show = checkBox.isSelected();
+                                if (show && !context.displayColumnOrdinals.contains(c)) {
+                                    context.displayColumnOrdinals.add(c);
+                                }
+                                else {
+                                    context.displayColumnOrdinals.remove(c);
+                                }
+                                updateDisplayColumns(new ArrayList<>(context.displayColumnOrdinals), fileTable.getColumnModel());
+                            });
+                            columnSettings.add(checkBox);
+                        }
+                );
 
         JScrollPane settingsPanel = new JScrollPane();
         {
@@ -214,6 +251,7 @@ public class FileRenderApp {
 
 
     private void initDisplayedColumns(AppContext context) {
+        var columns = new ArrayList<>(context.displayColumnOrdinals);
         // init displayed columns
         TableColumnModel columnModel = fileTable.getColumnModel();
         for (int i = 0; i < columnModel.getColumnCount(); i++) {
@@ -221,28 +259,68 @@ public class FileRenderApp {
             FileTableModel.Column c = FileTableModel.Column.values()[i];
             columToTableColumn.put(c, tc);
         }
-        for (TableColumn tc: columToTableColumn.values())
-            columnModel.removeColumn(tc);
+
         //display only columns from saved context
-        for (FileTableModel.Column column : context.displayColumnOrdinals) {
-            showColumn(column, true);
-        }
+        updateDisplayColumns(columns, fileTable.getColumnModel());
     }
 
     private HashMap<FileTableModel.Column, TableColumn> columToTableColumn = new HashMap<>();
 
-    void showColumn(FileTableModel.Column column, boolean show) {
+    void updateDisplayColumns(ArrayList<FileTableModel.Column> columns, TableColumnModel columnModel) {
+        {    // rebuild column model to match active columns.
+            // Remove all columns
+            while (columnModel.getColumnCount() > 0) {
+                columnModel.removeColumn(columnModel.getColumn(0));
+            }
+            for (var c : columns) {
+                columnModel.addColumn(columToTableColumn.get(c));
+            }
+            System.out.println("set display columns to: " + context.displayColumnOrdinals.stream().map(Object::toString).collect(Collectors.joining(", ")));
+        }
+    }
+
+    void showColumn(FileTableModel.Column column, int index, boolean show) {
         var columnModel = fileTable.getColumnModel();
-        if (show) {
-            activeColumns.add(column);
-            columnModel.addColumn(columToTableColumn.get(column));
+        if (show && !context.displayColumnOrdinals.contains(column)) {
+            context.displayColumnOrdinals.add(column);
         }
         else {
-            activeColumns.remove(column);
-            columnModel.removeColumn(columToTableColumn.get(column));
+            context.displayColumnOrdinals.remove(column);
         }
-        System.out.println(activeColumns.stream().toList());
-        context.displayColumnOrdinals = activeColumns.toArray(new FileTableModel.Column[0]);
+
+
+        {    // rebuild column model to match active columns.
+            // Remove all columns
+            while (columnModel.getColumnCount() > 0) {
+                columnModel.removeColumn(columnModel.getColumn(0));
+            }
+            for (var c : context.displayColumnOrdinals) {
+                columnModel.addColumn(columToTableColumn.get(c));
+            }
+        }
+    }
+
+    void updateContextColumns(TableColumnModel columnModel) {
+
+        Map<TableColumn, FileTableModel.Column> reverseMap = new HashMap<>();
+
+        for (Map.Entry<FileTableModel.Column, TableColumn> e : columToTableColumn.entrySet()) {
+            reverseMap.put(e.getValue(), e.getKey());
+        }
+
+        Enumeration<TableColumn> tableColumns =
+                columnModel.getColumns();
+
+        List<FileTableModel.Column> orderedColumns = new ArrayList<>();
+
+        while (tableColumns.hasMoreElements()) {
+            TableColumn tc = tableColumns.nextElement();
+            orderedColumns.add(reverseMap.get(tc));
+        }
+
+        context.displayColumnOrdinals =
+                new ArrayList<>(orderedColumns.stream().distinct().toList());
+        System.out.println(context.displayColumnOrdinals.stream().map(c -> c.displayName).collect(Collectors.joining(", ")));
         contextDirtyFlag = true;
     }
 
