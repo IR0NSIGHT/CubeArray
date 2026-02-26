@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.Set;
 
 public class FileRenderApp {
     final JFrame frame;
@@ -136,6 +137,7 @@ public class FileRenderApp {
                 if (text.isEmpty()) {
                     rowSorter.setRowFilter(null);
                 } else {
+
                     rowSorter.setRowFilter(new RowFilter<>() {
                         @Override
                         public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
@@ -146,6 +148,9 @@ public class FileRenderApp {
                             return false;
                         }
                     });
+                }
+                for (FileTableModel.Column c: FileTableModel.Column.values()) {
+                    c.renderer.setSearchText(text);
                 }
             }
 
