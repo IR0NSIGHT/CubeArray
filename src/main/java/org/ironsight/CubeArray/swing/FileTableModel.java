@@ -136,6 +136,10 @@ class FileTableModel extends AbstractTableModel {
         return Column.values().length;
     }
 
+    public Column getColumn(int columnIdx) {
+        return Column.values()[columnIdx];
+    }
+
     @Override
     public Object getValueAt(int row, int col) {
         assert row >= 0 : "row to small: " + row;

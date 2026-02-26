@@ -1,6 +1,7 @@
 package org.ironsight.CubeArray.swing;
 
 import org.ironsight.CubeArray.CubeArrayMain;
+import org.ironsight.CubeArray.InstancedCubes;
 import org.ironsight.CubeArray.ResourceUtils;
 import org.ironsight.CubeArray.SchemReader;
 
@@ -10,21 +11,19 @@ import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.TableColumnModelEvent;
 import javax.swing.event.TableColumnModelListener;
 import javax.swing.filechooser.FileFilter;
-import javax.swing.plaf.basic.BasicBorders;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 import javax.swing.table.TableRowSorter;
 import java.awt.*;
-import java.awt.event.*;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.File;
-import java.util.*;
 import java.util.List;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-
-import org.ironsight.CubeArray.InstancedCubes;
 
 public class FileRenderApp {
     final JFrame frame;
@@ -40,12 +39,14 @@ public class FileRenderApp {
     private final Set<Thread> loadingThreads = new HashSet<>();
     //is context dirty and needs to be saved?
     private boolean contextDirtyFlag;
+    private final HashMap<FileTableModel.Column, TableColumn> columToTableColumn = new HashMap<>();
 
     public FileRenderApp(final AppContext context) {
         this.context = context;
         if (context.neverBeforeUsed) {
             // add default schematics on very first use
-            ResourceUtils.getDefaultSchematics().forEach(s -> context.filesAndTimestamps.put(s.toFile(), System.currentTimeMillis()));
+            ResourceUtils.getDefaultSchematics().forEach(s -> context.filesAndTimestamps.put(s.toFile(),
+                    System.currentTimeMillis()));
             context.neverBeforeUsed = false;
             contextDirtyFlag = true;
         }
@@ -57,35 +58,35 @@ public class FileRenderApp {
         this.fileTable = new JTable(tableModel);
         this.rowSorter = new TableRowSorter<>(tableModel);
 
-        fileTable.getColumnModel().addColumnModelListener(
-                new TableColumnModelListener() {
+        tableAddMouseClickListener(fileTable);
 
-                    @Override
-                    public void columnAdded(TableColumnModelEvent e) {
-                        updateContextColumns(fileTable.getColumnModel());
-                    }
+        fileTable.getColumnModel().addColumnModelListener(new TableColumnModelListener() {
 
-                    @Override
-                    public void columnRemoved(TableColumnModelEvent e) {
-                        updateContextColumns(fileTable.getColumnModel());
-                    }
+            @Override
+            public void columnAdded(TableColumnModelEvent e) {
+                updateContextColumns(fileTable.getColumnModel());
+            }
 
-                    @Override
-                    public void columnMoved(TableColumnModelEvent e) {
-                        updateContextColumns(fileTable.getColumnModel());
-                    }
+            @Override
+            public void columnRemoved(TableColumnModelEvent e) {
+                updateContextColumns(fileTable.getColumnModel());
+            }
 
-                    @Override
-                    public void columnMarginChanged(ChangeEvent e) {
-                        // Optional: track width changes
-                    }
+            @Override
+            public void columnMoved(TableColumnModelEvent e) {
+                updateContextColumns(fileTable.getColumnModel());
+            }
 
-                    @Override
-                    public void columnSelectionChanged(ListSelectionEvent e) {
-                        // Usually ignore
-                    }
-                }
-        );
+            @Override
+            public void columnMarginChanged(ChangeEvent e) {
+                // Optional: track width changes
+            }
+
+            @Override
+            public void columnSelectionChanged(ListSelectionEvent e) {
+                // Usually ignore
+            }
+        });
 
         // construct UI
 
@@ -115,17 +116,7 @@ public class FileRenderApp {
         fileTable.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
         fileTable.setRowSorter(rowSorter);
 
-        fileTable.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
-                    int viewRow = fileTable.rowAtPoint(e.getPoint());
-                    if (viewRow >= 0) {
-                        renderSelectedFiles();
-                    }
-                }
-            }
-        });
+
         fileTable.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
 
         for (FileTableModel.Column c : FileTableModel.Column.values()) {
@@ -148,8 +139,7 @@ public class FileRenderApp {
                     rowSorter.setRowFilter(new RowFilter<>() {
                         @Override
                         public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
-                            return (entry.getValue(0) instanceof String name && name.toLowerCase().contains(text.toLowerCase()) ||
-                                    (entry.getValue(1) instanceof String fullPath && fullPath.toLowerCase().contains(text.toLowerCase())));
+                            return (entry.getValue(0) instanceof String name && name.toLowerCase().contains(text.toLowerCase()) || (entry.getValue(1) instanceof String fullPath && fullPath.toLowerCase().contains(text.toLowerCase())));
                         }
                     });
                 }
@@ -163,8 +153,6 @@ public class FileRenderApp {
                 update();
             }
         });
-
-
 
 
         fileTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF); // allows wide table + horizontal scrolling
@@ -205,36 +193,34 @@ public class FileRenderApp {
         frame.setVisible(true);
     }
 
+    public static void startApp(final AppContext context) {
+        SwingUtilities.invokeLater(() -> new FileRenderApp(context));
+    }
+
     private JComponent getSettingsComponent(ArrayList<FileTableModel.Column> initialColumns) {
         // SELECT WHICH COLUMNS TO DISPLAY
-        JComponent columnSettings = new JPanel(new GridLayout(0,1));
+        JComponent columnSettings = new JPanel(new GridLayout(0, 1));
         columnSettings.add(new JLabel("Show Columns:"));
         HashSet<FileTableModel.Column> columns = new HashSet<>(initialColumns);
 
         FileTableModel.Column[] columnSet = FileTableModel.Column.values();
 
-        IntStream.range(0, columnSet.length)
-                .mapToObj(i -> new AbstractMap.SimpleEntry<>(i, columnSet[i]))
-                .sorted(Comparator.comparing(e -> e.getValue().displayName))
-                .forEach(
-                        entry -> {
-                            var c = entry.getValue();
-                            JCheckBox checkBox = new JCheckBox(c.displayName);
-                            checkBox.setToolTipText(c.tooltip);
-                            checkBox.setSelected(columns.contains(c));
-                            checkBox.addActionListener(e -> {
-                                boolean show = checkBox.isSelected();
-                                if (show && !context.displayColumnOrdinals.contains(c)) {
-                                    context.displayColumnOrdinals.add(c);
-                                }
-                                else {
-                                    context.displayColumnOrdinals.remove(c);
-                                }
-                                updateDisplayColumns(new ArrayList<>(context.displayColumnOrdinals), fileTable.getColumnModel());
-                            });
-                            columnSettings.add(checkBox);
-                        }
-                );
+        IntStream.range(0, columnSet.length).mapToObj(i -> new AbstractMap.SimpleEntry<>(i, columnSet[i])).sorted(Comparator.comparing(e -> e.getValue().displayName)).forEach(entry -> {
+            var c = entry.getValue();
+            JCheckBox checkBox = new JCheckBox(c.displayName);
+            checkBox.setToolTipText(c.tooltip);
+            checkBox.setSelected(columns.contains(c));
+            checkBox.addActionListener(e -> {
+                boolean show = checkBox.isSelected();
+                if (show && !context.displayColumnOrdinals.contains(c)) {
+                    context.displayColumnOrdinals.add(c);
+                } else {
+                    context.displayColumnOrdinals.remove(c);
+                }
+                updateDisplayColumns(new ArrayList<>(context.displayColumnOrdinals), fileTable.getColumnModel());
+            });
+            columnSettings.add(checkBox);
+        });
 
         JScrollPane settingsPanel = new JScrollPane();
         {
@@ -245,10 +231,9 @@ public class FileRenderApp {
             settingsContentPane.add(columnSettings);
             settingsContentPane.add(new KeyBindingComponent());
             settingsPanel.setViewportView(settingsContentPane);
-        };
+        }
         return settingsPanel;
     }
-
 
     private void initDisplayedColumns(AppContext context) {
         var columns = new ArrayList<>(context.displayColumnOrdinals);
@@ -263,8 +248,6 @@ public class FileRenderApp {
         //display only columns from saved context
         updateDisplayColumns(columns, fileTable.getColumnModel());
     }
-
-    private HashMap<FileTableModel.Column, TableColumn> columToTableColumn = new HashMap<>();
 
     void updateDisplayColumns(ArrayList<FileTableModel.Column> columns, TableColumnModel columnModel) {
         {    // rebuild column model to match active columns.
@@ -283,8 +266,7 @@ public class FileRenderApp {
         var columnModel = fileTable.getColumnModel();
         if (show && !context.displayColumnOrdinals.contains(column)) {
             context.displayColumnOrdinals.add(column);
-        }
-        else {
+        } else {
             context.displayColumnOrdinals.remove(column);
         }
 
@@ -308,8 +290,7 @@ public class FileRenderApp {
             reverseMap.put(e.getValue(), e.getKey());
         }
 
-        Enumeration<TableColumn> tableColumns =
-                columnModel.getColumns();
+        Enumeration<TableColumn> tableColumns = columnModel.getColumns();
 
         List<FileTableModel.Column> orderedColumns = new ArrayList<>();
 
@@ -318,9 +299,9 @@ public class FileRenderApp {
             orderedColumns.add(reverseMap.get(tc));
         }
 
-        context.displayColumnOrdinals =
-                new ArrayList<>(orderedColumns.stream().distinct().toList());
-        System.out.println(context.displayColumnOrdinals.stream().map(c -> c.displayName).collect(Collectors.joining(", ")));
+        context.displayColumnOrdinals = new ArrayList<>(orderedColumns.stream().distinct().toList());
+        System.out.println(context.displayColumnOrdinals.stream().map(c -> c.displayName).collect(Collectors.joining(
+                ", ")));
         contextDirtyFlag = true;
     }
 
@@ -331,6 +312,83 @@ public class FileRenderApp {
             System.out.println("WRITE CONTEXT TO FILE");
             AppContext.write(this.context);
         }
+    }
+
+    private void tableAddMouseClickListener(JTable table) {
+        table.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
+                    int viewRow = table.rowAtPoint(e.getPoint());
+                    int viewCol = table.columnAtPoint(e.getPoint());
+
+                    if (viewRow == -1 || viewCol == -1) {
+                        return; // click outside cells
+                    }
+
+                    int modelRow = table.convertRowIndexToModel(viewRow);
+                    int modelCol = table.convertColumnIndexToModel(viewCol);
+
+                    Object object = tableModel.getValueAt(modelRow, modelCol);
+
+                    System.out.println("Model row=" + modelRow + ", model col=" + modelCol);
+
+                    JPopupMenu menu = new JPopupMenu();
+                    menu.setLightWeightPopupEnabled(false);
+                    JTextArea textArea = new JTextArea(10, 50);
+                    textArea.setLineWrap(true);
+                    textArea.setWrapStyleWord(true);
+                    textArea.setEditable(false);
+                    String content = "EMPTY";
+                    if (object instanceof List<?> list) {
+                       content = list.stream().map(Object::toString).collect(Collectors.joining("\n"));
+                    } else if (object instanceof Map<?,?> map) {
+                        content = map.entrySet().stream().map(entry -> entry.getKey().toString() +": " + entry.getValue().toString()).collect(Collectors.joining("\n"));
+                    } else if (object instanceof String s) {
+                        content = s;
+                    } else {
+                        content = object.toString();
+                    }
+
+                    var longestLine = Arrays.stream(content.split("\n")).max(Comparator.comparing(String::length));
+                    if (longestLine.isEmpty())
+                        return; //
+
+                    textArea.setText(content);
+
+                    FontMetrics metrics = textArea.getFontMetrics(textArea.getFont());
+                    float pxWidth = metrics.stringWidth(longestLine.get());
+                    pxWidth /= metrics.stringWidth("m"); // what column size is based off
+                    int columns = (int)Math.ceil(pxWidth);
+
+                    textArea.setColumns(Math.max(Math.min(100,columns+5),20));
+                    textArea.setRows(Math.max(7, Math.min(30, content.split("\n").length)));
+
+                    textArea.setFont(new Font(Font.SANS_SERIF, Font.PLAIN,12));
+
+                    System.out.println("object string = " + textArea.getText());
+                    JScrollPane scrollPane = new JScrollPane(textArea);
+                    menu.add(new JLabel(tableModel.getColumn(modelCol).displayName));
+                    menu.add(scrollPane);
+
+                    SwingUtilities.invokeLater(() ->
+                            menu.show(e.getComponent(), e.getX(), e.getY())
+                    );
+                }
+            }
+        });
+
+        table.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 3 && SwingUtilities.isLeftMouseButton(e)) {
+                    int viewRow = table.rowAtPoint(e.getPoint());
+                    if (viewRow >= 0) {
+                        renderSelectedFiles();
+                    }
+                }
+            }
+        });
     }
 
     private void checkLoadingThreads() {
@@ -349,10 +407,8 @@ public class FileRenderApp {
         }
 
         int[] viewRows = fileTable.getSelectedRows();
-        List<File> selected = java.util.Arrays.stream(viewRows)
-                .map(fileTable::convertRowIndexToModel)
-                .mapToObj(tableModel::getFileAt)
-                .toList();
+        List<File> selected =
+                java.util.Arrays.stream(viewRows).map(fileTable::convertRowIndexToModel).mapToObj(tableModel::getFileAt).toList();
 
         context.activeFiles.clear();
         context.activeFiles.addAll(selected);
@@ -365,8 +421,6 @@ public class FileRenderApp {
             renderFiles(selected);
         }
     }
-
-
 
     private void addFiles(Component parent) {
         JFileChooser chooser = getFileChooser();
@@ -384,7 +438,8 @@ public class FileRenderApp {
 
     private void removeSelectedFiles() {
         int[] viewRows = fileTable.getSelectedRows();
-        File[] files = Arrays.stream(viewRows).map(fileTable::convertRowIndexToModel).mapToObj(tableModel::getFileAt).toArray(File[]::new);
+        File[] files =
+                Arrays.stream(viewRows).map(fileTable::convertRowIndexToModel).mapToObj(tableModel::getFileAt).toArray(File[]::new);
 
         Arrays.stream(files).forEach(context.filesAndTimestamps::remove);
         tableModel.removeFile(files);
@@ -402,11 +457,12 @@ public class FileRenderApp {
         try {
             Thread glThread = new Thread(() -> {
                 try {
-                    SchemReader.CubeSetup setup = SchemReader.prepareData(SchemReader.loadSchematics(selectedFiles.stream().map(File::toPath).toList()));
+                    SchemReader.CubeSetup setup =
+                            SchemReader.prepareData(SchemReader.loadSchematics(selectedFiles.stream().map(File::toPath).toList()));
                     if (setup == null) {
                         SwingUtilities.invokeLater(() -> {
-                            JOptionPane.showMessageDialog(frame, "Error: unable to load schematics from selected files. Maybe the file type is not supported or does not exist " +
-                                    "anymore?");
+                            JOptionPane.showMessageDialog(frame, "Error: unable to load schematics from selected " +
+                                    "files. Maybe the file type is not supported or does not exist " + "anymore?");
                         });
                         return;
                     }
@@ -437,8 +493,7 @@ public class FileRenderApp {
             @Override
             public boolean accept(File f) {
                 for (String type : ResourceUtils.SUPPORTED_FILE_TYPES) {
-                    if (f.isDirectory() || f.getPath().endsWith(type))
-                        return true;
+                    if (f.isDirectory() || f.getPath().endsWith(type)) return true;
                 }
                 return false;
             }
@@ -449,9 +504,5 @@ public class FileRenderApp {
             }
         });
         return chooser;
-    }
-
-    public static void startApp(final AppContext context) {
-        SwingUtilities.invokeLater(() -> new FileRenderApp(context));
     }
 }
