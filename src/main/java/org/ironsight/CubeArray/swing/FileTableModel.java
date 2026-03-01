@@ -335,9 +335,11 @@ class FileTableModel extends AbstractTableModel {
             int index = lowerText.indexOf(searchText);
 
             if (index < 0) {
+                setForeground(Color.LIGHT_GRAY);
                 super.paintComponent(g);
                 return;
             }
+            setForeground(Color.BLACK);
 
             // draw a yellow filled rect into the background where the matchign string will be
             FontMetrics fm = g.getFontMetrics();
