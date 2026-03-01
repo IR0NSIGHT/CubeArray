@@ -16,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.ZipException;
@@ -29,7 +30,7 @@ public class SchemReader {
         Material mat = Material.COBBLESTONE_STAIRS;
         System.out.println(mat);
     }
-    public static List<WPObject> loadSchematics(List<Path> pathList) throws IOException {
+    public static List<WPObject> loadSchematics(List<Path> pathList, Consumer<File> onLoadError) throws IOException {
         ArrayList<WPObject> schematics = new ArrayList<>();
         for (Path path : pathList) {
             File file = path.toFile();
@@ -40,9 +41,10 @@ public class SchemReader {
                     schematics.add(schematic);
                 } catch (IllegalArgumentException ex) {
                     System.out.println("ignore non-schem:" + file.getName());
-                } catch (ZipException ex) {
-                    System.err.println("cant load file:" + file.getName());
+                } catch (ArrayIndexOutOfBoundsException | ZipException ex) {
+                    System.err.println("cant load file:" + file.getAbsolutePath());
                     System.err.println(ex);
+                    onLoadError.accept(file);
                 }
             }
         }

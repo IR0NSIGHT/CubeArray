@@ -34,8 +34,6 @@ public class PeriodicChecker {
                             e.printStackTrace();
                         }
                     }
-
-                    // wait 5 seconds
                     Thread.sleep(1000);
                 } catch (InterruptedException e) {
                     // Exit if the thread is interrupted

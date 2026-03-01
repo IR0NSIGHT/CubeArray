@@ -138,7 +138,7 @@ public class InstancedCubes {
         }
         System.out.println("File path: " + schemFile.getAbsolutePath());
 
-        SchemReader.CubeSetup setup = SchemReader.prepareData(SchemReader.loadSchematics(List.of(schemFile.toPath())));
+        SchemReader.CubeSetup setup = SchemReader.prepareData(SchemReader.loadSchematics(List.of(schemFile.toPath()),f -> {}));
         if (setup == null) {
             throw new RuntimeException("could not load schematic into cube setup");
         } else {

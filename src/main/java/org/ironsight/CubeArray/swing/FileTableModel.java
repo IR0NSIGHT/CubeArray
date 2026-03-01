@@ -94,6 +94,11 @@ class FileTableModel extends AbstractTableModel {
             checker.addCallback(this::tryLoadSchematics);
     }
 
+    private final HashSet<File> errorFiles = new HashSet<>();
+    private void flagAsError(File file) {
+        errorFiles.add(file);
+    }
+
     /**
      * this method will be called from another thread
      */
@@ -105,6 +110,7 @@ class FileTableModel extends AbstractTableModel {
 
         IntStream.range(0, copyFiles.size())
                 .mapToObj(i -> Map.entry(i, copyFiles.get(i)))
+                .filter(entry -> !errorFiles.contains(entry.getValue()))
                 .filter(entry -> !schematicObjects.containsKey(entry.getValue()))
                 .sorted(Comparator.comparingLong(k -> k.getValue().length()))
                 .forEach(entry -> {
@@ -114,22 +120,21 @@ class FileTableModel extends AbstractTableModel {
 
                     // check and load each files schematic if necessary.
                     try {
-                        var schems = SchemReader.loadSchematics(List.of(f.toPath()));
+                        var schems = SchemReader.loadSchematics(List.of(f.toPath()), this::flagAsError );
                         for (WPObject schem : schems)
                             schematicObjects.put(f, schem);
                         final int ii = i;
                         SwingUtilities.invokeLater(() -> {
-                            fireTableRowsUpdated(ii, ii);
+                            if (ii >= files.size())
+                                return;
+                            fireTableRowsUpdated(ii, ii); //FIXME the index might have changed, get current index of file
                             if (remainingFileCountChangedCallback != null) {
                                 int remainingCount = files.size() - schematicObjects.size();
                                 remainingFileCountChangedCallback.accept(remainingCount);
                             }
                         });
-                        Thread.sleep(1000);
                     } catch (IOException | InvalidPathException ex) {
                         System.err.println("unable to load schematic from file: " + f);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
                     }
                 });
     }
@@ -141,6 +146,7 @@ class FileTableModel extends AbstractTableModel {
 
     public void flagReloadFile(int modelRow) {
         schematicObjects.remove(getFile(modelRow));
+        errorFiles.remove(getFile(modelRow));
         fireTableRowsUpdated(modelRow,modelRow);
         if (remainingFileCountChangedCallback != null) {
             int remainingCount = files.size() - schematicObjects.size();
@@ -295,7 +301,7 @@ class FileTableModel extends AbstractTableModel {
     }
 
     public void addFile(File f) {
-        if (!files.contains(f)) {
+        if (f != null && !files.contains(f)) {
             files.add(f);
             fireTableRowsInserted(files.size() - 1, files.size() - 1);
         }

@@ -17,7 +17,6 @@ public class AppContext implements Serializable {
 
         // Deep copy collections
         this.filesAndTimestamps.putAll(other.filesAndTimestamps);
-        this.activeFiles.addAll(other.activeFiles);
 
         // Immutable enough (File is effectively immutable)
         this.lastSearchPath = other.lastSearchPath;
@@ -39,7 +38,6 @@ public class AppContext implements Serializable {
     }
 
     final HashMap<File, Long> filesAndTimestamps = new HashMap<>();
-    final Set<File> activeFiles = new HashSet<>();
     File lastSearchPath = new File(System.getProperty("user.home"));
     Rectangle guiBounds = new Rectangle(0,0,800,600);
     boolean neverBeforeUsed = true;
@@ -59,6 +57,7 @@ public class AppContext implements Serializable {
     public static AppContext read() {
         File file = getSaveFile();
         if (!file.exists()) {
+            System.err.println("NO APP CONTEXT FOUND; ADD NEW ONE");
             AppContext context = new AppContext(); // empty context
             return context;
         }
@@ -66,6 +65,7 @@ public class AppContext implements Serializable {
         try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {
             Object obj = in.readObject();
             if (obj instanceof AppContext ctx) {
+                System.err.println("successfully loaded app context");
                 return ctx;
             } else {
                 System.err.println("app.context is invalid, returning empty context.");

@@ -14,12 +14,18 @@ import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.Set;
+import java.util.stream.Stream;
+
+import static org.ironsight.CubeArray.ResourceUtils.isSupportedSchematicType;
 
 public class FileRenderApp {
     final JFrame frame;
@@ -31,7 +37,6 @@ public class FileRenderApp {
 
     private final TableRowSorter<FileTableModel> rowSorter;
 
-    private final JButton renderBtn;
     private final Set<Thread> loadingThreads = new HashSet<>();
     //is context dirty and needs to be saved?
     private boolean contextDirtyFlag;
@@ -95,7 +100,7 @@ public class FileRenderApp {
             if (count == 0)
                 this.setTextRemainingFiles("");
             else
-                this.setTextRemainingFiles("Loading " + count + " files");
+                this.setTextRemainingFiles("Loading " + count + " file(s)");
         });
 
         this.fileTable = new JTable(tableModel);
@@ -198,16 +203,52 @@ public class FileRenderApp {
         {
             JPanel topButtons = new JPanel(new FlowLayout(FlowLayout.LEFT));
             {
-                JButton addBtn = new JButton("Add");
-                JButton removeBtn = new JButton("Remove");
-                renderBtn = new JButton("Render");
+                JButton addBtn = new JButton("Files");
+                final JPopupMenu filesMenu = new JPopupMenu(){
+                    @Override
+                    public Dimension getPreferredSize() { // snugly assume width of button
+                        Dimension d = super.getPreferredSize();
+                        if (d.width < addBtn.getWidth())
+                            d.width = addBtn.getWidth();
+                        return d;
+                    }
+                };
+                filesMenu.setLayout(new GridLayout(0, 1));
+                {
+                    {
+                        JButton importSingleFile = new JButton("Import file");
+                        importSingleFile.addActionListener(a -> this.importFile());
+                        filesMenu.add(importSingleFile);
+                    }
 
-                addBtn.addActionListener(e -> addFiles(frame));
-                removeBtn.addActionListener(e -> removeSelectedFiles());
-                renderBtn.addActionListener(e -> renderSelectedFiles());
+                    {
+                        JButton importFolder = new JButton("Import folder");
+                        importFolder.addActionListener(a -> this.importFolder());
+                        filesMenu.add(importFolder);
+                    }
 
+                    {
+                        JButton reloadAll = new JButton("Reload all");
+                        reloadAll.addActionListener(a -> this.reloadAllFiles());
+                        filesMenu.add(reloadAll);
+                    }
+
+                    {
+                        JButton reloadAll = new JButton("Remove all");
+                        reloadAll.addActionListener(a -> this.removeAllFiles());
+                        filesMenu.add(reloadAll);
+                    }
+
+                }
+
+
+                addBtn.addActionListener(e -> {
+                    SwingUtilities.invokeLater(() -> {
+                        filesMenu.show(addBtn, 0, addBtn.getHeight());
+                    });
+                });
                 topPanel.add(addBtn);
-                topPanel.add(removeBtn);
+
                 topPanel.add(searchField);
             }
             JPanel topInfo = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -224,7 +265,6 @@ public class FileRenderApp {
 
 
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        bottomPanel.add(renderBtn);
 
         JPanel fileListPanel = new JPanel(new BorderLayout());
         {
@@ -263,6 +303,81 @@ public class FileRenderApp {
         });
 
         frame.setVisible(true);
+    }
+
+    private void importFile() {
+        JFileChooser chooser = getFileChooser(false);
+        if (chooser.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) {
+            for (File f : chooser.getSelectedFiles()) {
+                if (!context.filesAndTimestamps.containsKey(f)) {
+                    tableModel.addFile(f);
+                    context.filesAndTimestamps.put(f, System.currentTimeMillis());
+                }
+            }
+        }
+        context.lastSearchPath = chooser.getCurrentDirectory();
+        flagContextDirty();
+    }
+
+    private void importFolder() {
+        JFileChooser chooser = getFileChooser(true);
+        if (chooser.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) {
+            for (File folder : chooser.getSelectedFiles()) {
+                try {
+                    var filesInFolderRecursive = getAllFiles(folder);
+                    filesInFolderRecursive.forEach(f -> {
+                        context.filesAndTimestamps.put(f,System.currentTimeMillis());
+                        tableModel.addFile(f);
+                    });
+                } catch (IOException e) {
+                    JOptionPane.showMessageDialog(
+                            frame,
+                            "Importing of folder '" + folder.getAbsolutePath() + "' has failed: " + e.getMessage(),
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE
+                    );
+                }
+            }
+        }
+        context.lastSearchPath = chooser.getCurrentDirectory();
+        flagContextDirty();
+    }
+
+    /**
+     * Recursively collects all files in a folder and its subfolders.
+     *
+     * @param folder the root folder to start from
+     * @return list of files found
+     * @throws IOException if an I/O error occurs
+     */
+    public static List<File> getAllFiles(File folder) throws IOException {
+        if (folder == null || !folder.isDirectory()) {
+            throw new IllegalArgumentException("Input must be a valid directory");
+        }
+
+        List<File> fileList = new ArrayList<>();
+
+        // Using java.nio.file.Files.walk
+        try (Stream<Path> paths = Files.walk(folder.toPath())) {
+            paths
+                    .filter(Files::isRegularFile) // only files, ignore directories
+                    .filter(isSupportedSchematicType)
+                    .forEach(path -> fileList.add(path.toFile()));
+        }
+
+        return fileList;
+    }
+
+    private void reloadAllFiles() {
+        var allFiles = IntStream.range(0,tableModel.getRowCount()).toArray();
+        for (int row : allFiles)
+            tableModel.flagReloadFile(row);
+    }
+
+    private void removeAllFiles() {
+        var allFiles = IntStream.range(0,tableModel.getRowCount()).mapToObj(tableModel::getFileAt).toArray(File[]::new);
+        context.filesAndTimestamps.clear();
+        tableModel.removeFile(allFiles);
     }
 
     public static void startApp(final AppContext context) {
@@ -428,19 +543,61 @@ public class FileRenderApp {
         }
     }
 
+    private void openFolderSelectedFiles() {
+        var files = getSelectedFiles();
+        Desktop desktop = Desktop.getDesktop();
+        if (desktop == null) {
+            assert false : "desktop is null";
+            return;
+        }
+        List<File> folders = Arrays.stream(files).map(File::getParentFile).distinct().toList();
+        if (folders.size() > 2) {
+            int reply = JOptionPane.showConfirmDialog(frame, "You are trying to open " + folders.size() + " folders at once. Do you want to continue?", "Open folders", JOptionPane.YES_NO_OPTION);
+            if (reply != JOptionPane.YES_OPTION) {
+                return;
+            }
+        }
+        folders.forEach(folder -> {
+            try {
+                desktop.open(folder);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
     private void tableAddMouseClickListener(JTable table) {
         final JPopupMenu rightMenu = new JPopupMenu();
-        rightMenu.setLayout(new GridLayout(0, 1));
-        JLabel title = new JLabel("");
-        rightMenu.add(title);
-        JButton reloadFileBtn = new JButton("Reload");
-        rightMenu.add(reloadFileBtn);
-        JButton renderFilesBtn = new JButton("Render");
-        rightMenu.add(renderFilesBtn);
-        reloadFileBtn.addActionListener(a -> this.reloadSelectedFiles());
-        Consumer<Integer> updateRightMenu = (Consumer<Integer>) modelRow -> {
+        final JButton reloadFileBtn;
+        final  JLabel menuTitleLbl;
+        final JButton renderFilesBtn;
+        {
+            rightMenu.setLayout(new GridLayout(0, 1));
+
+            menuTitleLbl = new JLabel("");
+            rightMenu.add(menuTitleLbl);
+
+            reloadFileBtn = new JButton("Reload");
+            reloadFileBtn.addActionListener(a -> this.reloadSelectedFiles());
+            rightMenu.add(reloadFileBtn);
+
+            renderFilesBtn = new JButton("Render");
+            renderFilesBtn.addActionListener(a -> this.renderSelectedFiles());
+            rightMenu.add(renderFilesBtn);
+
+            JButton removeFilesBtn = new JButton("Remove");
+            removeFilesBtn.addActionListener(a -> this.removeSelectedFiles());
+            rightMenu.add(removeFilesBtn);
+
+            JButton openFolderBtn = new JButton("Open folder");
+            openFolderBtn.addActionListener(a -> this.openFolderSelectedFiles());
+            rightMenu.add(openFolderBtn);
+        }
+
+        Consumer<Integer> updateRightMenu = modelRow -> {
             reloadFileBtn.setEnabled(Arrays.stream(getSelectedModelRows()).anyMatch(tableModel::isFileLoaded)); //unloaded files cant be reloaded, pointless
-            title.setText(getSelectedFiles().length + " files selected");
+            renderFilesBtn.setEnabled(Arrays.stream(getSelectedModelRows()).allMatch(tableModel::isFileLoaded));
+            menuTitleLbl.setText(getSelectedFiles().length + " file(s) selected");
         };
 
         table.addMouseListener(new MouseAdapter() {
@@ -528,10 +685,6 @@ public class FileRenderApp {
         synchronized (loadingThreads) {
             loadingThreads.removeIf(t -> !t.isAlive());
         }
-        SwingUtilities.invokeLater(() -> {
-            renderBtn.setVisible(loadingThreads.isEmpty());
-        });
-
     }
 
     private void renderSelectedFiles() {
@@ -543,8 +696,6 @@ public class FileRenderApp {
         List<File> selected =
                 java.util.Arrays.stream(viewRows).map(fileTable::convertRowIndexToModel).mapToObj(tableModel::getFileAt).toList();
 
-        context.activeFiles.clear();
-        context.activeFiles.addAll(selected);
         flagContextDirty();
 
         if (selected.isEmpty()) {
@@ -553,20 +704,6 @@ public class FileRenderApp {
             // Your action goes here
             renderFiles(selected);
         }
-    }
-
-    private void addFiles(Component parent) {
-        JFileChooser chooser = getFileChooser();
-        if (chooser.showOpenDialog(parent) == JFileChooser.APPROVE_OPTION) {
-            for (File f : chooser.getSelectedFiles()) {
-                if (!context.filesAndTimestamps.containsKey(f)) {
-                    tableModel.addFile(f);
-                    context.filesAndTimestamps.put(f, System.currentTimeMillis());
-                }
-            }
-        }
-        context.lastSearchPath = chooser.getCurrentDirectory();
-        flagContextDirty();
     }
 
     private File[] getSelectedFiles() {
@@ -603,7 +740,7 @@ public class FileRenderApp {
             Thread glThread = new Thread(() -> {
                 try {
                     SchemReader.CubeSetup setup =
-                            SchemReader.prepareData(SchemReader.loadSchematics(selectedFiles.stream().map(File::toPath).toList()));
+                            SchemReader.prepareData(SchemReader.loadSchematics(selectedFiles.stream().map(File::toPath).toList(),f -> System.err.println("can not render " + f.getAbsolutePath())));
                     if (setup == null) {
                         SwingUtilities.invokeLater(() -> {
                             JOptionPane.showMessageDialog(frame, "Error: unable to load schematics from selected " +
@@ -630,24 +767,32 @@ public class FileRenderApp {
 
     }
 
-    private JFileChooser getFileChooser() {
+    private JFileChooser getFileChooser(boolean folder) {
         JFileChooser chooser = new JFileChooser();
         chooser.setCurrentDirectory(context.lastSearchPath);
         chooser.setMultiSelectionEnabled(true);
-        chooser.setFileFilter(new FileFilter() {
-            @Override
-            public boolean accept(File f) {
-                for (String type : ResourceUtils.SUPPORTED_FILE_TYPES) {
-                    if (f.isDirectory() || f.getPath().endsWith(type)) return true;
-                }
-                return false;
-            }
 
-            @Override
-            public String getDescription() {
-                return ResourceUtils.SUPPORTED_FILE_TYPES.stream().sorted().collect(Collectors.joining(", "));
-            }
-        });
+        if (!folder) {
+            // IMPORT FILES
+            chooser.setFileFilter(new FileFilter() {
+                @Override
+                public boolean accept(File f) {
+                    for (String type : ResourceUtils.SUPPORTED_FILE_TYPES) {
+                        if (f.isDirectory() || f.getPath().endsWith(type)) return true;
+                    }
+                    return false;
+                }
+
+                @Override
+                public String getDescription() {
+                    return ResourceUtils.SUPPORTED_FILE_TYPES.stream().sorted().collect(Collectors.joining(", "));
+                }
+            });
+        } else {
+            // IMPORT FOLDER
+            chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            chooser.setAcceptAllFileFilterUsed(false); // optional, hide files
+        }
         return chooser;
     }
 }

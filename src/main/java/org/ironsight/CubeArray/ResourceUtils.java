@@ -1,5 +1,7 @@
 package org.ironsight.CubeArray;
 
+import org.apache.commons.io.FilenameUtils;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -8,6 +10,7 @@ import java.net.JarURLConnection;
 import java.net.URISyntaxException;
 import java.nio.file.*;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.net.*;
@@ -24,9 +27,15 @@ public class ResourceUtils {
                     ".schematic",
                     ".schem"
             ));
+    private static final Set<String> SUPPORTED_FILE_EXTENSIONS = SUPPORTED_FILE_TYPES.stream().map(s -> s.replace(".","")).collect(Collectors.toSet());
     public static String TEXTURE_RESOURCES = "textures/";
     public static String TEXTURE_PACK_ROOT = "textures/Faithful_32x_1_21_7/";
     public static String SCHEMATICS_ROOT = "schematics/", SCHEMATIC_RESOURCES = "schematics/";
+
+    public static final Predicate<? super Path> isSupportedSchematicType = (f) -> {
+        String ext = FilenameUtils.getExtension(f.toFile().getName());
+        return SUPPORTED_FILE_EXTENSIONS.contains(ext);
+    };
 
     public static List<Path> getDefaultSchematics() {
         Path defaultSchematicsDir = ResourceUtils.getInstallPath().resolve(ResourceUtils.SCHEMATICS_ROOT);
