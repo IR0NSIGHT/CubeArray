@@ -1,6 +1,7 @@
 package org.ironsight.CubeArray.swing;
 
 import org.ironsight.CubeArray.ResourceUtils;
+import org.ironsight.CubeArray.swing.FileTableModel.CaColumn;
 
 import java.awt.*;
 import java.io.*;
@@ -28,8 +29,8 @@ public class AppContext implements Serializable {
         this.neverBeforeUsed = other.neverBeforeUsed;
 
         // Copy list
-        this.displayColumnOrdinals =
-                new ArrayList<>(other.displayColumnOrdinals);
+        this.displayCaColumnOrdinals =
+                new ArrayList<>(other.displayCaColumnOrdinals);
 
         this.columnWidths = new ArrayList<>(other.columnWidths);
     }
@@ -39,8 +40,10 @@ public class AppContext implements Serializable {
     File lastSearchPath = new File(System.getProperty("user.home"));
     Rectangle guiBounds = new Rectangle(0,0,400,400);
     boolean neverBeforeUsed = true;
-    ArrayList<FileTableModel.Column> displayColumnOrdinals =new ArrayList<>(List.of(FileTableModel.Column.values()));
-    ArrayList<Integer> columnWidths = new ArrayList<>(Arrays.stream(FileTableModel.Column.values()).mapToInt(c -> c.defaultWidth).boxed().toList());
+    ArrayList<CaColumn> displayCaColumnOrdinals =new ArrayList<>(List.of(CaColumn.values()));
+    ArrayList<Integer> columnWidths = new ArrayList<>(Arrays.stream(CaColumn.values()).mapToInt(c -> c.defaultWidth).boxed().toList());
+
+
 
     public static File getSaveFile() {
         File file = new File(ResourceUtils.getInstallPath().toFile(), "app.context");

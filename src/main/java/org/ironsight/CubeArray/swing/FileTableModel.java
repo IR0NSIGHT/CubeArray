@@ -132,11 +132,11 @@ class FileTableModel extends AbstractTableModel {
 
     @Override
     public int getColumnCount() {
-        return Column.values().length;
+        return CaColumn.values().length;
     }
 
-    public Column getColumn(int columnIdx) {
-        return Column.values()[columnIdx];
+    public CaColumn getColumn(int columnIdx) {
+        return CaColumn.values()[columnIdx];
     }
 
     @Override
@@ -144,12 +144,12 @@ class FileTableModel extends AbstractTableModel {
         assert row >= 0 : "row to small: " + row;
         assert row < files.size() : "row to big: " + row + ", " + files.size();
 
-        if (col >= Column.values().length)
+        if (col >= CaColumn.values().length)
             return null;
 
         File f = files.get(row);
         WPObject obj = getSchematicFor(f);
-        return switch (Column.values()[col]) {
+        return switch (CaColumn.values()[col]) {
             case FILE -> f.getName();
             case PATH -> f.getAbsolutePath();
             case FILE_SIZE -> getSizeBytes(f);
@@ -236,16 +236,16 @@ class FileTableModel extends AbstractTableModel {
 
     @Override
     public String getColumnName(int column) {
-        if (column >= Column.values().length)
+        if (column >= CaColumn.values().length)
             return "";
-        return Column.values()[column].displayName;
+        return CaColumn.values()[column].displayName;
     }
 
     @Override
     public Class<?> getColumnClass(int column) {
-        if (column >= Column.values().length)
+        if (column >= CaColumn.values().length)
             return Object.class;
-        return Column.values()[column].clazz;
+        return CaColumn.values()[column].clazz;
     }
 
     public File getFileAt(int row) {
@@ -270,7 +270,11 @@ class FileTableModel extends AbstractTableModel {
         }
     }
 
-    enum Column {
+    /**
+     * hardcoded enum list of columns that the table (and model) can display.
+     * comes with all info required to store across restarts and display to user
+     */
+    enum CaColumn {
         FILE("File", String.class, defaultRenderer, "Name of the file",240),
         LAST_CHANGED("Last Changed", Date.class, defaultRenderer, "Date when the file was last modified",185),
         FILE_TYPE("File Type", String.class, defaultRenderer, "File extension",50),
@@ -290,7 +294,7 @@ class FileTableModel extends AbstractTableModel {
         final String tooltip;
         final StringConverter renderer;
         final int defaultWidth;
-        private Column(String name, Class<?> clazz, StringConverter renderer, String tooltip, int defaultWidth) {
+        private CaColumn(String name, Class<?> clazz, StringConverter renderer, String tooltip, int defaultWidth) {
             this.tooltip = tooltip;
             this.displayName = name;
             this.clazz = clazz;
