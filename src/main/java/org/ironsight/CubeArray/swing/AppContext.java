@@ -30,6 +30,8 @@ public class AppContext implements Serializable {
         // Copy list
         this.displayColumnOrdinals =
                 new ArrayList<>(other.displayColumnOrdinals);
+
+        this.columnWidths = new ArrayList<>(other.columnWidths);
     }
 
     final HashMap<File, Long> filesAndTimestamps = new HashMap<>();
@@ -38,6 +40,7 @@ public class AppContext implements Serializable {
     Rectangle guiBounds = new Rectangle(0,0,400,400);
     boolean neverBeforeUsed = true;
     ArrayList<FileTableModel.Column> displayColumnOrdinals =new ArrayList<>(List.of(FileTableModel.Column.values()));
+    ArrayList<Integer> columnWidths = new ArrayList<>(Arrays.stream(FileTableModel.Column.values()).mapToInt(ignored -> 10).boxed().toList());
 
     public static File getSaveFile() {
         File file = new File(ResourceUtils.getInstallPath().toFile(), "app.context");

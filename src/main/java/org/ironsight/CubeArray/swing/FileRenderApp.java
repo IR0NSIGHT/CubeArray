@@ -42,6 +42,10 @@ public class FileRenderApp {
     private boolean contextDirtyFlag;
     private final HashMap<FileTableModel.Column, TableColumn> columToTableColumn = new HashMap<>();
 
+    private void flagContextDirty() {
+        contextDirtyFlag = true;
+    }
+    
     private record TextSearch(
             String searchString,
             List<FileTableModel.Column> searchColumns,
@@ -82,7 +86,7 @@ public class FileRenderApp {
             ResourceUtils.getDefaultSchematics().forEach(s -> context.filesAndTimestamps.put(s.toFile(),
                     System.currentTimeMillis()));
             context.neverBeforeUsed = false;
-            contextDirtyFlag = true;
+            flagContextDirty();
         }
 
         CubeArrayMain.periodicChecker.addCallback(this::checkContextSaving);
@@ -113,7 +117,7 @@ public class FileRenderApp {
 
             @Override
             public void columnMarginChanged(ChangeEvent e) {
-                // Optional: track width changes
+                updateContextColumns(fileTable.getColumnModel());
             }
 
             @Override
@@ -134,14 +138,14 @@ public class FileRenderApp {
             public void componentResized(ComponentEvent e) {
                 Rectangle bounds = frame.getBounds();
                 context.guiBounds = bounds;
-                contextDirtyFlag = true;
+                flagContextDirty();
             }
 
             @Override
             public void componentMoved(ComponentEvent e) {
                 Rectangle bounds = frame.getBounds();
                 context.guiBounds = bounds;
-                contextDirtyFlag = true;
+                flagContextDirty();
             }
         });
 
@@ -242,7 +246,7 @@ public class FileRenderApp {
                 } else {
                     context.displayColumnOrdinals.remove(c);
                 }
-                updateDisplayColumns(new ArrayList<>(context.displayColumnOrdinals), fileTable.getColumnModel());
+                updateDisplayColumns(new ArrayList<>(context.displayColumnOrdinals), new ArrayList<>(context.columnWidths), fileTable.getColumnModel());
             });
             columnSettings.add(checkBox);
         });
@@ -262,7 +266,8 @@ public class FileRenderApp {
 
     private void initDisplayedColumns(AppContext context) {
         var columns = new ArrayList<>(context.displayColumnOrdinals);
-        // init displayed columns
+        var columnWidths =  new ArrayList<>(context.columnWidths);
+        // construct hashmap to lookup column -> tableColumn
         TableColumnModel columnModel = fileTable.getColumnModel();
         for (int i = 0; i < columnModel.getColumnCount(); i++) {
             TableColumn tc = columnModel.getColumn(i);
@@ -271,19 +276,22 @@ public class FileRenderApp {
         }
 
         //display only columns from saved context
-        updateDisplayColumns(columns, fileTable.getColumnModel());
+        updateDisplayColumns(columns,columnWidths, fileTable.getColumnModel());
     }
 
-    void updateDisplayColumns(ArrayList<FileTableModel.Column> columns, TableColumnModel columnModel) {
+    void updateDisplayColumns(ArrayList<FileTableModel.Column> columns, ArrayList<Integer> columnWidths, TableColumnModel columnModel) {
         {    // rebuild column model to match active columns.
             // Remove all columns
             while (columnModel.getColumnCount() > 0) {
                 columnModel.removeColumn(columnModel.getColumn(0));
             }
-            for (var c : columns) {
-                columnModel.addColumn(columToTableColumn.get(c));
+            for (int i = 0; i < columns.size(); i++) {
+                TableColumn tc = columToTableColumn.get(columns.get(i));
+                tc.setPreferredWidth(columnWidths.get(i));
+                tc.setWidth(columnWidths.get(i));
+                columnModel.addColumn(tc);
             }
-            System.out.println("set display columns to: " + context.displayColumnOrdinals.stream().map(Object::toString).collect(Collectors.joining(", ")));
+            System.out.println("DISPLAY COLUMN WIDTHS " + columnWidths);
         }
     }
 
@@ -316,18 +324,34 @@ public class FileRenderApp {
         }
 
         Enumeration<TableColumn> tableColumns = columnModel.getColumns();
+        List<TableColumn> columns =
+                Collections.list(columnModel.getColumns());
 
         List<FileTableModel.Column> orderedColumns = new ArrayList<>();
+        ArrayList<Integer> columnWidths = new ArrayList<>();
 
-        while (tableColumns.hasMoreElements()) {
-            TableColumn tc = tableColumns.nextElement();
-            orderedColumns.add(reverseMap.get(tc));
+        FileTableModel.Column[] enumColums = FileTableModel.Column.values();
+        for (TableColumn tc : columns) {
+            int modelIdx = tc.getModelIndex();
+            //model columns are equal to the enum
+            if (modelIdx >= 0 && modelIdx < enumColums.length) {
+                FileTableModel.Column column = enumColums[modelIdx];
+                orderedColumns.add(column);
+                columnWidths.add(tc.getWidth());
+            }
         }
 
-        context.displayColumnOrdinals = new ArrayList<>(orderedColumns.stream().distinct().toList());
-        System.out.println(context.displayColumnOrdinals.stream().map(c -> c.displayName).collect(Collectors.joining(
-                ", ")));
-        contextDirtyFlag = true;
+        if (!(orderedColumns.size() == orderedColumns.stream().distinct().toList().size())) {
+            assert false : "Columns have different size";;
+        }
+        context.displayColumnOrdinals = new ArrayList<>(orderedColumns);
+        System.out.println("SET COLUMN WIDTHS TO " + columnWidths);
+        context.columnWidths = columnWidths;
+        assert orderedColumns.size() == orderedColumns.stream().distinct().toList().size() : "ordered columns not distinct:" + orderedColumns;
+        assert context.displayColumnOrdinals.size() == context.columnWidths.size();
+
+        System.out.println(context.columnWidths);
+        flagContextDirty();
     }
 
     void checkContextSaving() {
@@ -437,7 +461,7 @@ public class FileRenderApp {
 
         context.activeFiles.clear();
         context.activeFiles.addAll(selected);
-        contextDirtyFlag = true;
+        flagContextDirty();
 
         if (selected.isEmpty()) {
             JOptionPane.showMessageDialog(null, "No files selected.");
@@ -458,7 +482,7 @@ public class FileRenderApp {
             }
         }
         context.lastSearchPath = chooser.getCurrentDirectory();
-        contextDirtyFlag = true;
+        flagContextDirty();
     }
 
     private void removeSelectedFiles() {
@@ -469,7 +493,7 @@ public class FileRenderApp {
         Arrays.stream(files).forEach(context.filesAndTimestamps::remove);
         tableModel.removeFile(files);
 
-        contextDirtyFlag = true;
+        flagContextDirty();
     }
 
     private void renderFiles(List<File> selectedFiles) {
