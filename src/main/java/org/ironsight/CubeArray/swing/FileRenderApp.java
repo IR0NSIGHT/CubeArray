@@ -6,10 +6,7 @@ import org.ironsight.CubeArray.ResourceUtils;
 import org.ironsight.CubeArray.SchemReader;
 
 import javax.swing.*;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.TableColumnModelEvent;
-import javax.swing.event.TableColumnModelListener;
+import javax.swing.event.*;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
@@ -213,11 +210,32 @@ public class FileRenderApp {
 
         JTabbedPane tabbedPane = new JTabbedPane(SwingConstants.LEFT);
         tabbedPane.add("File List", fileListPanel);
-        tabbedPane.add("⚙\uFE0F", getSettingsComponent(context.displayCaColumnOrdinals)); // SETTINGS
+        tabbedPane.add("⚙\uFE0F", getSettingsComponent(context.displayedColumns)); // SETTINGS
         frame.add(tabbedPane);
         context.filesAndTimestamps.keySet().forEach(tableModel::addFile);
 
         initDisplayedColumns(context);
+
+        rowSorter.addRowSorterListener(e -> {
+            if (e.getType() == RowSorterEvent.Type.SORT_ORDER_CHANGED) {
+
+                List<? extends RowSorter.SortKey> sortKeys =
+                        fileTable.getRowSorter().getSortKeys();
+
+                if (!sortKeys.isEmpty()) {
+                    RowSorter.SortKey key = sortKeys.get(0);
+
+                    int modelColumn = key.getColumn();   // model index
+                    SortOrder order = key.getSortOrder(); // ASCENDING / DESCENDING
+
+                    context.orderedColumn = tableModel.getColumn(modelColumn);
+                    context.orderAscending = SortOrder.ASCENDING.equals(order);
+                } else {
+                    context.orderedColumn = null;
+                    context.orderAscending = false;
+                }
+            }
+        });
 
         frame.setVisible(true);
     }
@@ -241,12 +259,12 @@ public class FileRenderApp {
             checkBox.setSelected(caColumns.contains(c));
             checkBox.addActionListener(e -> {
                 boolean show = checkBox.isSelected();
-                if (show && !context.displayCaColumnOrdinals.contains(c)) {
-                    context.displayCaColumnOrdinals.add(c);
+                if (show && !context.displayedColumns.contains(c)) {
+                    context.displayedColumns.add(c);
                 } else {
-                    context.displayCaColumnOrdinals.remove(c);
+                    context.displayedColumns.remove(c);
                 }
-                updateDisplayColumns(new ArrayList<>(context.displayCaColumnOrdinals), new ArrayList<>(context.columnWidths), fileTable.getColumnModel());
+                updateDisplayColumns(new ArrayList<>(context.displayedColumns), new ArrayList<>(context.columnWidths), fileTable.getColumnModel());
             });
             columnSettings.add(checkBox);
         });
@@ -265,8 +283,8 @@ public class FileRenderApp {
     }
 
     private void initDisplayedColumns(AppContext context) {
-        var columns = new ArrayList<>(context.displayCaColumnOrdinals);
-        var columnWidths =  new ArrayList<>(context.columnWidths);
+        var contextClone = new AppContext(context);
+
         // construct hashmap to lookup column -> tableColumn
         TableColumnModel columnModel = fileTable.getColumnModel();
         for (int i = 0; i < columnModel.getColumnCount(); i++) {
@@ -276,7 +294,14 @@ public class FileRenderApp {
         }
 
         //display only columns from saved context
-        updateDisplayColumns(columns,columnWidths, fileTable.getColumnModel());
+        updateDisplayColumns(contextClone.displayedColumns,contextClone.columnWidths, fileTable.getColumnModel());
+
+        // apply sorting
+        if (contextClone.orderedColumn != null) {
+            List<RowSorter.SortKey> keys = List.of(new RowSorter.SortKey(contextClone.orderedColumn.ordinal(), contextClone.orderAscending ? SortOrder.ASCENDING : SortOrder.DESCENDING));
+            rowSorter.setSortKeys(keys);
+            rowSorter.sort();
+        }
     }
 
     void updateDisplayColumns(ArrayList<FileTableModel.CaColumn> caColumns, ArrayList<Integer> columnWidths, TableColumnModel columnModel) {
@@ -298,10 +323,10 @@ public class FileRenderApp {
 
     void showColumn(FileTableModel.CaColumn caColumn, int index, boolean show) {
         var columnModel = fileTable.getColumnModel();
-        if (show && !context.displayCaColumnOrdinals.contains(caColumn)) {
-            context.displayCaColumnOrdinals.add(caColumn);
+        if (show && !context.displayedColumns.contains(caColumn)) {
+            context.displayedColumns.add(caColumn);
         } else {
-            context.displayCaColumnOrdinals.remove(caColumn);
+            context.displayedColumns.remove(caColumn);
         }
 
 
@@ -310,7 +335,7 @@ public class FileRenderApp {
             while (columnModel.getColumnCount() > 0) {
                 columnModel.removeColumn(columnModel.getColumn(0));
             }
-            for (var c : context.displayCaColumnOrdinals) {
+            for (var c : context.displayedColumns) {
                 columnModel.addColumn(columToTableColumn.get(c));
             }
         }
@@ -345,11 +370,11 @@ public class FileRenderApp {
         if (!(orderedCaColumns.size() == orderedCaColumns.stream().distinct().toList().size())) {
             assert false : "Columns have different size";;
         }
-        context.displayCaColumnOrdinals = new ArrayList<>(orderedCaColumns);
+        context.displayedColumns = new ArrayList<>(orderedCaColumns);
         System.out.println("SET COLUMN WIDTHS TO " + columnWidths);
         context.columnWidths = columnWidths;
         assert orderedCaColumns.size() == orderedCaColumns.stream().distinct().toList().size() : "ordered columns not distinct:" + orderedCaColumns;
-        assert context.displayCaColumnOrdinals.size() == context.columnWidths.size();
+        assert context.displayedColumns.size() == context.columnWidths.size();
 
         System.out.println(context.columnWidths);
         flagContextDirty();

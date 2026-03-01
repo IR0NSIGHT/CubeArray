@@ -29,10 +29,13 @@ public class AppContext implements Serializable {
         this.neverBeforeUsed = other.neverBeforeUsed;
 
         // Copy list
-        this.displayCaColumnOrdinals =
-                new ArrayList<>(other.displayCaColumnOrdinals);
+        this.displayedColumns =
+                new ArrayList<>(other.displayedColumns);
 
         this.columnWidths = new ArrayList<>(other.columnWidths);
+
+        this.orderAscending = other.orderAscending;
+        this.orderedColumn = other.orderedColumn;
     }
 
     final HashMap<File, Long> filesAndTimestamps = new HashMap<>();
@@ -40,9 +43,10 @@ public class AppContext implements Serializable {
     File lastSearchPath = new File(System.getProperty("user.home"));
     Rectangle guiBounds = new Rectangle(0,0,400,400);
     boolean neverBeforeUsed = true;
-    ArrayList<CaColumn> displayCaColumnOrdinals =new ArrayList<>(List.of(CaColumn.values()));
+    ArrayList<CaColumn> displayedColumns =new ArrayList<>(List.of(CaColumn.values()));
     ArrayList<Integer> columnWidths = new ArrayList<>(Arrays.stream(CaColumn.values()).mapToInt(c -> c.defaultWidth).boxed().toList());
-
+    CaColumn orderedColumn = CaColumn.FILE;
+    boolean orderAscending = false;
 
 
     public static File getSaveFile() {
