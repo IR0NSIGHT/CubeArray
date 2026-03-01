@@ -13,12 +13,24 @@ import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 class FileTableModel extends AbstractTableModel {
+    private final static StringConverter dateRenderer = new StringConverter() {
+        final  SimpleDateFormat sdf = new SimpleDateFormat("HH:mm, EEE dd MMM yyyy");
+        @Override
+        public String convertToString(Object o) {
+            if (o instanceof Date date) {
+                String formatted = sdf.format(date);
+                return formatted;
+            }
+            return super.convertToString(o);
+        }
+    };
 
     private final static StringConverter defaultRenderer = new StringConverter() {
         @Override
@@ -276,7 +288,7 @@ class FileTableModel extends AbstractTableModel {
      */
     enum CaColumn {
         FILE("File", String.class, defaultRenderer, "Name of the file",240),
-        LAST_CHANGED("Last Changed", Date.class, defaultRenderer, "Date when the file was last modified",185),
+        LAST_CHANGED("Last Changed", Date.class, dateRenderer, "Date when the file was last modified",135),
         FILE_TYPE("File Type", String.class, defaultRenderer, "File extension",50),
         FILE_SIZE("File Size (MB)", Long.class, fileSizeRenderer, "Size of the file",60),
         DIMENSION_WIDTH("Width", Integer.class, dimensionRenderer, "Width of the schematic (meters)",40),
