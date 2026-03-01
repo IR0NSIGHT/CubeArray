@@ -12,13 +12,11 @@ import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 import javax.swing.table.TableRowSorter;
 import java.awt.*;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.event.*;
 import java.io.File;
 import java.util.List;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.Set;
@@ -55,6 +53,8 @@ public class FileRenderApp {
     }
     private TextSearch currentSearch = new TextSearch();
 
+
+
     private void updateTextSearch(TextSearch newSearch) {
         this.currentSearch = newSearch;
         if (currentSearch.searchString.isEmpty()) {
@@ -76,6 +76,7 @@ public class FileRenderApp {
             c.renderer.setSearchText(currentSearch.searchString);
         }
     }
+    private final JLabel topInfoLabel;
     public FileRenderApp(final AppContext context) {
         this.context = context;
         if (context.neverBeforeUsed) {
@@ -90,6 +91,13 @@ public class FileRenderApp {
         CubeArrayMain.periodicChecker.addCallback(this::checkLoadingThreads);
 
         this.tableModel = new FileTableModel(CubeArrayMain.periodicChecker);
+        tableModel.setFileQueueSizeChangedCallback(count -> {
+            if (count == 0)
+                this.setTextRemainingFiles("");
+            else
+                this.setTextRemainingFiles("Loading " + count + " files");
+        });
+
         this.fileTable = new JTable(tableModel);
         this.rowSorter = new TableRowSorter<>(tableModel);
 
@@ -184,18 +192,35 @@ public class FileRenderApp {
         fileTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF); // allows wide table + horizontal scrolling
         JScrollPane scrollPane = new JScrollPane(fileTable);
 
-        JButton addBtn = new JButton("Add");
-        JButton removeBtn = new JButton("Remove");
-        renderBtn = new JButton("Render");
 
-        addBtn.addActionListener(e -> addFiles(frame));
-        removeBtn.addActionListener(e -> removeSelectedFiles());
-        renderBtn.addActionListener(e -> renderSelectedFiles());
 
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        topPanel.add(addBtn);
-        topPanel.add(removeBtn);
-        topPanel.add(searchField);
+        JPanel topPanel = new JPanel(new GridLayout(2, 0));
+        {
+            JPanel topButtons = new JPanel(new FlowLayout(FlowLayout.LEFT));
+            {
+                JButton addBtn = new JButton("Add");
+                JButton removeBtn = new JButton("Remove");
+                renderBtn = new JButton("Render");
+
+                addBtn.addActionListener(e -> addFiles(frame));
+                removeBtn.addActionListener(e -> removeSelectedFiles());
+                renderBtn.addActionListener(e -> renderSelectedFiles());
+
+                topPanel.add(addBtn);
+                topPanel.add(removeBtn);
+                topPanel.add(searchField);
+            }
+            JPanel topInfo = new JPanel(new FlowLayout(FlowLayout.LEFT));
+            {
+                JLabel topInfoLabel = new JLabel();
+                topInfo.add(topInfoLabel);
+                this.topInfoLabel = topInfoLabel;
+
+            }
+            topPanel.add(topButtons);
+            topPanel.add(topInfo);
+        }
+
 
 
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
@@ -392,22 +417,52 @@ public class FileRenderApp {
         }
     }
 
+    private void setTextRemainingFiles(String text) {
+        topInfoLabel.setText(text);
+    }
+
+    private void reloadSelectedFiles() {
+        var rows = getSelectedModelRows();
+        for (int row: rows) {
+            tableModel.flagReloadFile(row);
+        }
+    }
+
     private void tableAddMouseClickListener(JTable table) {
+        final JPopupMenu rightMenu = new JPopupMenu();
+        rightMenu.setLayout(new GridLayout(0, 1));
+        JLabel title = new JLabel("");
+        rightMenu.add(title);
+        JButton reloadFileBtn = new JButton("Reload");
+        rightMenu.add(reloadFileBtn);
+        JButton renderFilesBtn = new JButton("Render");
+        rightMenu.add(renderFilesBtn);
+        reloadFileBtn.addActionListener(a -> this.reloadSelectedFiles());
+        Consumer<Integer> updateRightMenu = (Consumer<Integer>) modelRow -> {
+            reloadFileBtn.setEnabled(Arrays.stream(getSelectedModelRows()).anyMatch(tableModel::isFileLoaded)); //unloaded files cant be reloaded, pointless
+            title.setText(getSelectedFiles().length + " files selected");
+        };
+
         table.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
+                int viewRow = table.rowAtPoint(e.getPoint());
+                int viewCol = table.columnAtPoint(e.getPoint());
+                if (viewRow == -1 || viewCol == -1) {
+                    return; // click outside cells
+                }
+                int modelRow = table.convertRowIndexToModel(viewRow);
+                int modelCol = table.convertColumnIndexToModel(viewCol);
+                Object object = tableModel.getValueAt(modelRow, modelCol);
+
+                if (e.getClickCount() == 1 && SwingUtilities.isRightMouseButton(e)) {
+                    updateRightMenu.accept(modelRow);
+                    SwingUtilities.invokeLater(() ->
+                        rightMenu.show(e.getComponent(), e.getX(), e.getY())
+                    );
+                }
                 if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
-                    int viewRow = table.rowAtPoint(e.getPoint());
-                    int viewCol = table.columnAtPoint(e.getPoint());
 
-                    if (viewRow == -1 || viewCol == -1) {
-                        return; // click outside cells
-                    }
-
-                    int modelRow = table.convertRowIndexToModel(viewRow);
-                    int modelCol = table.convertColumnIndexToModel(viewCol);
-
-                    Object object = tableModel.getValueAt(modelRow, modelCol);
 
                     System.out.println("Model row=" + modelRow + ", model col=" + modelCol);
 
@@ -514,11 +569,23 @@ public class FileRenderApp {
         flagContextDirty();
     }
 
-    private void removeSelectedFiles() {
+    private File[] getSelectedFiles() {
         int[] viewRows = fileTable.getSelectedRows();
         File[] files =
                 Arrays.stream(viewRows).map(fileTable::convertRowIndexToModel).mapToObj(tableModel::getFileAt).toArray(File[]::new);
 
+        return files;
+    }
+
+    private int[] getSelectedModelRows() {
+        int[] viewRows = fileTable.getSelectedRows();
+        int[] rows =
+                Arrays.stream(viewRows).map(fileTable::convertRowIndexToModel).toArray();
+        return rows;
+    }
+
+    private void removeSelectedFiles() {
+        var files = getSelectedFiles();
         Arrays.stream(files).forEach(context.filesAndTimestamps::remove);
         tableModel.removeFile(files);
 

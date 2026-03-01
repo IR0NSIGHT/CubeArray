@@ -16,6 +16,7 @@ import java.nio.file.InvalidPathException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -119,11 +120,38 @@ class FileTableModel extends AbstractTableModel {
                         final int ii = i;
                         SwingUtilities.invokeLater(() -> {
                             fireTableRowsUpdated(ii, ii);
+                            if (remainingFileCountChangedCallback != null) {
+                                int remainingCount = files.size() - schematicObjects.size();
+                                remainingFileCountChangedCallback.accept(remainingCount);
+                            }
                         });
+                        Thread.sleep(1000);
                     } catch (IOException | InvalidPathException ex) {
                         System.err.println("unable to load schematic from file: " + f);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
                     }
                 });
+    }
+
+    private Consumer<Integer> remainingFileCountChangedCallback; // int = remainingFiles
+    public void setFileQueueSizeChangedCallback(Consumer<Integer> callback) {
+        this.remainingFileCountChangedCallback = callback;
+    }
+
+    public void flagReloadFile(int modelRow) {
+        schematicObjects.remove(getFile(modelRow));
+        fireTableRowsUpdated(modelRow,modelRow);
+        if (remainingFileCountChangedCallback != null) {
+            int remainingCount = files.size() - schematicObjects.size();
+            remainingFileCountChangedCallback.accept(remainingCount);
+        }
+    }
+
+    public File getFile(int modelRow) {
+        if (modelRow < 0 || modelRow >= files.size())
+            return null;
+        return files.get(modelRow);
     }
 
     private static String formatSize(long bytes) {
@@ -226,7 +254,9 @@ class FileTableModel extends AbstractTableModel {
     public WPObject getSchematicFor(File f) {
         return schematicObjects.get(f);
     }
-
+    public boolean isFileLoaded(int modelRow) {
+        return schematicObjects.containsKey(getFile(modelRow));
+    }
     private static long getSizeBytes(File f) {
         try {
             if (!f.isFile()) {
@@ -337,6 +367,7 @@ class FileTableModel extends AbstractTableModel {
         @Override
         protected void paintComponent(Graphics g) {
             if (searchText == null || searchText.isEmpty()) {
+                setForeground(Color.BLACK);
                 super.paintComponent(g);
                 return;
             }
@@ -351,7 +382,7 @@ class FileTableModel extends AbstractTableModel {
             int index = lowerText.indexOf(searchText);
 
             if (index < 0) {
-                setForeground(Color.LIGHT_GRAY);
+                setForeground(Color.GRAY);
                 super.paintComponent(g);
                 return;
             }
