@@ -41,9 +41,9 @@ public class AppContext implements Serializable {
     final HashMap<File, Long> filesAndTimestamps = new HashMap<>();
     final Set<File> activeFiles = new HashSet<>();
     File lastSearchPath = new File(System.getProperty("user.home"));
-    Rectangle guiBounds = new Rectangle(0,0,400,400);
+    Rectangle guiBounds = new Rectangle(0,0,800,600);
     boolean neverBeforeUsed = true;
-    ArrayList<CaColumn> displayedColumns =new ArrayList<>(List.of(CaColumn.values()));
+    ArrayList<CaColumn> displayedColumns = new ArrayList<>(List.of(CaColumn.values()));
     ArrayList<Integer> columnWidths = new ArrayList<>(Arrays.stream(CaColumn.values()).mapToInt(c -> c.defaultWidth).boxed().toList());
     CaColumn orderedColumn = CaColumn.FILE;
     boolean orderAscending = false;

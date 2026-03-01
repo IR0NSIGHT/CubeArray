@@ -264,7 +264,7 @@ public class FileRenderApp {
                 } else {
                     context.displayedColumns.remove(c);
                 }
-                updateDisplayColumns(new ArrayList<>(context.displayedColumns), new ArrayList<>(context.columnWidths), fileTable.getColumnModel());
+                updateDisplayColumns(new ArrayList<>(context.displayedColumns), new ArrayList<>(context.columnWidths), new HashSet<>(), fileTable.getColumnModel());
             });
             columnSettings.add(checkBox);
         });
@@ -294,7 +294,7 @@ public class FileRenderApp {
         }
 
         //display only columns from saved context
-        updateDisplayColumns(contextClone.displayedColumns,contextClone.columnWidths, fileTable.getColumnModel());
+        updateDisplayColumns(contextClone.displayedColumns,contextClone.columnWidths, new HashSet<>(), fileTable.getColumnModel());
 
         // apply sorting
         if (contextClone.orderedColumn != null) {
@@ -304,14 +304,17 @@ public class FileRenderApp {
         }
     }
 
-    void updateDisplayColumns(ArrayList<FileTableModel.CaColumn> caColumns, ArrayList<Integer> columnWidths, TableColumnModel columnModel) {
+    void updateDisplayColumns(ArrayList<FileTableModel.CaColumn> caColumns, ArrayList<Integer> columnWidths, HashSet<FileTableModel.CaColumn> hiddenColumns, TableColumnModel columnModel) {
         {    // rebuild column model to match active columns.
             // Remove all columns
             while (columnModel.getColumnCount() > 0) {
                 columnModel.removeColumn(columnModel.getColumn(0));
             }
             for (int i = 0; i < caColumns.size(); i++) {
-                TableColumn tc = columToTableColumn.get(caColumns.get(i));
+                FileTableModel.CaColumn column = caColumns.get(i);
+                if (hiddenColumns.contains(column))
+                    continue;
+                TableColumn tc = columToTableColumn.get(column);
                 int width = (i < columnWidths.size()) ? columnWidths.get(i) : caColumns.get(i).defaultWidth;
                 tc.setPreferredWidth(width);
                 tc.setWidth(width);
