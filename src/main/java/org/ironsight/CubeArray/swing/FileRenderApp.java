@@ -287,8 +287,9 @@ public class FileRenderApp {
             }
             for (int i = 0; i < columns.size(); i++) {
                 TableColumn tc = columToTableColumn.get(columns.get(i));
-                tc.setPreferredWidth(columnWidths.get(i));
-                tc.setWidth(columnWidths.get(i));
+                int width = (i < columnWidths.size()) ? columnWidths.get(i) : columns.get(i).defaultWidth;
+                tc.setPreferredWidth(width);
+                tc.setWidth(width);
                 columnModel.addColumn(tc);
             }
             System.out.println("DISPLAY COLUMN WIDTHS " + columnWidths);
