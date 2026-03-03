@@ -30,7 +30,7 @@ import static org.ironsight.CubeArray.ResourceUtils.isSupportedSchematicType;
 public class FileRenderApp {
     final JFrame frame;
     // main data structure
-    private final AppContext context;
+    private AppContext context;
     // UI model
     private final FileTableModel tableModel;
     private final JTable fileTable;
@@ -40,15 +40,16 @@ public class FileRenderApp {
     private final Set<Thread> loadingThreads = new HashSet<>();
     //is context dirty and needs to be saved?
     private boolean contextDirtyFlag;
-    private final HashMap<FileTableModel.CaColumn, TableColumn> columToTableColumn = new HashMap<>();
+    private final HashMap<CaColumn, TableColumn> columToTableColumn = new HashMap<>();
 
-    private void flagContextDirty() {
+    private void flagContextDirty(AppContext context) {
+        this.context = context;
         contextDirtyFlag = true;
     }
     
     private record TextSearch(
             String searchString,
-            List<FileTableModel.CaColumn> searchCaColumns,
+            List<CaColumn> searchCaColumns,
             boolean excludeMatches
     ) {
         // provide default values via a compact constructor
@@ -69,7 +70,7 @@ public class FileRenderApp {
             rowSorter.setRowFilter(new RowFilter<>() {
                 @Override
                 public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
-                    for (FileTableModel.CaColumn c: FileTableModel.CaColumn.values()) {
+                    for (CaColumn c: CaColumn.values()) {
                         if (c.renderer.convertToString(entry.getValue(c.ordinal())).toLowerCase().contains(currentSearch.searchString))
                             return true;
                     }
@@ -77,19 +78,20 @@ public class FileRenderApp {
                 }
             });
         }
-        for (FileTableModel.CaColumn c: FileTableModel.CaColumn.values()) {
+        for (CaColumn c: CaColumn.values()) {
             c.renderer.setSearchText(currentSearch.searchString);
         }
     }
     private final JLabel topInfoLabel;
-    public FileRenderApp(final AppContext context) {
-        this.context = context;
-        if (context.neverBeforeUsed) {
+    public FileRenderApp(final AppContext initialContext) {
+        this.context = initialContext;
+        if (context.neverBeforeUsed()) {
             // add default schematics on very first use
-            ResourceUtils.getDefaultSchematics().forEach(s -> context.filesAndTimestamps.put(s.toFile(),
+            var newFilesAndTimestamps = new HashMap<File,Long>();
+            ResourceUtils.getDefaultSchematics().forEach(s -> newFilesAndTimestamps.put(s.toFile(),
                     System.currentTimeMillis()));
-            context.neverBeforeUsed = false;
-            flagContextDirty();
+            AppContext newContext = new AppContext(newFilesAndTimestamps, context.lastSearchPath(), context.guiBounds(), false, context.columnContext());
+            flagContextDirty(newContext);
         }
 
         CubeArrayMain.periodicChecker.addCallback(this::checkContextSaving);
@@ -139,23 +141,23 @@ public class FileRenderApp {
         // construct UI
 
         frame = new JFrame("File Renderer");
-        frame.setSize(context.guiBounds.width, context.guiBounds.height);
-        frame.setLocation(context.guiBounds.x, context.guiBounds.y);
+        frame.setSize(context.guiBounds().width, context.guiBounds().height);
+        frame.setLocation(context.guiBounds().x, context.guiBounds().y);
 
         // Add listener
         frame.addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
                 Rectangle bounds = frame.getBounds();
-                context.guiBounds = bounds;
-                flagContextDirty();
+                var newContext =  new AppContext(context.filesAndTimestamps(),context.lastSearchPath(),bounds,context.neverBeforeUsed(), context.columnContext());
+                flagContextDirty(newContext);
             }
 
             @Override
             public void componentMoved(ComponentEvent e) {
                 Rectangle bounds = frame.getBounds();
-                context.guiBounds = bounds;
-                flagContextDirty();
+                var newContext =  new AppContext(context.filesAndTimestamps(),context.lastSearchPath(),bounds,context.neverBeforeUsed(), context.columnContext());
+                flagContextDirty(newContext);
             }
         });
 
@@ -167,7 +169,7 @@ public class FileRenderApp {
 
         fileTable.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
 
-        for (FileTableModel.CaColumn c : FileTableModel.CaColumn.values()) {
+        for (CaColumn c : CaColumn.values()) {
             fileTable.getColumnModel().getColumn(c.ordinal()).setCellRenderer(c.renderer);
         }
 
@@ -275,9 +277,9 @@ public class FileRenderApp {
 
         JTabbedPane tabbedPane = new JTabbedPane(SwingConstants.LEFT);
         tabbedPane.add("File List", fileListPanel);
-        tabbedPane.add("⚙\uFE0F", getSettingsComponent(context.displayedColumns)); // SETTINGS
+        tabbedPane.add("⚙\uFE0F", getSettingsComponent(context.columnContext().displayedColumns())); // SETTINGS
         frame.add(tabbedPane);
-        context.filesAndTimestamps.keySet().forEach(tableModel::addFile);
+        context.filesAndTimestamps().keySet().forEach(tableModel::addFile);
 
         initDisplayedColumns(context);
 
@@ -286,19 +288,18 @@ public class FileRenderApp {
 
                 List<? extends RowSorter.SortKey> sortKeys =
                         fileTable.getRowSorter().getSortKeys();
-
+                var oldColumnContext = this.context.columnContext();
+                ColumnContext newColumnContext;
                 if (!sortKeys.isEmpty()) {
                     RowSorter.SortKey key = sortKeys.get(0);
 
                     int modelColumn = key.getColumn();   // model index
                     SortOrder order = key.getSortOrder(); // ASCENDING / DESCENDING
-
-                    context.orderedColumn = tableModel.getColumn(modelColumn);
-                    context.orderAscending = SortOrder.ASCENDING.equals(order);
+                    newColumnContext = new ColumnContext(oldColumnContext.displayedColumns(),oldColumnContext.columnWidths(),tableModel.getColumn(modelColumn),SortOrder.ASCENDING.equals(order));
                 } else {
-                    context.orderedColumn = null;
-                    context.orderAscending = false;
+                    newColumnContext = new ColumnContext(oldColumnContext.displayedColumns(),oldColumnContext.columnWidths(),null, false);
                 }
+                flagContextDirty(new AppContext(context.filesAndTimestamps(),context.lastSearchPath(),context.guiBounds(),context.neverBeforeUsed(),newColumnContext));
             }
         });
 
@@ -307,26 +308,29 @@ public class FileRenderApp {
 
     private void importFile() {
         JFileChooser chooser = getFileChooser(false);
+        var newFilesAndTimeStamps = new HashMap<>(context.filesAndTimestamps());
         if (chooser.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) {
+
             for (File f : chooser.getSelectedFiles()) {
-                if (!context.filesAndTimestamps.containsKey(f)) {
+                if (!context.filesAndTimestamps().containsKey(f)) {
                     tableModel.addFile(f);
-                    context.filesAndTimestamps.put(f, System.currentTimeMillis());
+                    newFilesAndTimeStamps.put(f, System.currentTimeMillis());
                 }
             }
         }
-        context.lastSearchPath = chooser.getCurrentDirectory();
-        flagContextDirty();
+        var newContext = new AppContext(newFilesAndTimeStamps,chooser.getCurrentDirectory(), context.guiBounds(), context.neverBeforeUsed(), context.columnContext());
+        flagContextDirty(newContext);
     }
 
     private void importFolder() {
         JFileChooser chooser = getFileChooser(true);
+        var newFilesAndTimeStamps = new HashMap<>(context.filesAndTimestamps());
         if (chooser.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) {
             for (File folder : chooser.getSelectedFiles()) {
                 try {
                     var filesInFolderRecursive = getAllFiles(folder);
                     filesInFolderRecursive.forEach(f -> {
-                        context.filesAndTimestamps.put(f,System.currentTimeMillis());
+                        newFilesAndTimeStamps.put(f,System.currentTimeMillis());
                         tableModel.addFile(f);
                     });
                 } catch (IOException e) {
@@ -339,8 +343,8 @@ public class FileRenderApp {
                 }
             }
         }
-        context.lastSearchPath = chooser.getCurrentDirectory();
-        flagContextDirty();
+        var newContext = new AppContext(newFilesAndTimeStamps,chooser.getCurrentDirectory(), context.guiBounds(), context.neverBeforeUsed(), context.columnContext());
+        flagContextDirty(newContext);
     }
 
     /**
@@ -376,21 +380,22 @@ public class FileRenderApp {
 
     private void removeAllFiles() {
         var allFiles = IntStream.range(0,tableModel.getRowCount()).mapToObj(tableModel::getFileAt).toArray(File[]::new);
-        context.filesAndTimestamps.clear();
         tableModel.removeFile(allFiles);
+
+        flagContextDirty(new AppContext(new HashMap<>(), context.lastSearchPath(),context.guiBounds(),context.neverBeforeUsed(),context.columnContext()));
     }
 
     public static void startApp(final AppContext context) {
         SwingUtilities.invokeLater(() -> new FileRenderApp(context));
     }
 
-    private JComponent getSettingsComponent(ArrayList<FileTableModel.CaColumn> initialCaColumns) {
+    private JComponent getSettingsComponent(List<CaColumn> initialCaColumns) {
         // SELECT WHICH COLUMNS TO DISPLAY
         JComponent columnSettings = new JPanel(new GridLayout(0, 1));
         columnSettings.add(new JLabel("Show Columns:"));
-        HashSet<FileTableModel.CaColumn> caColumns = new HashSet<>(initialCaColumns);
+        HashSet<CaColumn> caColumns = new HashSet<>(initialCaColumns);
 
-        FileTableModel.CaColumn[] caColumnSet = FileTableModel.CaColumn.values();
+        CaColumn[] caColumnSet = CaColumn.values();
 
         IntStream.range(0, caColumnSet.length).mapToObj(i -> new AbstractMap.SimpleEntry<>(i, caColumnSet[i])).sorted(Comparator.comparing(e -> e.getValue().displayName)).forEach(entry -> {
             var c = entry.getValue();
@@ -399,12 +404,15 @@ public class FileRenderApp {
             checkBox.setSelected(caColumns.contains(c));
             checkBox.addActionListener(e -> {
                 boolean show = checkBox.isSelected();
-                if (show && !context.displayedColumns.contains(c)) {
-                    context.displayedColumns.add(c);
+                if (show && !context.columnContext().displayedColumns().contains(c)) {
+                    context.columnContext().displayedColumns().add(c);
+                    var oldColumnContext = context.columnContext();
+                    var newColumnContext = new ColumnContext();
+                    flagContextDirty(new AppContext(context.filesAndTimestamps(), context.lastSearchPath(),context.guiBounds(),context.neverBeforeUsed(),context.columnContext()));
                 } else {
-                    context.displayedColumns.remove(c);
+                    context.columnContext().displayedColumns().remove(c);
                 }
-                updateDisplayColumns(new ArrayList<>(context.displayedColumns), new ArrayList<>(context.columnWidths), new HashSet<>(), fileTable.getColumnModel());
+                updateDisplayColumns(new ArrayList<>(context.columnContext().displayedColumns()), new ArrayList<>(context.columnContext().columnWidths()), new HashSet<>(), fileTable.getColumnModel());
             });
             columnSettings.add(checkBox);
         });
@@ -423,35 +431,35 @@ public class FileRenderApp {
     }
 
     private void initDisplayedColumns(AppContext context) {
-        var contextClone = new AppContext(context);
+        var contextClone = context.columnContext().copy();
 
         // construct hashmap to lookup column -> tableColumn
         TableColumnModel columnModel = fileTable.getColumnModel();
         for (int i = 0; i < columnModel.getColumnCount(); i++) {
             TableColumn tc = columnModel.getColumn(i);
-            FileTableModel.CaColumn c = FileTableModel.CaColumn.values()[i];
+            CaColumn c = CaColumn.values()[i];
             columToTableColumn.put(c, tc);
         }
 
         //display only columns from saved context
-        updateDisplayColumns(contextClone.displayedColumns,contextClone.columnWidths, new HashSet<>(), fileTable.getColumnModel());
+        updateDisplayColumns(contextClone.displayedColumns(),contextClone.columnWidths(), new HashSet<>(), fileTable.getColumnModel());
 
         // apply sorting
-        if (contextClone.orderedColumn != null) {
-            List<RowSorter.SortKey> keys = List.of(new RowSorter.SortKey(contextClone.orderedColumn.ordinal(), contextClone.orderAscending ? SortOrder.ASCENDING : SortOrder.DESCENDING));
+        if (contextClone.orderedColumn() != null) {
+            List<RowSorter.SortKey> keys = List.of(new RowSorter.SortKey(contextClone.orderedColumn().ordinal(), contextClone.orderAscending() ? SortOrder.ASCENDING : SortOrder.DESCENDING));
             rowSorter.setSortKeys(keys);
             rowSorter.sort();
         }
     }
 
-    void updateDisplayColumns(ArrayList<FileTableModel.CaColumn> caColumns, ArrayList<Integer> columnWidths, HashSet<FileTableModel.CaColumn> hiddenColumns, TableColumnModel columnModel) {
+    void updateDisplayColumns(List<CaColumn> caColumns, List<Integer> columnWidths, HashSet<CaColumn> hiddenColumns, TableColumnModel columnModel) {
         {    // rebuild column model to match active columns.
             // Remove all columns
             while (columnModel.getColumnCount() > 0) {
                 columnModel.removeColumn(columnModel.getColumn(0));
             }
             for (int i = 0; i < caColumns.size(); i++) {
-                FileTableModel.CaColumn column = caColumns.get(i);
+                CaColumn column = caColumns.get(i);
                 if (hiddenColumns.contains(column))
                     continue;
                 TableColumn tc = columToTableColumn.get(column);
@@ -464,47 +472,19 @@ public class FileRenderApp {
         }
     }
 
-    void showColumn(FileTableModel.CaColumn caColumn, int index, boolean show) {
-        var columnModel = fileTable.getColumnModel();
-        if (show && !context.displayedColumns.contains(caColumn)) {
-            context.displayedColumns.add(caColumn);
-        } else {
-            context.displayedColumns.remove(caColumn);
-        }
-
-
-        {    // rebuild column model to match active columns.
-            // Remove all columns
-            while (columnModel.getColumnCount() > 0) {
-                columnModel.removeColumn(columnModel.getColumn(0));
-            }
-            for (var c : context.displayedColumns) {
-                columnModel.addColumn(columToTableColumn.get(c));
-            }
-        }
-    }
-
     void updateContextColumns(TableColumnModel columnModel) {
-
-        Map<TableColumn, FileTableModel.CaColumn> reverseMap = new HashMap<>();
-
-        for (Map.Entry<FileTableModel.CaColumn, TableColumn> e : columToTableColumn.entrySet()) {
-            reverseMap.put(e.getValue(), e.getKey());
-        }
-
-        Enumeration<TableColumn> tableColumns = columnModel.getColumns();
         List<TableColumn> columns =
                 Collections.list(columnModel.getColumns());
 
-        List<FileTableModel.CaColumn> orderedCaColumns = new ArrayList<>();
+        ArrayList<CaColumn> orderedCaColumns = new ArrayList<>();
         ArrayList<Integer> columnWidths = new ArrayList<>();
 
-        FileTableModel.CaColumn[] enumColums = FileTableModel.CaColumn.values();
+        CaColumn[] enumColums = CaColumn.values();
         for (TableColumn tc : columns) {
             int modelIdx = tc.getModelIndex();
             //model columns are equal to the enum
             if (modelIdx >= 0 && modelIdx < enumColums.length) {
-                FileTableModel.CaColumn caColumn = enumColums[modelIdx];
+                CaColumn caColumn = enumColums[modelIdx];
                 orderedCaColumns.add(caColumn);
                 columnWidths.add(tc.getWidth());
             }
@@ -513,14 +493,13 @@ public class FileRenderApp {
         if (!(orderedCaColumns.size() == orderedCaColumns.stream().distinct().toList().size())) {
             assert false : "Columns have different size";;
         }
-        context.displayedColumns = new ArrayList<>(orderedCaColumns);
+        var oldColumnContext = this.context.columnContext();
+        var newColumnContext = new ColumnContext(orderedCaColumns, columnWidths,  oldColumnContext.orderedColumn(), oldColumnContext.orderAscending());
         System.out.println("SET COLUMN WIDTHS TO " + columnWidths);
-        context.columnWidths = columnWidths;
         assert orderedCaColumns.size() == orderedCaColumns.stream().distinct().toList().size() : "ordered columns not distinct:" + orderedCaColumns;
-        assert context.displayedColumns.size() == context.columnWidths.size();
+        assert oldColumnContext.displayedColumns().size() == oldColumnContext.columnWidths().size();
 
-        System.out.println(context.columnWidths);
-        flagContextDirty();
+        flagContextDirty(new AppContext(context.filesAndTimestamps(),context.lastSearchPath(),context.guiBounds(),context.neverBeforeUsed(),newColumnContext));
     }
 
     void checkContextSaving() {
@@ -696,8 +675,6 @@ public class FileRenderApp {
         List<File> selected =
                 java.util.Arrays.stream(viewRows).map(fileTable::convertRowIndexToModel).mapToObj(tableModel::getFileAt).toList();
 
-        flagContextDirty();
-
         if (selected.isEmpty()) {
             JOptionPane.showMessageDialog(null, "No files selected.");
         } else {
@@ -723,10 +700,9 @@ public class FileRenderApp {
 
     private void removeSelectedFiles() {
         var files = getSelectedFiles();
-        Arrays.stream(files).forEach(context.filesAndTimestamps::remove);
         tableModel.removeFile(files);
 
-        flagContextDirty();
+        flagContextDirty(new AppContext(new HashMap<>(),context.lastSearchPath(),context.guiBounds(),context.neverBeforeUsed(),context.columnContext()));
     }
 
     private void renderFiles(List<File> selectedFiles) {
@@ -769,7 +745,7 @@ public class FileRenderApp {
 
     private JFileChooser getFileChooser(boolean folder) {
         JFileChooser chooser = new JFileChooser();
-        chooser.setCurrentDirectory(context.lastSearchPath);
+        chooser.setCurrentDirectory(context.lastSearchPath());
         chooser.setMultiSelectionEnabled(true);
 
         if (!folder) {

@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 class FileTableModel extends AbstractTableModel {
-    private final static StringConverter dateRenderer = new StringConverter() {
+    public final static StringConverter dateRenderer = new StringConverter() {
         final  SimpleDateFormat sdf = new SimpleDateFormat("HH:mm, EEE dd MMM yyyy");
         @Override
         public String convertToString(Object o) {
@@ -33,13 +33,13 @@ class FileTableModel extends AbstractTableModel {
         }
     };
 
-    private final static StringConverter defaultRenderer = new StringConverter() {
+    public final static StringConverter defaultRenderer = new StringConverter() {
         @Override
         public String convertToString(Object o) {
             return o.toString();
         }
     };
-    private final static StringConverter attributesRenderer = new StringConverter() {
+    public final static StringConverter attributesRenderer = new StringConverter() {
         @Override
         public String convertToString(Object value) {
             if (value instanceof HashMap<?, ?> map) {
@@ -54,7 +54,7 @@ class FileTableModel extends AbstractTableModel {
             return super.convertToString(value);
         }
     };
-    private static final StringConverter fileSizeRenderer = new StringConverter() {
+    public final static StringConverter fileSizeRenderer = new StringConverter() {
 
         @Override
         public String convertToString(Object value) {
@@ -65,7 +65,7 @@ class FileTableModel extends AbstractTableModel {
             }
         }
     };
-    private static final StringConverter stringListRenderer = new StringConverter() {
+    public final static StringConverter stringListRenderer = new StringConverter() {
         @Override
         public String convertToString(Object value) {
             if (value instanceof List<?> list) {
@@ -76,7 +76,7 @@ class FileTableModel extends AbstractTableModel {
         }
     };
     public static int NO_VALUE = -1;
-    private static final StringConverter dimensionRenderer = new StringConverter() {
+    public final static StringConverter dimensionRenderer = new StringConverter() {
         @Override
         public String convertToString(Object value) {
             if (value instanceof Integer dim && dim != NO_VALUE) {
@@ -315,40 +315,6 @@ class FileTableModel extends AbstractTableModel {
 
             if (i >= 0) fireTableRowsDeleted(i, i);
             assert !this.files.contains(file);
-        }
-    }
-
-    /**
-     * hardcoded enum list of columns that the table (and model) can display.
-     * comes with all info required to store across restarts and display to user
-     */
-    enum CaColumn {
-        FILE("File", String.class, defaultRenderer, "Name of the file",240),
-        LAST_CHANGED("Last Changed", Date.class, dateRenderer, "Date when the file was last modified",135),
-        FILE_TYPE("File Type", String.class, defaultRenderer, "File extension",50),
-        FILE_SIZE("File Size (MB)", Long.class, fileSizeRenderer, "Size of the file",60),
-        DIMENSION_WIDTH("Width", Integer.class, dimensionRenderer, "Width of the schematic (meters)",40),
-        DIMENSION_HEIGHT("Height", Integer.class, dimensionRenderer, "Height of the schematic (meters)",45),
-        DIMENSION_DEPTH("Depth", Integer.class, dimensionRenderer, "Depth of the schematic (meters)",40),
-        DIMENSION_DIAGONAL("Diagonal", Integer.class, dimensionRenderer, "Diagonal of the schematic from edge to edge (meters)",45),
-        PATH("Path", String.class, defaultRenderer, "Filepath where the file lives",600),
-        BLOCKS("Blocks", List.class, stringListRenderer, "Blocktypes that are used in the schematic",500),
-        ENTITIES("Entities", List.class, stringListRenderer, "Entities in the schematic",200),
-        TILE_ENTITIES("Tile Entities", List.class, stringListRenderer, "Tile Entities in the schematic",200),
-        ATTRIBUTES("Attributes", HashMap.class, attributesRenderer, "NBT Attributes attached to the schematic",100),
-        ;
-        final String displayName;
-        final Class<?> clazz;
-        final String tooltip;
-        final StringConverter renderer;
-        final int defaultWidth;
-        private CaColumn(String name, Class<?> clazz, StringConverter renderer, String tooltip, int defaultWidth) {
-            this.tooltip = tooltip;
-            this.displayName = name;
-            this.clazz = clazz;
-            this.defaultWidth = defaultWidth;
-            this.renderer = renderer;
-
         }
     }
 
