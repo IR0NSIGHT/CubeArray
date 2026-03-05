@@ -5,7 +5,7 @@ You can fly through the landscape in FPV or view it from further away.
 [Github repository](https://github.com/IR0NSIGHT/CubeArray)  
 [Download latest release](https://github.com/IR0NSIGHT/CubeArray/releases)
 
-
+[![YouTube Showcase](./images/tumbnail_video.png)](https://youtu.be/3LYkifQ4AOs)
 ![](./images/screenshot_CubeArray_Quercus_robur4_1770744307148.png)
 ![](./images/screenshot_CubeArray_schematics_1770744334677.png)
 ![](./images/screenshot_CubeArray_schematics_1770744275833.png)
