@@ -18,7 +18,7 @@ You can fly through the landscape in FPV or view it from further away.
 This program can take a minecraft schematic file, like myHouse.schem which you previously exported from minecraft using WorldEdit f.e. and then 3d render it in a window where you can look at it, rotate it, zoom, fly and screenshot it.
 
 ## How to use it
-1. Download the program and execute "CubeArray.exe". 
+1. Download the program. Execute `CubeArray.exe` (no Java needed), or if you have Java 17+ installed, run `java -jar CubeArray.jar`. 
 2. Select and load a schematic file.
 3. A window will appear that shows your schematic. 
 

@@ -15,7 +15,8 @@ jpackage \
   --type app-image \
   --dest dist/
 
-mkdir dist
+# copy the fat jar alongside the exe inside the app-image folder
+cp target/CubeArray.jar dist/CubeArray/CubeArray.jar
 
 # zip the app-image
 cd dist && zip -r CubeArray.zip CubeArray && cd ..
