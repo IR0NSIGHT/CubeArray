@@ -19,11 +19,11 @@ public class VertexShaderSource {
             uniform mat4 view;
 
             // Palettes (bound to texture units 0 and 1 in your Java code)
-            uniform sampler1D colorPaletteTex;
-            uniform sampler1D sizePaletteTex;
-            uniform sampler1D offsetPaletteTex;
-            uniform sampler1D rotationPaletteTex;
-            uniform sampler1D uvPaletteTex;
+            uniform sampler2D colorPaletteTex;
+            uniform sampler2D sizePaletteTex;
+            uniform sampler2D offsetPaletteTex;
+            uniform sampler2D rotationPaletteTex;
+            uniform sampler2D uvPaletteTex;
             uniform int paletteSize; // total number of entries
 
             // Pass to fragment shader
@@ -77,11 +77,11 @@ public class VertexShaderSource {
              float texCoord = (float(aInstanceColorIndex) + 0.5) / float(paletteSize);
 
              // Lookup per-block attributes
-             vec3 blockColor = texture(colorPaletteTex, texCoord).rgb;
-             vec3 blockSize  = texture(sizePaletteTex,  texCoord).rgb;
-             vec3 blockOffset = texture(offsetPaletteTex,  texCoord).rgb;
-             vec3 blockRotation = texture(rotationPaletteTex,  texCoord).rgb;
-             vec4 uvCoords =  texture(uvPaletteTex, texCoord).rgba;
+             vec3 blockColor = texture(colorPaletteTex, vec2(texCoord, 0.5)).rgb;
+             vec3 blockSize  = texture(sizePaletteTex,  vec2(texCoord, 0.5)).rgb;
+             vec3 blockOffset = texture(offsetPaletteTex,  vec2(texCoord, 0.5)).rgb;
+             vec3 blockRotation = texture(rotationPaletteTex,  vec2(texCoord, 0.5)).rgb;
+             vec4 uvCoords =  texture(uvPaletteTex, vec2(texCoord, 0.5)).rgba;
              // Scale + translate block vertex into world space
 
 
