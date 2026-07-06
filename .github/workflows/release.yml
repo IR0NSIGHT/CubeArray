@@ -50,13 +50,23 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Create ZIP
+      - name: Create exe ZIP (with bundled JRE)
         shell: powershell
         run: |
-          Compress-Archive -Path "dist\CubeArray\*" -DestinationPath "dist\CubeArray-${{ steps.version.outputs.version }}.zip"
+          Compress-Archive -Path "dist\CubeArray\*" -DestinationPath "dist\CubeArray-${{ steps.version.outputs.version }}-win-exe.zip"
+
+      - name: Create jar-only ZIP (requires Java 17+)
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Path "dist\jar-only" -Force
+          Copy-Item "staging\CubeArray.jar" "dist\jar-only\CubeArray.jar"
+          Copy-Item "release\README.txt" "dist\jar-only\README.txt"
+          Compress-Archive -Path "dist\jar-only\*" -DestinationPath "dist\CubeArray-${{ steps.version.outputs.version }}-win-jar.zip"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2.2.1
         with:
           name: CubeArray ${{ steps.version.outputs.version }}
-          files: dist/CubeArray-${{ steps.version.outputs.version }}.zip
+          files: |
+            dist/CubeArray-${{ steps.version.outputs.version }}-win-exe.zip
+            dist/CubeArray-${{ steps.version.outputs.version }}-win-jar.zip
