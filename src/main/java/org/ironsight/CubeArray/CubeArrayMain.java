@@ -2,7 +2,6 @@ package org.ironsight.CubeArray;
 
 import java.nio.file.Path;
 import java.util.List;
-
 import org.ironsight.CubeArray.swing.AppContext;
 import org.ironsight.CubeArray.swing.FileRenderApp;
 
@@ -19,9 +18,10 @@ public class CubeArrayMain {
 
       ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
 
-      SchemReader.CubeSetup setup = SchemReader.prepareData(
-          SchemReader.loadSchematics(List.of(schematicPath), f ->
-              System.err.println("can not load " + f)));
+      SchemReader.CubeSetup setup =
+          SchemReader.prepareData(
+              SchemReader.loadSchematics(
+                  List.of(schematicPath), f -> System.err.println("can not load " + f)));
       if (setup == null) {
         System.err.println("Failed to load schematic: " + schematicPath);
         System.exit(1);
