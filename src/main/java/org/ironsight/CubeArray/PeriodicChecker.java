@@ -2,10 +2,13 @@ package org.ironsight.CubeArray;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static org.ironsight.CubeArray.ResourceUtils.copyResourcesToFile;
 
 public class PeriodicChecker {
+    private static final Logger logger = AppLogger.get(PeriodicChecker.class);
     private ArrayList<Runnable> callbacks = new ArrayList<>();
 
     public void copyDefaultSchematics() {
@@ -13,7 +16,7 @@ public class PeriodicChecker {
             //prepare files on plate
             try {
                 copyResourcesToFile(ResourceUtils.SCHEMATIC_RESOURCES);
-                System.out.println("finished copying all schematics");
+                logger.info("finished copying all schematics");
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -31,7 +34,7 @@ public class PeriodicChecker {
                         try {
                             callback.run();
                         } catch (Exception e) {
-                            e.printStackTrace();
+                            logger.log(Level.SEVERE, "periodic callback failed", e);
                         }
                     }
                     Thread.sleep(1000);
@@ -39,7 +42,7 @@ public class PeriodicChecker {
                     // Exit if the thread is interrupted
                     break;
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    logger.log(Level.SEVERE, "unhandled exception in periodic task", e);
                 }
             }
         });

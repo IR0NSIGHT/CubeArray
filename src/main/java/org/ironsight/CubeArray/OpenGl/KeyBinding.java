@@ -4,6 +4,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.ironsight.CubeArray.AppLogger;
 
 import static org.lwjgl.glfw.GLFW.*;
 public enum KeyBinding {
@@ -44,6 +47,8 @@ public enum KeyBinding {
     public final int key;
     public final String keyName;
 
+    private static final Logger logger = AppLogger.get(KeyBinding.class);
+
     private KeyBinding(int glfw_key, String keyName) {
         this.key = glfw_key;
         this.keyName = keyName;
@@ -68,9 +73,9 @@ public enum KeyBinding {
         Path file = Path.of("KeyBindings.md");
         try {
             Files.writeString(file, sb.toString());
-            System.out.println("KeyBindings.md generated successfully!");
+            logger.info("KeyBindings.md generated successfully!");
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.log(Level.WARNING, "failed to write KeyBindings.md", e);
         }
     }
 }

@@ -1,17 +1,22 @@
 package org.ironsight.CubeArray.swing;
 
+import org.ironsight.CubeArray.AppLogger;
 import org.ironsight.CubeArray.ResourceUtils;
 
 import java.awt.*;
 import java.io.*;
 import java.util.*;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public record AppContext(Map<File, Long> filesAndTimestamps,
                          File lastSearchPath,
                          Rectangle guiBounds,
                          boolean neverBeforeUsed,
                         ColumnContext columnContext) implements Serializable {
+
+    private static final Logger logger = AppLogger.get(AppContext.class);
     public AppContext() {
         this(new HashMap<>(),
                 new File(System.getProperty("user.home")),
@@ -24,19 +29,17 @@ public record AppContext(Map<File, Long> filesAndTimestamps,
         return new AppContext(new HashMap<>(this.filesAndTimestamps),this.lastSearchPath,new Rectangle(this.guiBounds),this.neverBeforeUsed, this.columnContext.copy());
     }
 
-    // Read AppContext from folder, default to empty if missing/corrupt
     public static AppContext read() {
         File file = getSaveFile();
         if (!file.exists()) {
-            System.err.println("NO APP CONTEXT FOUND; ADD NEW ONE");
-            AppContext context = new AppContext(); // empty context
-            return context;
+            logger.info("No app context found; starting with empty context");
+            return new AppContext();
         }
 
         try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {
             Object obj = in.readObject();
             if (obj instanceof AppContext ctx) {
-                System.err.println("successfully loaded app context");
+                logger.info("Successfully loaded app context");
                 if (ctx.columnContext() == null) {
                     return new AppContext(ctx.filesAndTimestamps(), ctx.lastSearchPath(),
                                           ctx.guiBounds(), ctx.neverBeforeUsed(),
@@ -44,34 +47,31 @@ public record AppContext(Map<File, Long> filesAndTimestamps,
                 }
                 return ctx;
             } else {
-                System.err.println("app.context is invalid, returning empty context.");
+                logger.warning("app.context is invalid, returning empty context");
                 return new AppContext();
             }
         } catch (IOException | ClassNotFoundException e) {
-            System.err.println("app.context is invalid, returning empty context.");
-            e.printStackTrace();
+            logger.log(Level.WARNING, "app.context is invalid, returning empty context", e);
             return new AppContext();
         }
     }
 
     public static File getSaveFile() {
         File file = new File(ResourceUtils.getInstallPath().toFile(), "app.context");
-        System.out.println("context savefile at: " + file.getAbsolutePath());
+        logger.fine("context savefile at: " + file.getAbsolutePath());
         return file;
     }
 
-    // Write AppContext to folder
     public static void write(AppContext context) {
         File file = getSaveFile();
         File folder = file.getParentFile();
-        // Ensure folder exists
         if (!folder.exists() && !folder.mkdirs()) {
             throw new RuntimeException("Could not create folder: " + folder.getAbsolutePath());
         }
 
         try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(file))) {
             out.writeObject(context);
-            System.out.println("app.context written");
+            logger.info("app.context written");
         } catch (IOException e) {
             throw new RuntimeException("Failed to write context to " + file.getAbsolutePath(), e);
         }

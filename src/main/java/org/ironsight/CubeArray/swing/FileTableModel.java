@@ -1,6 +1,8 @@
 package org.ironsight.CubeArray.swing;
 
+import org.ironsight.CubeArray.AppLogger;
 import org.ironsight.CubeArray.PeriodicChecker;
+import org.ironsight.CubeArray.ResourceUtils;
 import org.ironsight.CubeArray.SchemReader;
 import org.joml.Vector3f;
 import org.pepsoft.worldpainter.layers.bo2.Schem;
@@ -17,10 +19,14 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 class FileTableModel extends AbstractTableModel {
+
+    private static final Logger logger = AppLogger.get(FileTableModel.class);
     public final static StringConverter dateRenderer = new StringConverter() {
         final  SimpleDateFormat sdf = new SimpleDateFormat("HH:mm, EEE dd MMM yyyy");
         @Override
@@ -88,6 +94,7 @@ class FileTableModel extends AbstractTableModel {
     };
     private final List<File> files = new java.util.ArrayList<>();
     private final HashMap<File, WPObject> schematicObjects = new HashMap<>();
+    private final HashSet<File> loadingFiles = new HashSet<>();
 
     public FileTableModel(PeriodicChecker checker) {
         if (checker != null)
@@ -97,6 +104,7 @@ class FileTableModel extends AbstractTableModel {
     private final HashSet<File> errorFiles = new HashSet<>();
     private void flagAsError(File file) {
         errorFiles.add(file);
+        loadingFiles.remove(file);
     }
 
     /**
@@ -116,11 +124,19 @@ class FileTableModel extends AbstractTableModel {
                 .forEach(entry -> {
                     int i = entry.getKey();
                     File f = entry.getValue();
-                    System.out.println("Loading " + f.getName() + " size=" + f.length());
+                    logger.info("Loading " + f.getName() + " size=" + f.length());
+
+                    loadingFiles.add(f);
+                    final int loadingIdx = i;
+                    SwingUtilities.invokeLater(() -> {
+                        if (loadingIdx < files.size())
+                            fireTableRowsUpdated(loadingIdx, loadingIdx);
+                    });
 
                     // check and load each files schematic if necessary.
                     try {
                         var schems = SchemReader.loadSchematics(List.of(f.toPath()), this::flagAsError );
+                        loadingFiles.remove(f);
                         for (WPObject schem : schems)
                             schematicObjects.put(f, schem);
                         final int ii = i;
@@ -134,7 +150,14 @@ class FileTableModel extends AbstractTableModel {
                             }
                         });
                     } catch (IOException | InvalidPathException ex) {
-                        System.err.println("unable to load schematic from file: " + f);
+                        logger.log(Level.SEVERE, "unable to load schematic from file: " + f, ex);
+                        loadingFiles.remove(f);
+                        errorFiles.add(f);
+                        final int ii = i;
+                        SwingUtilities.invokeLater(() -> {
+                            if (ii < files.size())
+                                fireTableRowsUpdated(ii, ii);
+                        });
                     }
                 });
     }
@@ -145,8 +168,10 @@ class FileTableModel extends AbstractTableModel {
     }
 
     public void flagReloadFile(int modelRow) {
-        schematicObjects.remove(getFile(modelRow));
-        errorFiles.remove(getFile(modelRow));
+        File file = getFile(modelRow);
+        schematicObjects.remove(file);
+        errorFiles.remove(file);
+        loadingFiles.remove(file);
         fireTableRowsUpdated(modelRow,modelRow);
         if (remainingFileCountChangedCallback != null) {
             int remainingCount = files.size() - schematicObjects.size();
@@ -158,6 +183,10 @@ class FileTableModel extends AbstractTableModel {
         if (modelRow < 0 || modelRow >= files.size())
             return null;
         return files.get(modelRow);
+    }
+
+    private static String formatPos(int x, int y, int z) {
+        return x + ", " + y + ", " + z;
     }
 
     private static String formatSize(long bytes) {
@@ -199,7 +228,7 @@ class FileTableModel extends AbstractTableModel {
             case FILE -> f.getName();
             case PATH -> f.getAbsolutePath();
             case FILE_SIZE -> getSizeBytes(f);
-            case FILE_TYPE -> getFileExtension(f);
+            case FILE_TYPE -> ResourceUtils.detectSchematicType(f);
             case LAST_CHANGED -> new Date(f.lastModified());
             case DIMENSION_WIDTH -> obj == null ? NO_VALUE : obj.getDimensions().x;
             case DIMENSION_HEIGHT -> obj == null ? NO_VALUE : obj.getDimensions().z;
@@ -208,6 +237,26 @@ class FileTableModel extends AbstractTableModel {
                 if (obj == null)
                     yield NO_VALUE;
                 yield Math.round(new Vector3f(obj.getDimensions().x, obj.getDimensions().y, obj.getDimensions().z).length());
+            }
+            case OFFSET -> {
+                if (obj == null)
+                    yield "";
+                var o = obj.getOffset();
+                // Point3i axes are (x=width, y=depth, z=height); present in Minecraft order (x, y-up, z)
+                yield formatPos(o.x, o.z, o.y);
+            }
+            case MIN_POS -> {
+                if (obj == null)
+                    yield "";
+                var o = obj.getOffset();
+                yield formatPos(o.x, o.z, o.y);
+            }
+            case MAX_POS -> {
+                if (obj == null)
+                    yield "";
+                var o = obj.getOffset();
+                var d = obj.getDimensions();
+                yield formatPos(o.x + d.x - 1, o.z + d.z - 1, o.y + d.y - 1);
             }
             case BLOCKS -> {
                 if (obj == null)
@@ -250,9 +299,14 @@ class FileTableModel extends AbstractTableModel {
                     yield List.of();
             }
 
-            default -> {
-                assert false : "incomplete enum";
-                yield null;
+            case LOADING_STATE -> {
+                if (errorFiles.contains(f))
+                    yield "failed";
+                if (schematicObjects.containsKey(f))
+                    yield "loaded";
+                if (loadingFiles.contains(f))
+                    yield "loading";
+                yield "pending";
             }
         };
     }
@@ -312,6 +366,8 @@ class FileTableModel extends AbstractTableModel {
             int i = this.files.indexOf(file);
             this.files.remove(file);
             this.schematicObjects.remove(file);
+            this.errorFiles.remove(file);
+            this.loadingFiles.remove(file);
 
             if (i >= 0) fireTableRowsDeleted(i, i);
             assert !this.files.contains(file);

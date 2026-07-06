@@ -10,10 +10,12 @@ import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
+import java.util.logging.Logger;
 
 import static org.pepsoft.minecraft.Constants.*;
 
 public class Sponge2Schematic extends AbstractNBTItem {
+    private static final Logger logger = AppLogger.get(Sponge2Schematic.class);
     public static final String TAG_WIDTH = "Width";
     public static final String TAG_HEIGHT = "Height";
     public static final String TAG_LENGTH = "Length";
@@ -88,7 +90,7 @@ public class Sponge2Schematic extends AbstractNBTItem {
             nbtOut.writeTag(this.toNBT());
         }
 
-        System.out.println("Schematic with single dirt block saved to: " + filename);
+        logger.info("Schematic saved to: " + filename);
     }
 
     private void generatePaletteTag() {

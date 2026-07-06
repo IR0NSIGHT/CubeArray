@@ -4,6 +4,7 @@ import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.pepsoft.minecraft.Direction;
 import org.pepsoft.minecraft.Material;
+import org.pepsoft.util.mdc.MDCCapturingRuntimeException;
 import org.pepsoft.worldpainter.DefaultCustomObjectProvider;
 import org.pepsoft.worldpainter.objects.WPObject;
 
@@ -17,6 +18,8 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.ZipException;
@@ -25,10 +28,12 @@ import static org.pepsoft.minecraft.Material.*;
 
 public class SchemReader {
 
+    private static final Logger logger = AppLogger.get(SchemReader.class);
+
     //TEST
     public static void main(String[] args) {
         Material mat = Material.COBBLESTONE_STAIRS;
-        System.out.println(mat);
+        logger.fine(mat.toString());
     }
     public static List<WPObject> loadSchematics(List<Path> pathList, Consumer<File> onLoadError) throws IOException {
         ArrayList<WPObject> schematics = new ArrayList<>();
@@ -40,10 +45,9 @@ public class SchemReader {
                     WPObject schematic = new DefaultCustomObjectProvider().loadObject(file);
                     schematics.add(schematic);
                 } catch (IllegalArgumentException ex) {
-                    System.out.println("ignore non-schem:" + file.getName());
-                } catch (ArrayIndexOutOfBoundsException | ZipException ex) {
-                    System.err.println("cant load file:" + file.getAbsolutePath());
-                    System.err.println(ex);
+                    logger.fine("ignore non-schem: " + file.getName());
+                } catch (ArrayIndexOutOfBoundsException | ZipException | MDCCapturingRuntimeException | IllegalStateException ex) {
+                    logger.log(Level.SEVERE, "cant load file: " + file.getAbsolutePath(), ex);
                     onLoadError.accept(file);
                 }
             }

@@ -20,6 +20,8 @@ import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static java.lang.Math.toDegrees;
 import static java.lang.Math.toRadians;
@@ -31,6 +33,8 @@ import static org.lwjgl.opengl.GL33.*;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class InstancedCubes {
+
+    private static final Logger logger = AppLogger.get(InstancedCubes.class);
 
     int gridX = 1000;
     int gridY = 10;
@@ -132,11 +136,10 @@ public class InstancedCubes {
         File schemFile = new File("src/main/resources/schematics/" +
                 "Ir0nsight/jerusalem_tower_pretty_I.schem");
         if (!schemFile.exists()) {
-            System.out.println("working dir = " + new File("").getAbsolutePath());
-
+            logger.warning("working dir = " + new File("").getAbsolutePath());
             throw new RuntimeException("File not found: " + schemFile.getAbsolutePath());
         }
-        System.out.println("File path: " + schemFile.getAbsolutePath());
+        logger.info("File path: " + schemFile.getAbsolutePath());
 
         SchemReader.CubeSetup setup = SchemReader.prepareData(SchemReader.loadSchematics(List.of(schemFile.toPath()),f -> {}));
         if (setup == null) {
@@ -165,7 +168,7 @@ public class InstancedCubes {
     }
 
     private void init() throws Exception {
-        System.out.println("generating " + setup.positions.length + " cubes");
+        logger.info("generating " + setup.positions.length + " cubes");
 
         GLFWErrorCallback.createPrint(System.err).set();
 
@@ -212,7 +215,7 @@ public class InstancedCubes {
         GLFW.glfwSetKeyCallback(window, (windowHandle, key, scancode, action, mods) -> {
             if (action == GLFW.GLFW_PRESS) {
                 String name = GLFW.glfwGetKeyName(key, scancode);
-                System.out.println("############### Pressed: " + name + ", " + scancode);
+                logger.fine("############### Pressed: " + name + ", " + scancode);
             }
         });
 
@@ -252,7 +255,7 @@ public class InstancedCubes {
             if (action == GLFW_PRESS) {
                 if (!keys[key]) {
                     // 🔹 Run once when key is pressed
-                    System.out.println("Key pressed once: " + key);
+                    logger.fine("Key pressed once: " + key);
 
                     // put your action here
                     if (key == TOGGLE_AUTOROTATE.key) {
@@ -334,7 +337,7 @@ public class InstancedCubes {
                 keys[key] = true;
             } else if (action == GLFW_RELEASE) {
                 keys[key] = false;
-                System.out.println("Key released: " + key + ", scancode=" + scancode);
+                logger.fine("Key released: " + key + ", scancode=" + scancode);
             }
         });
 
@@ -465,8 +468,9 @@ public class InstancedCubes {
     }
 
     private void saveScreenshot() {
+        File out = null;
         try {
-            File out = ResourceUtils.getScreenshotPath().resolve("screenshot_CubeArray_"+setup.name+ "_" +System.currentTimeMillis()+".png").toFile();
+            out = ResourceUtils.getScreenshotPath().resolve("screenshot_CubeArray_"+setup.name+ "_" +System.currentTimeMillis()+".png").toFile();
             if (out.exists())
                 return; //pointless to screenshot the sam ething twice.
 
@@ -487,9 +491,9 @@ public class InstancedCubes {
                 }
             }
             ImageIO.write(image, "png", out);
-            System.out.println("screenshot saved to " + out);
-        } catch (IOException ex ){
-            System.out.println(ex);
+            logger.info("screenshot saved to " + out);
+        } catch (IOException ex) {
+            logger.log(Level.WARNING, "failed to save screenshot to " + out, ex);
         }
     }
 
@@ -736,14 +740,12 @@ public class InstancedCubes {
         if (type.equals("PROGRAM")) {
             success = glGetProgrami(shader, GL_LINK_STATUS);
             if (success == GL_FALSE) {
-                System.err.println("ERROR::PROGRAM_LINKING_ERROR");
-                System.err.println(glGetProgramInfoLog(shader));
+                logger.severe("ERROR::PROGRAM_LINKING_ERROR\n" + glGetProgramInfoLog(shader));
             }
         } else {
             success = glGetShaderi(shader, GL_COMPILE_STATUS);
             if (success == GL_FALSE) {
-                System.err.println("ERROR::SHADER_COMPILATION_ERROR of type: " + type);
-                System.err.println(glGetShaderInfoLog(shader));
+                logger.severe("ERROR::SHADER_COMPILATION_ERROR of type: " + type + "\n" + glGetShaderInfoLog(shader));
             }
         }
     }
