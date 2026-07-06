@@ -11,10 +11,12 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Logger;
 
 import static java.lang.Math.*;
 
 public class SpriteSheet {
+    private static final Logger logger = AppLogger.get(SpriteSheet.class);
     private static final String[] EXTENSIONS = {"", "s", "_block", "_top", "_block_top", "_front", "_planks",
             "_stage7", "_stage3", "_stage2", "_0"}; // Try adding these
     private static final String[] PREFIXES = {"", "infested_", "smooth_"}; // Try removing these
@@ -68,7 +70,7 @@ public class SpriteSheet {
             if (textureFile != null) {
                 outMap.put(mat, textureFile);
             } else {
-                System.err.println("CAN NOT LOCATE TEXTURE FOR: " + mat.simpleName);
+                logger.warning("CAN NOT LOCATE TEXTURE FOR: " + mat.simpleName);
             }
         }
         return outMap;

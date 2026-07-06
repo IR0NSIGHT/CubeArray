@@ -11,17 +11,21 @@ import java.util.List;
 public enum CaColumn {
     FILE("File", String.class, FileTableModel.defaultRenderer, "Name of the file", 240),
     LAST_CHANGED("Last Changed", Date.class, FileTableModel.dateRenderer, "Date when the file was last modified", 135),
-    FILE_TYPE("File Type", String.class, FileTableModel.defaultRenderer, "File extension", 50),
+    FILE_TYPE("Schematic Type", String.class, FileTableModel.defaultRenderer, "File format and version", 130),
     FILE_SIZE("File Size (MB)", Long.class, FileTableModel.fileSizeRenderer, "Size of the file", 60),
     DIMENSION_WIDTH("Width", Integer.class, FileTableModel.dimensionRenderer, "Width of the schematic (meters)", 40),
     DIMENSION_HEIGHT("Height", Integer.class, FileTableModel.dimensionRenderer, "Height of the schematic (meters)", 45),
     DIMENSION_DEPTH("Depth", Integer.class, FileTableModel.dimensionRenderer, "Depth of the schematic (meters)", 40),
     DIMENSION_DIAGONAL("Diagonal", Integer.class, FileTableModel.dimensionRenderer, "Diagonal of the schematic from edge to edge (meters)", 45),
+    OFFSET("Offset", String.class, FileTableModel.defaultRenderer, "WorldEdit offset / minimum corner (x, y, z)", 90),
+    MIN_POS("Min Pos", String.class, FileTableModel.defaultRenderer, "Minimum block position (x, y, z)", 90),
+    MAX_POS("Max Pos", String.class, FileTableModel.defaultRenderer, "Maximum block position (x, y, z)", 90),
     PATH("Path", String.class, FileTableModel.defaultRenderer, "Filepath where the file lives", 600),
     BLOCKS("Blocks", List.class, FileTableModel.stringListRenderer, "Blocktypes that are used in the schematic", 500),
     ENTITIES("Entities", List.class, FileTableModel.stringListRenderer, "Entities in the schematic", 200),
     TILE_ENTITIES("Tile Entities", List.class, FileTableModel.stringListRenderer, "Tile Entities in the schematic", 200),
     ATTRIBUTES("Attributes", HashMap.class, FileTableModel.attributesRenderer, "NBT Attributes attached to the schematic", 100),
+    LOADING_STATE("State", String.class, FileTableModel.defaultRenderer, "Current loading state of the file", 70),
     ;
     public final String displayName;
     public final Class<?> clazz;

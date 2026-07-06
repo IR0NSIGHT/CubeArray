@@ -1,0 +1,22 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Debug PinkWoolMain",
+      "request": "launch",
+      "mainClass": "org.ironsight.CubeArray.objects.PinkWoolMain",
+      "projectName": "CubeArray",
+      "cwd": "${workspaceFolder}",
+      "vmArgs": "-Djavax.net.ssl.trustStoreType=WINDOWS-ROOT -Djavax.net.ssl.trustStore=NUL"
+    },
+    {
+      "type": "java",
+      "name": "Build, Run & Attach to CubeArray",
+      "request": "attach",
+      "hostName": "localhost",
+      "port": 5005,
+      "preLaunchTask": "run-debug"
+    }
+  ]
+}

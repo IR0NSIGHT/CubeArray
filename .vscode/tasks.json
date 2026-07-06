@@ -1,0 +1,41 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "type": "process",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-File",
+        "${workspaceFolder}/mvn.ps1",
+        "clean",
+        "package",
+        "-DskipTests"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "run-debug",
+      "type": "process",
+      "command": "java",
+      "args": [
+        "-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005",
+        "-jar",
+        "${workspaceFolder}/target/CubeArray.jar"
+      ],
+      "isBackground": true,
+      "dependsOn": "build",
+      "problemMatcher": {
+        "pattern": [
+          { "regexp": ".", "file": 1, "location": 2, "message": 3 }
+        ],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "Listening for transport dt_socket"
+        }
+      }
+    }
+  ]
+}

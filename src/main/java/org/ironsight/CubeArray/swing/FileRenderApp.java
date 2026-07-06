@@ -1,9 +1,12 @@
 package org.ironsight.CubeArray.swing;
 
+import org.ironsight.CubeArray.AppLogger;
 import org.ironsight.CubeArray.CubeArrayMain;
 import org.ironsight.CubeArray.InstancedCubes;
 import org.ironsight.CubeArray.ResourceUtils;
 import org.ironsight.CubeArray.SchemReader;
+import org.ironsight.schemEdit.BatchConverter;
+import org.ironsight.schemEdit.BlockReplacer;
 
 import javax.swing.*;
 import javax.swing.event.*;
@@ -23,11 +26,14 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Stream;
 
 import static org.ironsight.CubeArray.ResourceUtils.isSupportedSchematicType;
 
 public class FileRenderApp {
+    private static final Logger logger = AppLogger.get(FileRenderApp.class);
     final JFrame frame;
     // main data structure
     private AppContext context;
@@ -404,15 +410,23 @@ public class FileRenderApp {
             checkBox.setSelected(caColumns.contains(c));
             checkBox.addActionListener(e -> {
                 boolean show = checkBox.isSelected();
-                if (show && !context.columnContext().displayedColumns().contains(c)) {
-                    context.columnContext().displayedColumns().add(c);
-                    var oldColumnContext = context.columnContext();
-                    var newColumnContext = new ColumnContext();
-                    flagContextDirty(new AppContext(context.filesAndTimestamps(), context.lastSearchPath(),context.guiBounds(),context.neverBeforeUsed(),context.columnContext()));
-                } else {
-                    context.columnContext().displayedColumns().remove(c);
+                var oldColumnContext = context.columnContext();
+                List<CaColumn> newDisplayed = new ArrayList<>(oldColumnContext.displayedColumns());
+                List<Integer> newWidths = new ArrayList<>(oldColumnContext.columnWidths());
+                int idx = newDisplayed.indexOf(c);
+                if (show) {
+                    if (idx < 0) {
+                        newDisplayed.add(c);
+                        newWidths.add(c.defaultWidth);
+                    }
+                } else if (idx >= 0) {
+                    newDisplayed.remove(idx);
+                    if (idx < newWidths.size())
+                        newWidths.remove(idx);
                 }
-                updateDisplayColumns(new ArrayList<>(context.columnContext().displayedColumns()), new ArrayList<>(context.columnContext().columnWidths()), new HashSet<>(), fileTable.getColumnModel());
+                var newColumnContext = new ColumnContext(newDisplayed, newWidths, oldColumnContext.orderedColumn(), oldColumnContext.orderAscending());
+                flagContextDirty(new AppContext(context.filesAndTimestamps(), context.lastSearchPath(), context.guiBounds(), context.neverBeforeUsed(), newColumnContext));
+                updateDisplayColumns(new ArrayList<>(newColumnContext.displayedColumns()), new ArrayList<>(newColumnContext.columnWidths()), new HashSet<>(), fileTable.getColumnModel());
             });
             columnSettings.add(checkBox);
         });
@@ -421,8 +435,40 @@ public class FileRenderApp {
         {
             settingsPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
+            JPanel appPanel = new JPanel(new GridLayout(0, 1));
+            appPanel.add(new JLabel("Application:"));
+            JButton openInstallPathBtn = new JButton("Open install folder");
+            openInstallPathBtn.addActionListener(e -> {
+                try {
+                    Desktop.getDesktop().open(ResourceUtils.getInstallPath().toFile());
+                } catch (IOException ex) {
+                    logger.log(Level.WARNING, "Could not open install folder", ex);
+                }
+            });
+            appPanel.add(openInstallPathBtn);
+
+            JButton openLogFileBtn = new JButton("Open log file");
+            openLogFileBtn.addActionListener(e -> {
+                try {
+                    java.nio.file.Path logDir = ResourceUtils.getInstallPath().resolve("logs");
+                    java.io.File[] logs = logDir.toFile().listFiles((d, n) -> n.startsWith("cubearray") && n.endsWith(".log"));
+                    if (logs == null || logs.length == 0) {
+                        JOptionPane.showMessageDialog(frame, "No log file found in:\n" + logDir, "Open log file", JOptionPane.INFORMATION_MESSAGE);
+                        return;
+                    }
+                    java.io.File latest = Arrays.stream(logs)
+                            .max(Comparator.comparingLong(java.io.File::lastModified))
+                            .get();
+                    Desktop.getDesktop().open(latest);
+                } catch (IOException ex) {
+                    logger.log(Level.WARNING, "Could not open log file", ex);
+                }
+            });
+            appPanel.add(openLogFileBtn);
+
             JPanel settingsContentPane = new JPanel();
             settingsContentPane.setLayout(new GridLayout(0, 1));
+            settingsContentPane.add(appPanel);
             settingsContentPane.add(columnSettings);
             settingsContentPane.add(new KeyBindingComponent());
             settingsPanel.setViewportView(settingsContentPane);
@@ -468,7 +514,7 @@ public class FileRenderApp {
                 tc.setWidth(width);
                 columnModel.addColumn(tc);
             }
-            System.out.println("DISPLAY COLUMN WIDTHS " + columnWidths);
+            logger.fine("DISPLAY COLUMN WIDTHS " + columnWidths);
         }
     }
 
@@ -495,7 +541,7 @@ public class FileRenderApp {
         }
         var oldColumnContext = this.context.columnContext();
         var newColumnContext = new ColumnContext(orderedCaColumns, columnWidths,  oldColumnContext.orderedColumn(), oldColumnContext.orderAscending());
-        System.out.println("SET COLUMN WIDTHS TO " + columnWidths);
+        logger.fine("SET COLUMN WIDTHS TO " + columnWidths);
         assert orderedCaColumns.size() == orderedCaColumns.stream().distinct().toList().size() : "ordered columns not distinct:" + orderedCaColumns;
         assert oldColumnContext.displayedColumns().size() == oldColumnContext.columnWidths().size();
 
@@ -506,7 +552,7 @@ public class FileRenderApp {
         // WARNING: this runs on the background thread NOT the gui thread!
         if (contextDirtyFlag) {
             contextDirtyFlag = false;
-            System.out.println("WRITE CONTEXT TO FILE");
+            logger.fine("WRITE CONTEXT TO FILE");
             AppContext.write(this.context);
         }
     }
@@ -548,8 +594,8 @@ public class FileRenderApp {
     private void tableAddMouseClickListener(JTable table) {
         final JPopupMenu rightMenu = new JPopupMenu();
         final JButton reloadFileBtn;
-        final  JLabel menuTitleLbl;
         final JButton renderFilesBtn;
+        final JLabel menuTitleLbl;
         {
             rightMenu.setLayout(new GridLayout(0, 1));
 
@@ -568,13 +614,25 @@ public class FileRenderApp {
             removeFilesBtn.addActionListener(a -> this.removeSelectedFiles());
             rightMenu.add(removeFilesBtn);
 
+            JButton deleteFilesBtn = new JButton("Delete from disk");
+            deleteFilesBtn.addActionListener(a -> this.deleteSelectedFiles());
+            rightMenu.add(deleteFilesBtn);
+
             JButton openFolderBtn = new JButton("Open folder");
             openFolderBtn.addActionListener(a -> this.openFolderSelectedFiles());
             rightMenu.add(openFolderBtn);
+
+            JButton convertToSponge3Btn = new JButton("Convert to Sponge3");
+            convertToSponge3Btn.addActionListener(a -> this.convertSelectedToSponge3());
+            rightMenu.add(convertToSponge3Btn);
+
+            JButton replaceSandstoneBtn = new JButton("Replace sandstone with cobblestone");
+            replaceSandstoneBtn.addActionListener(a -> this.replaceSandstoneWithCobblestone());
+            rightMenu.add(replaceSandstoneBtn);
         }
 
         Consumer<Integer> updateRightMenu = modelRow -> {
-            reloadFileBtn.setEnabled(Arrays.stream(getSelectedModelRows()).anyMatch(tableModel::isFileLoaded)); //unloaded files cant be reloaded, pointless
+            reloadFileBtn.setEnabled(Arrays.stream(getSelectedModelRows()).anyMatch(tableModel::isFileLoaded));
             renderFilesBtn.setEnabled(Arrays.stream(getSelectedModelRows()).allMatch(tableModel::isFileLoaded));
             menuTitleLbl.setText(getSelectedFiles().length + " file(s) selected");
         };
@@ -600,7 +658,7 @@ public class FileRenderApp {
                 if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
 
 
-                    System.out.println("Model row=" + modelRow + ", model col=" + modelCol);
+                    logger.fine("Model row=" + modelRow + ", model col=" + modelCol);
 
                     JPopupMenu menu = new JPopupMenu();
                     menu.setLightWeightPopupEnabled(false);
@@ -635,7 +693,7 @@ public class FileRenderApp {
 
                     textArea.setFont(new Font(Font.SANS_SERIF, Font.PLAIN,12));
 
-                    System.out.println("object string = " + textArea.getText());
+                    logger.fine("object string = " + textArea.getText());
                     JScrollPane scrollPane = new JScrollPane(textArea);
                     menu.add(new JLabel(tableModel.getColumn(modelCol).displayName));
                     menu.add(scrollPane);
@@ -705,18 +763,182 @@ public class FileRenderApp {
         flagContextDirty(new AppContext(new HashMap<>(),context.lastSearchPath(),context.guiBounds(),context.neverBeforeUsed(),context.columnContext()));
     }
 
+    private void deleteSelectedFiles() {
+        File[] selected = getSelectedFiles();
+        if (selected.length == 0) return;
+
+        String fileList = Arrays.stream(selected)
+                .map(File::getName)
+                .collect(Collectors.joining("\n"));
+        int reply = JOptionPane.showConfirmDialog(frame,
+                "Permanently delete " + selected.length + " file(s) from disk?\n\n" + fileList,
+                "Delete from disk",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+        if (reply != JOptionPane.YES_OPTION) return;
+
+        List<File> failed = new ArrayList<>();
+        for (File file : selected) {
+            try {
+                Files.delete(file.toPath());
+                logger.info("Deleted file: " + file.getAbsolutePath());
+            } catch (IOException e) {
+                failed.add(file);
+                logger.log(Level.WARNING, "Could not delete file: " + file.getAbsolutePath(), e);
+            }
+        }
+
+        // Remove all selected from the table regardless of delete success
+        tableModel.removeFile(selected);
+        flagContextDirty(new AppContext(new HashMap<>(), context.lastSearchPath(), context.guiBounds(), context.neverBeforeUsed(), context.columnContext()));
+
+        if (!failed.isEmpty()) {
+            JOptionPane.showMessageDialog(frame,
+                    "Could not delete:\n" + failed.stream().map(File::getName).collect(Collectors.joining("\n")),
+                    "Delete from disk",
+                    JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void replaceSandstoneWithCobblestone() {
+        File[] selected = getSelectedFiles();
+        if (selected.length == 0) {
+            JOptionPane.showMessageDialog(frame, "No files selected.",
+                    "Replace blocks", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // Collect the union palette across all selected files
+        Set<String> palette = new LinkedHashSet<>();
+        Map<File, pitheguy.schemconvert.converter.Schematic> loaded = new LinkedHashMap<>();
+        for (File file : selected) {
+            try {
+                var schematic = BlockReplacer.load(file);
+                loaded.put(file, schematic);
+                palette.addAll(BlockReplacer.getPalette(schematic));
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(frame,
+                        "Could not load: " + file.getName() + "\n" + e.getMessage(),
+                        "Replace blocks", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+        }
+
+        // Load the full block ID list from the bundled resource
+        Set<String> availableBlocks;
+        try {
+            availableBlocks = BlockReplacer.loadDefaultPalette();
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(frame,
+                    "Could not load block list: " + e.getMessage(),
+                    "Replace blocks", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        // Show the mapping dialog — palette = rows, full block list = available choices
+        var mapping = BlockReplacerDialog.show(frame, palette, availableBlocks);
+        if (mapping.isEmpty()) return;
+        var replaceResult = mapping.get();
+
+        // Ask for output options (postfix + optional target folder)
+        File firstFile = loaded.keySet().iterator().next();
+        var outputOptions = OutputOptionsDialog.show(frame, firstFile);
+        if (outputOptions.isEmpty()) return;
+        var options = outputOptions.get();
+
+        List<File> failed  = new ArrayList<>();
+        List<File> written = new ArrayList<>();
+
+        for (var entry : loaded.entrySet()) {
+            File file = entry.getKey();
+            try {
+                var replaced = BlockReplacer.replace(entry.getValue(), replaceResult.replacements());
+                File output = options.outputFileFor(file);
+                if (output.getParentFile() != null) output.getParentFile().mkdirs();
+                BlockReplacer.write(replaced, output);
+                written.add(output);
+                tableModel.addFile(output);
+            } catch (IOException e) {
+                failed.add(file);
+                logger.log(Level.SEVERE, "failed to write replaced schematic for: " + file.getName(), e);
+            }
+        }
+
+        String msg = written.size() + " file(s) written.";
+        if (!failed.isEmpty())
+            msg += "\nFailed: " + failed.stream().map(File::getName)
+                    .collect(Collectors.joining(", "));
+        JOptionPane.showMessageDialog(frame, msg, "Replace blocks",
+                failed.isEmpty() ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.WARNING_MESSAGE);
+    }
+
+    private void convertSelectedToSponge3() {
+        List<File> selected = Arrays.asList(getSelectedFiles());
+        if (selected.isEmpty()) {
+            JOptionPane.showMessageDialog(frame, "No files selected.", "Convert to Sponge3", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        JFileChooser chooser = new JFileChooser();
+        chooser.setCurrentDirectory(selected.get(0).getParentFile());
+        chooser.setDialogTitle("Select output folder for converted .schem files");
+        chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        chooser.setAcceptAllFileFilterUsed(false);
+        if (chooser.showOpenDialog(frame) != JFileChooser.APPROVE_OPTION) return;
+        final File outputDir = chooser.getSelectedFile();
+
+        new Thread(() -> {
+            List<Path> paths = selected.stream().map(File::toPath).toList();
+            BatchConverter.ConversionResult result;
+            try {
+                result = BatchConverter.convertToSponge3(paths, outputDir);
+            } catch (IOException e) {
+                SwingUtilities.invokeLater(() ->
+                        JOptionPane.showMessageDialog(frame,
+                                "Conversion failed: " + e.getMessage(),
+                                "Convert to Sponge3", JOptionPane.ERROR_MESSAGE));
+                return;
+            }
+
+            SwingUtilities.invokeLater(() -> {
+                // add each newly produced .schem file to the table
+                var newFilesAndTimestamps = new HashMap<>(context.filesAndTimestamps());
+                for (File produced : result.convertedFiles()) {
+                    tableModel.addFile(produced);
+                    newFilesAndTimestamps.put(produced, System.currentTimeMillis());
+                }
+                flagContextDirty(new AppContext(newFilesAndTimestamps, context.lastSearchPath(),
+                        context.guiBounds(), context.neverBeforeUsed(), context.columnContext()));
+
+                List<File> failed = result.failedFiles();
+                if (failed.isEmpty()) {
+                    JOptionPane.showMessageDialog(frame,
+                            "Converted " + result.convertedFiles().size() + " file(s) to Sponge v3.",
+                            "Convert to Sponge3", JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    String failedNames = failed.stream()
+                            .map(File::getName)
+                            .collect(Collectors.joining("\n"));
+                    JOptionPane.showMessageDialog(frame,
+                            "Converted " + result.convertedFiles().size() + " of " + selected.size() + " file(s).\n\nFailed:\n" + failedNames,
+                            "Convert to Sponge3", JOptionPane.WARNING_MESSAGE);
+                }
+            });
+        }, "sponge3-converter").start();
+    }
+
     private void renderFiles(List<File> selectedFiles) {
         // Placeholder logic
-        System.out.println("Rendering files:");
+        logger.info("Rendering files:");
         for (File f : selectedFiles) {
-            System.out.println(" - " + f.getAbsolutePath());
+            logger.info(" - " + f.getAbsolutePath());
         }
 
         try {
             Thread glThread = new Thread(() -> {
                 try {
                     SchemReader.CubeSetup setup =
-                            SchemReader.prepareData(SchemReader.loadSchematics(selectedFiles.stream().map(File::toPath).toList(),f -> System.err.println("can not render " + f.getAbsolutePath())));
+                            SchemReader.prepareData(SchemReader.loadSchematics(selectedFiles.stream().map(File::toPath).toList(), f -> logger.warning("can not render " + f.getAbsolutePath())));
                     if (setup == null) {
                         SwingUtilities.invokeLater(() -> {
                             JOptionPane.showMessageDialog(frame, "Error: unable to load schematics from selected " +
@@ -738,7 +960,7 @@ public class FileRenderApp {
             checkLoadingThreads();
 
         } catch (Exception ex) {
-            System.out.println("Error: " + ex.getMessage());
+            logger.log(Level.SEVERE, "Error starting render", ex);
         }
 
     }
