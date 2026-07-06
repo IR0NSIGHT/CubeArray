@@ -890,9 +890,13 @@ public class FileRenderApp {
     var files = getSelectedFiles();
     tableModel.removeFile(files);
 
+    var newFilesAndTimestamps = new HashMap<>(context.filesAndTimestamps());
+    for (File file : files) {
+      newFilesAndTimestamps.remove(file);
+    }
     flagContextDirty(
         new AppContext(
-            new HashMap<>(),
+            newFilesAndTimestamps,
             context.lastSearchPath(),
             context.guiBounds(),
             context.neverBeforeUsed(),
@@ -926,9 +930,13 @@ public class FileRenderApp {
 
     // Remove all selected from the table regardless of delete success
     tableModel.removeFile(selected);
+    var newFilesAndTimestamps = new HashMap<>(context.filesAndTimestamps());
+    for (File file : selected) {
+      newFilesAndTimestamps.remove(file);
+    }
     flagContextDirty(
         new AppContext(
-            new HashMap<>(),
+            newFilesAndTimestamps,
             context.lastSearchPath(),
             context.guiBounds(),
             context.neverBeforeUsed(),
@@ -1011,6 +1019,18 @@ public class FileRenderApp {
         logger.log(Level.SEVERE, "failed to write replaced schematic for: " + file.getName(), e);
       }
     }
+
+    var newFilesAndTimestamps = new HashMap<>(context.filesAndTimestamps());
+    for (File output : written) {
+      newFilesAndTimestamps.put(output, System.currentTimeMillis());
+    }
+    flagContextDirty(
+        new AppContext(
+            newFilesAndTimestamps,
+            context.lastSearchPath(),
+            context.guiBounds(),
+            context.neverBeforeUsed(),
+            context.columnContext()));
 
     String msg = written.size() + " file(s) written.";
     if (!failed.isEmpty())
