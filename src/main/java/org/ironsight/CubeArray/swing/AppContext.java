@@ -37,6 +37,11 @@ public record AppContext(Map<File, Long> filesAndTimestamps,
             Object obj = in.readObject();
             if (obj instanceof AppContext ctx) {
                 System.err.println("successfully loaded app context");
+                if (ctx.columnContext() == null) {
+                    return new AppContext(ctx.filesAndTimestamps(), ctx.lastSearchPath(),
+                                          ctx.guiBounds(), ctx.neverBeforeUsed(),
+                                          new ColumnContext());
+                }
                 return ctx;
             } else {
                 System.err.println("app.context is invalid, returning empty context.");
