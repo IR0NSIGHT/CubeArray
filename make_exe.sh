@@ -17,7 +17,7 @@ jpackage \
 
 # copy the fat jar and readme alongside the exe inside the app-image folder
 cp target/CubeArray.jar dist/CubeArray/CubeArray.jar
-cp README.txt dist/CubeArray/README.txt
+cp release/README.txt dist/CubeArray/README.txt
 
 # zip the app-image
 cd dist && zip -r CubeArray.zip CubeArray && cd ..

@@ -16,18 +16,21 @@ jobs:
         with:
           java-version: 17
           distribution: temurin
+          cache: maven
 
       - name: Build fat JAR
         run: mvn clean package
 
       - name: Build app image (exe)
+        shell: cmd
         run: |
           jpackage --input target/ --name CubeArray --main-jar CubeArray.jar --main-class org.ironsight.CubeArray.CubeArrayMain --type app-image --dest dist/
 
       - name: Copy JAR and README into app-image
+        shell: cmd
         run: |
           copy "target\CubeArray.jar" "dist\CubeArray\CubeArray.jar"
-          copy "README.txt" "dist\CubeArray\README.txt"
+          copy "release\README.txt" "dist\CubeArray\README.txt"
 
       - name: Extract version from tag
         id: version
@@ -42,7 +45,7 @@ jobs:
         shell: bash
         run: |
           cd dist
-          7z a "CubeArray-${{ steps.version.outputs.version }}.zip" CubeArray/
+          zip -r "CubeArray-${{ steps.version.outputs.version }}.zip" CubeArray/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
