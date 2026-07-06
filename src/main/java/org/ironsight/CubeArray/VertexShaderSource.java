@@ -1,22 +1,23 @@
 package org.ironsight.CubeArray;
 
 public class VertexShaderSource {
-    public static final String source = """
+  public static final String source =
+      """
             #version 330 core
-                            
+
             // Per-vertex cube geometry
             layout(location = 0) in vec3 aPos;
-                            
+
             // Per-instance attributes
             layout(location = 1) in vec2 vertexUV;
             layout(location = 2) in vec3 aInstancePos;
             layout(location = 3) in int  aInstanceColorIndex;
-      
-            
+
+
             // Camera transforms
             uniform mat4 projection;
             uniform mat4 view;
-                            
+
             // Palettes (bound to texture units 0 and 1 in your Java code)
             uniform sampler1D colorPaletteTex;
             uniform sampler1D sizePaletteTex;
@@ -24,7 +25,7 @@ public class VertexShaderSource {
             uniform sampler1D rotationPaletteTex;
             uniform sampler1D uvPaletteTex;
             uniform int paletteSize; // total number of entries
-                            
+
             // Pass to fragment shader
             out vec3 vColor;
             out vec3 vWorldPos;
@@ -34,47 +35,47 @@ public class VertexShaderSource {
             mat3 rotationX(float angle) {
                 float sine = sin(angle);
                 float cosine = cos(angle);
-                        
+
                 return mat3(
                     1.0,    0.0,     0.0,
                     0.0, cosine, -sine,
                     0.0,  sine, cosine
                 );
             }
-                        
+
             // Rotation around the Y axis
             mat3 rotationY(float angle) {
                 float sine = sin(angle);
                 float cosine = cos(angle);
-                        
+
                 return mat3(
                     cosine, 0.0,  sine,
                     0.0,    1.0,  0.0,
                    -sine,   0.0, cosine
                 );
             }
-                        
+
             // Rotation around the Z axis
             mat3 rotationZ(float angle) {
                 float sine = sin(angle);
                 float cosine = cos(angle);
-                        
+
                 return mat3(
                     cosine, -sine, 0.0,
                     sine,   cosine, 0.0,
                     0.0,     0.0,  1.0
                 );
             }
-                   
+
             float rand(float n) {
                 return fract(sin(n) * 43758.5453123);
             }
-                            
+
             void main()
             {
              // Normalize palette index -> [0..1] texcoord
              float texCoord = (float(aInstanceColorIndex) + 0.5) / float(paletteSize);
-                            
+
              // Lookup per-block attributes
              vec3 blockColor = texture(colorPaletteTex, texCoord).rgb;
              vec3 blockSize  = texture(sizePaletteTex,  texCoord).rgb;
@@ -82,24 +83,24 @@ public class VertexShaderSource {
              vec3 blockRotation = texture(rotationPaletteTex,  texCoord).rgb;
              vec4 uvCoords =  texture(uvPaletteTex, texCoord).rgba;
              // Scale + translate block vertex into world space
-     
-             
+
+
              vec3 scaledVertex = aPos * blockSize + blockOffset;
              vec3 rotatedPosition =  rotationY(blockRotation.y) * scaledVertex;
              vec3 worldPos     = rotatedPosition + aInstancePos;
-                            
+
              // Outputs
              float r = rand(gl_InstanceID) * 0.025;
              vColor    = blockColor + vec3(r);
              vWorldPos = worldPos;
-             
+
              vec2 uvStart = uvCoords.rg;
              vec2 uvEnd = uvCoords.ba;
              if (uvCoords != vec4(0,0,0,0)) { // make the texture square slightly smaller, so the edges dont flicker in the render. skip for 0,0,0,0 uvs which have no texture
                 uvStart = uvCoords.rg + 0.001;
                 uvEnd = uvCoords.ba - 0.001;
              }
-             
+
              UV = (vertexUV * (uvEnd - uvStart)) + uvStart;
              viewPos = view * vec4(worldPos, 1.0);
              gl_Position = projection * view * vec4(worldPos, 1.0);

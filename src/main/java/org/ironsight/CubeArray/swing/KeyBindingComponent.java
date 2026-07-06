@@ -1,63 +1,64 @@
 package org.ironsight.CubeArray.swing;
 
-import org.ironsight.CubeArray.OpenGl.KeyBinding;
-
+import java.awt.*;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
-import java.awt.*;
+import org.ironsight.CubeArray.OpenGl.KeyBinding;
 
 public class KeyBindingComponent extends JPanel {
 
-    private JTable table;
-    private DefaultTableModel model;
+  private JTable table;
+  private DefaultTableModel model;
 
-    public KeyBindingComponent() {
-        setLayout(new BorderLayout());
+  public KeyBindingComponent() {
+    setLayout(new BorderLayout());
 
-        // Column names
-        String[] columns = {"Name", "Key", "Description"};
+    // Column names
+    String[] columns = {"Name", "Key", "Description"};
 
-        // Sample data (can be replaced dynamically)
-        Object[][] data = {
+    // Sample data (can be replaced dynamically)
+    Object[][] data = {};
+
+    // Table model
+    model =
+        new DefaultTableModel(data, columns) {
+          // Make cells non-editable
+          @Override
+          public boolean isCellEditable(int row, int column) {
+            return false;
+          }
         };
 
-        // Table model
-        model = new DefaultTableModel(data, columns) {
-            // Make cells non-editable
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-        };
+    // Table
+    table = new JTable(model);
+    table.setAutoCreateRowSorter(true); // enable sorting
 
-        // Table
-        table = new JTable(model);
-        table.setAutoCreateRowSorter(true); // enable sorting
+    // Add table to scroll pane
+    JScrollPane scrollPane = new JScrollPane(table);
+    add(new JLabel("3d Viewer Keybindings"), BorderLayout.NORTH);
+    add(scrollPane, BorderLayout.CENTER);
 
-        // Add table to scroll pane
-        JScrollPane scrollPane = new JScrollPane(table);
-        add(new JLabel("3d Viewer Keybindings"),BorderLayout.NORTH);
-        add(scrollPane, BorderLayout.CENTER);
-
-        for (KeyBinding k: KeyBinding.values()) {
-            this.addKeyBinding(k);
-        }
+    for (KeyBinding k : KeyBinding.values()) {
+      this.addKeyBinding(k);
     }
+  }
 
-    public void addKeyBinding(KeyBinding keyBinding) {
-        model.addRow(new Object[]{keyBinding.name().replace("_"," ").toLowerCase(), keyBinding.keyName, ""});
-    }
+  public void addKeyBinding(KeyBinding keyBinding) {
+    model.addRow(
+        new Object[] {keyBinding.name().replace("_", " ").toLowerCase(), keyBinding.keyName, ""});
+  }
 
-    // Example usage
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            JFrame frame = new JFrame("KeyBindings");
-            KeyBindingComponent keyBindingComponent = new KeyBindingComponent();
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.setSize(400, 300);
-            frame.add(keyBindingComponent);
-            frame.setLocationRelativeTo(null);
-            frame.setVisible(true);
+  // Example usage
+  public static void main(String[] args) {
+    SwingUtilities.invokeLater(
+        () -> {
+          JFrame frame = new JFrame("KeyBindings");
+          KeyBindingComponent keyBindingComponent = new KeyBindingComponent();
+          frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+          frame.setSize(400, 300);
+          frame.add(keyBindingComponent);
+          frame.setLocationRelativeTo(null);
+          frame.setVisible(true);
         });
-    }
+  }
 }

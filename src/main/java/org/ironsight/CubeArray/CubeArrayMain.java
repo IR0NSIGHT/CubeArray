@@ -3,30 +3,27 @@ package org.ironsight.CubeArray;
 import org.ironsight.CubeArray.swing.AppContext;
 import org.ironsight.CubeArray.swing.FileRenderApp;
 
-
 public class CubeArrayMain {
-    public static final String APP_NAME = "CubeArray";
-    public static final PeriodicChecker periodicChecker = new PeriodicChecker();
-    public static void main(String[] args) throws Exception {
-        AppLogger.init();
-        //copy files that are required to run the application
-        ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
+  public static final String APP_NAME = "CubeArray";
+  public static final PeriodicChecker periodicChecker = new PeriodicChecker();
 
-        //background copying for less improtant stuff
-        periodicChecker.copyDefaultSchematics();
+  public static void main(String[] args) throws Exception {
+    AppLogger.init();
+    // copy files that are required to run the application
+    ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
 
-        // background task for periodic checks
-        periodicChecker.startPeriodicTask();
+    // background copying for less improtant stuff
+    periodicChecker.copyDefaultSchematics();
 
-        //start swing GUI
-        FileRenderApp.startApp(AppContext.read());
+    // background task for periodic checks
+    periodicChecker.startPeriodicTask();
 
-        //start rendering app
+    // start swing GUI
+    FileRenderApp.startApp(AppContext.read());
+
+    // start rendering app
     //    final var schematicsForlder =  getInstallPath().resolve(ResourceUtils.SCHEMATICS_ROOT);
     //    var setup = SchemReader.prepareData(SchemReader.loadDefaultObjects(schematicsForlder));
     //    new InstancedCubes(setup).run();
-    }
-
-
-
+  }
 }
