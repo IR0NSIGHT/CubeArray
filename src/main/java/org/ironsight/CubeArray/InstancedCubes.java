@@ -18,9 +18,9 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import javax.imageio.ImageIO;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -31,8 +31,6 @@ import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
 
 public class InstancedCubes {
-
-  private static final Logger logger = AppLogger.get(InstancedCubes.class);
 
   int gridX = 1000;
   int gridY = 10;
@@ -116,10 +114,11 @@ public class InstancedCubes {
     File schemFile =
         new File("src/main/resources/schematics/" + "Ir0nsight/jerusalem_tower_pretty_I.schem");
     if (!schemFile.exists()) {
-      logger.warning("working dir = " + new File("").getAbsolutePath());
+      System.out.println("working dir = " + new File("").getAbsolutePath());
+
       throw new RuntimeException("File not found: " + schemFile.getAbsolutePath());
     }
-    logger.info("File path: " + schemFile.getAbsolutePath());
+    System.out.println("File path: " + schemFile.getAbsolutePath());
 
     SchemReader.CubeSetup setup =
         SchemReader.prepareData(SchemReader.loadSchematics(List.of(schemFile.toPath()), f -> {}));
@@ -161,7 +160,7 @@ public class InstancedCubes {
   }
 
   private void init() throws Exception {
-    logger.info("generating " + setup.positions.length + " cubes");
+    System.out.println("generating " + setup.positions.length + " cubes");
 
     GLFWErrorCallback.createPrint(System.err).set();
 
@@ -209,7 +208,7 @@ public class InstancedCubes {
         (windowHandle, key, scancode, action, mods) -> {
           if (action == GLFW.GLFW_PRESS) {
             String name = GLFW.glfwGetKeyName(key, scancode);
-            logger.fine("############### Pressed: " + name + ", " + scancode);
+            System.out.println("############### Pressed: " + name + ", " + scancode);
           }
         });
 
@@ -255,7 +254,7 @@ public class InstancedCubes {
           if (action == GLFW_PRESS) {
             if (!keys[key]) {
               // 🔹 Run once when key is pressed
-              logger.fine("Key pressed once: " + key);
+              System.out.println("Key pressed once: " + key);
 
               // put your action here
               if (key == TOGGLE_AUTOROTATE.key) {
@@ -372,7 +371,7 @@ public class InstancedCubes {
             keys[key] = true;
           } else if (action == GLFW_RELEASE) {
             keys[key] = false;
-            logger.fine("Key released: " + key + ", scancode=" + scancode);
+            System.out.println("Key released: " + key + ", scancode=" + scancode);
           }
         });
 
@@ -502,36 +501,37 @@ public class InstancedCubes {
     }
   }
 
+  private void saveScreenshot(Path out) throws IOException {
+    ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * 4);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+
+    BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
+        int i = (x + width * y) * 4;
+        int r = buffer.get(i) & 0xFF;
+        int g = buffer.get(i + 1) & 0xFF;
+        int b = buffer.get(i + 2) & 0xFF;
+        int a = buffer.get(i + 3) & 0xFF;
+        image.setRGB(x, height - y - 1, (a << 24) | (r << 16) | (g << 8) | b);
+      }
+    }
+    ImageIO.write(image, "png", out.toFile());
+    System.out.println("screenshot saved to " + out);
+  }
+
   private void saveScreenshot() {
-    File out = null;
     try {
-      out =
+      Path out =
           ResourceUtils.getScreenshotPath()
               .resolve(
-                  "screenshot_CubeArray_" + setup.name + "_" + System.currentTimeMillis() + ".png")
-              .toFile();
-      if (out.exists()) return; // pointless to screenshot the sam ething twice.
-
-      ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * 4);
-      glBindFramebuffer(GL_FRAMEBUFFER, 0);
-      glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
-
-      BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-
-      for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-          int i = (x + width * y) * 4;
-          int r = buffer.get(i) & 0xFF;
-          int g = buffer.get(i + 1) & 0xFF;
-          int b = buffer.get(i + 2) & 0xFF;
-          int a = buffer.get(i + 3) & 0xFF;
-          image.setRGB(x, height - y - 1, (a << 24) | (r << 16) | (g << 8) | b);
-        }
-      }
-      ImageIO.write(image, "png", out);
-      logger.info("screenshot saved to " + out);
+                  "screenshot_CubeArray_" + setup.name + "_" + System.currentTimeMillis() + ".png");
+      if (out.toFile().exists()) return;
+      saveScreenshot(out);
     } catch (IOException ex) {
-      logger.log(Level.WARNING, "failed to save screenshot to " + out, ex);
+      System.out.println(ex);
     }
   }
 
@@ -554,6 +554,75 @@ public class InstancedCubes {
     glDeleteProgram(shaderProgram);
 
     glfwFreeCallbacks(window);
+    glfwDestroyWindow(window);
+    glfwTerminate();
+    glfwSetErrorCallback(null).free();
+  }
+
+  public static void renderToFile(
+      SchemReader.CubeSetup setup, Path outputPath, int width, int height) throws Exception {
+    System.out.println("rendering " + setup.positions.length + " cubes to " + outputPath);
+
+    GLFWErrorCallback.createPrint(System.err).set();
+    if (!glfwInit()) throw new IllegalStateException("Unable to initialize GLFW");
+
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+
+    long window = glfwCreateWindow(width, height, "", NULL, NULL);
+    if (window == NULL) throw new RuntimeException("Failed to create GLFW window");
+
+    glfwMakeContextCurrent(window);
+    GL.createCapabilities();
+
+    InstancedCubes renderer = new InstancedCubes(setup);
+    renderer.width = width;
+    renderer.height = height;
+    renderer.window = window;
+    renderer.setupShaders();
+    renderer.setupBuffers();
+
+    renderer.cameraState = renderer.initialPos;
+
+    glClearColor(0.53f, 0.81f, 0.92f, 1f);
+
+    Matrix4f projection =
+        new Matrix4f().perspective((float) toRadians(45.0f), (float) width / height, .1f, 10000.0f);
+
+    CameraState cam = renderer.cameraState;
+    float camX = (float) (cam.radius() * Math.cos(cam.pitch()) * Math.sin(cam.yaw()));
+    float camY = (float) (cam.radius() * Math.sin(cam.pitch()));
+    float camZ = (float) (cam.radius() * Math.cos(cam.pitch()) * Math.cos(cam.yaw()));
+    Vector3f cameraPos = new Vector3f(camX, camY, camZ).add(cam.target());
+    Matrix4f view = new Matrix4f().lookAt(cameraPos, cam.target(), new Vector3f(0, 1, 0));
+
+    FloatBuffer projBuffer = BufferUtils.createFloatBuffer(16);
+    FloatBuffer viewBuffer = BufferUtils.createFloatBuffer(16);
+    projection.get(projBuffer);
+    view.get(viewBuffer);
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glUseProgram(renderer.shaderProgram);
+    glUniformMatrix4fv(
+        glGetUniformLocation(renderer.shaderProgram, "projection"), false, projBuffer);
+    glUniformMatrix4fv(glGetUniformLocation(renderer.shaderProgram, "view"), false, viewBuffer);
+    glBindVertexArray(renderer.vao);
+    glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, setup.positions.length);
+    glBindVertexArray(0);
+
+    glfwSwapBuffers(window);
+    glFinish();
+
+    Path parent = outputPath.getParent();
+    if (parent != null) Files.createDirectories(parent);
+    renderer.saveScreenshot(outputPath);
+
+    glDeleteVertexArrays(renderer.vao);
+    glDeleteBuffers(renderer.vbo);
+    glDeleteBuffers(renderer.ebo);
+    glDeleteProgram(renderer.shaderProgram);
     glfwDestroyWindow(window);
     glfwTerminate();
     glfwSetErrorCallback(null).free();
@@ -703,19 +772,19 @@ public class InstancedCubes {
             setup.uvCoordsPalette, "uvPaletteTex", GL_TEXTURE4, shaderProgram);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_1D, colorPaletteTexID);
+    glBindTexture(GL_TEXTURE_2D, colorPaletteTexID);
 
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_1D, sizePaletteTexID);
+    glBindTexture(GL_TEXTURE_2D, sizePaletteTexID);
 
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_1D, offsetPaletteTexID);
+    glBindTexture(GL_TEXTURE_2D, offsetPaletteTexID);
 
     glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_1D, rotationPaletteTexID);
+    glBindTexture(GL_TEXTURE_2D, rotationPaletteTexID);
 
     glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_1D, uvPaletteTexId);
+    glBindTexture(GL_TEXTURE_2D, uvPaletteTexId);
 
     BufferedImage image = setup.textureAtlas;
     int width = image.getWidth();
@@ -732,12 +801,13 @@ public class InstancedCubes {
       pixels[i + 2] = b;
       pixels[i + 3] = a;
     }
+    glActiveTexture(GL_TEXTURE5);
     int texId = GlUtils.createSimple2DTexture(abgr.getWidth(), abgr.getHeight(), pixels);
 
     int texUniform = glGetUniformLocation(shaderProgram, "blockTexture");
-    glUniform1i(texUniform, 4);
+    glUniform1i(texUniform, 5);
 
-    glActiveTexture(GL_TEXTURE4);
+    glActiveTexture(GL_TEXTURE5);
     glBindTexture(GL_TEXTURE_2D, texId);
 
     // -------------
@@ -772,13 +842,14 @@ public class InstancedCubes {
     if (type.equals("PROGRAM")) {
       success = glGetProgrami(shader, GL_LINK_STATUS);
       if (success == GL_FALSE) {
-        logger.severe("ERROR::PROGRAM_LINKING_ERROR\n" + glGetProgramInfoLog(shader));
+        System.err.println("ERROR::PROGRAM_LINKING_ERROR");
+        System.err.println(glGetProgramInfoLog(shader));
       }
     } else {
       success = glGetShaderi(shader, GL_COMPILE_STATUS);
       if (success == GL_FALSE) {
-        logger.severe(
-            "ERROR::SHADER_COMPILATION_ERROR of type: " + type + "\n" + glGetShaderInfoLog(shader));
+        System.err.println("ERROR::SHADER_COMPILATION_ERROR of type: " + type);
+        System.err.println(glGetShaderInfoLog(shader));
       }
     }
   }

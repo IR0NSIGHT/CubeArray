@@ -20,17 +20,18 @@ public class GlUtils {
       Vector4f[] inputData, String textureName, int textureId, int shaderProgram) {
     // --- Color palette ---
     int colorPaletteTexID = glGenTextures();
-    glBindTexture(GL_TEXTURE_1D, colorPaletteTexID);
+    glBindTexture(GL_TEXTURE_2D, colorPaletteTexID);
     {
       FloatBuffer colorBuffer = BufferUtils.createFloatBuffer(inputData.length * 4);
       for (Vector4f c : inputData) colorBuffer.put(c.x).put(c.y).put(c.z).put(c.w);
       colorBuffer.flip();
 
-      glTexImage1D(
-          GL_TEXTURE_1D, 0, GL_RGBA32F, inputData.length, 0, GL_RGBA, GL_FLOAT, colorBuffer);
-      glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-      glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-      glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexImage2D(
+          GL_TEXTURE_2D, 0, GL_RGBA32F, inputData.length, 1, 0, GL_RGBA, GL_FLOAT, colorBuffer);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     }
     int colorLoc = glGetUniformLocation(shaderProgram, textureName);
     int loc = textureId - GL_TEXTURE0;
@@ -43,23 +44,22 @@ public class GlUtils {
       Vector3f[] inputData, String textureName, int textureId, int shaderProgram) {
     // --- Color palette ---
     int colorPaletteTexID = glGenTextures();
-    glBindTexture(GL_TEXTURE_1D, colorPaletteTexID);
+    glBindTexture(GL_TEXTURE_2D, colorPaletteTexID);
     {
       FloatBuffer colorBuffer = BufferUtils.createFloatBuffer(inputData.length * 3);
       for (Vector3f c : inputData) colorBuffer.put(c.x).put(c.y).put(c.z);
       colorBuffer.flip();
 
-      glTexImage1D(GL_TEXTURE_1D, 0, GL_RGB32F, inputData.length, 0, GL_RGB, GL_FLOAT, colorBuffer);
-      glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-      glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-      glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexImage2D(
+          GL_TEXTURE_2D, 0, GL_RGB32F, inputData.length, 1, 0, GL_RGB, GL_FLOAT, colorBuffer);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     }
     int colorLoc = glGetUniformLocation(shaderProgram, textureName);
     int loc = textureId - GL_TEXTURE0;
     glUniform1i(colorLoc, loc);
-
-    //  glActiveTexture(textureId);
-    //   glBindTexture(GL_TEXTURE_1D, colorPaletteTexID);
 
     return colorPaletteTexID;
   }
