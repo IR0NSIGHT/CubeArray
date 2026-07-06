@@ -6,9 +6,14 @@ rm -rf dist
 # clean and rebuild
 mvn clean package
 
+# stage only the fat jar — jpackage copies everything in --input
+rm -rf staging
+mkdir staging
+cp target/CubeArray.jar staging/CubeArray.jar
+
 # make new exe
 jpackage \
-  --input target/ \
+  --input staging/ \
   --name CubeArray \
   --main-jar CubeArray.jar \
   --main-class org.ironsight.CubeArray.CubeArrayMain \
@@ -16,7 +21,7 @@ jpackage \
   --dest dist/
 
 # copy the fat jar and readme alongside the exe inside the app-image folder
-cp target/CubeArray.jar dist/CubeArray/CubeArray.jar
+cp staging/CubeArray.jar dist/CubeArray/CubeArray.jar
 cp release/README.txt dist/CubeArray/README.txt
 
 # zip the app-image

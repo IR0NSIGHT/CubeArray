@@ -24,15 +24,21 @@ jobs:
       - name: Build fat JAR
         run: mvn clean package
 
+      - name: Stage clean input for jpackage
+        shell: cmd
+        run: |
+          mkdir staging
+          copy "target\CubeArray.jar" "staging\CubeArray.jar"
+
       - name: Build app image (exe)
         shell: cmd
         run: |
-          jpackage --input target/ --name CubeArray --main-jar CubeArray.jar --main-class org.ironsight.CubeArray.CubeArrayMain --type app-image --dest dist/
+          jpackage --input staging\ --name CubeArray --main-jar CubeArray.jar --main-class org.ironsight.CubeArray.CubeArrayMain --type app-image --dest dist\
 
       - name: Copy JAR and README into app-image
         shell: cmd
         run: |
-          copy "target\CubeArray.jar" "dist\CubeArray\CubeArray.jar"
+          copy "staging\CubeArray.jar" "dist\CubeArray\CubeArray.jar"
           copy "release\README.txt" "dist\CubeArray\README.txt"
 
       - name: Extract version from tag
