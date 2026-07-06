@@ -1,5 +1,8 @@
 package org.ironsight.CubeArray;
 
+import java.nio.file.Path;
+import java.util.List;
+
 import org.ironsight.CubeArray.swing.AppContext;
 import org.ironsight.CubeArray.swing.FileRenderApp;
 
@@ -8,22 +11,29 @@ public class CubeArrayMain {
   public static final PeriodicChecker periodicChecker = new PeriodicChecker();
 
   public static void main(String[] args) throws Exception {
+    if (args.length >= 2 && args[0].equals("--render")) {
+      Path schematicPath = Path.of(args[1]);
+      Path outputPath = args.length >= 3 ? Path.of(args[2]) : Path.of("output.png");
+      int imgWidth = args.length >= 4 ? Integer.parseInt(args[3]) : 1920;
+      int imgHeight = args.length >= 5 ? Integer.parseInt(args[4]) : 1080;
+
+      ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
+
+      SchemReader.CubeSetup setup = SchemReader.prepareData(
+          SchemReader.loadSchematics(List.of(schematicPath), f ->
+              System.err.println("can not load " + f)));
+      if (setup == null) {
+        System.err.println("Failed to load schematic: " + schematicPath);
+        System.exit(1);
+      }
+      InstancedCubes.renderToFile(setup, outputPath, imgWidth, imgHeight);
+      return;
+    }
+
     AppLogger.init();
-    // copy files that are required to run the application
     ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
-
-    // background copying for less improtant stuff
     periodicChecker.copyDefaultSchematics();
-
-    // background task for periodic checks
     periodicChecker.startPeriodicTask();
-
-    // start swing GUI
     FileRenderApp.startApp(AppContext.read());
-
-    // start rendering app
-    //    final var schematicsForlder =  getInstallPath().resolve(ResourceUtils.SCHEMATICS_ROOT);
-    //    var setup = SchemReader.prepareData(SchemReader.loadDefaultObjects(schematicsForlder));
-    //    new InstancedCubes(setup).run();
   }
 }
