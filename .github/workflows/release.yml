@@ -42,10 +42,9 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Create ZIP
-        shell: bash
+        shell: powershell
         run: |
-          cd dist
-          zip -r "CubeArray-${{ steps.version.outputs.version }}.zip" CubeArray/
+          Compress-Archive -Path "dist\CubeArray\*" -DestinationPath "dist\CubeArray-${{ steps.version.outputs.version }}.zip"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
