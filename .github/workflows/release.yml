@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: windows-latest
@@ -47,7 +50,7 @@ jobs:
           Compress-Archive -Path "dist\CubeArray\*" -DestinationPath "dist\CubeArray-${{ steps.version.outputs.version }}.zip"
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.2.1
         with:
           name: CubeArray ${{ steps.version.outputs.version }}
           files: dist/CubeArray-${{ steps.version.outputs.version }}.zip
