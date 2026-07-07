@@ -15,6 +15,10 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -48,6 +52,13 @@ public class FileRenderApp {
   // is context dirty and needs to be saved?
   private boolean contextDirtyFlag;
   private final HashMap<CaColumn, TableColumn> columToTableColumn = new HashMap<>();
+  private final ExecutorService renderExecutor =
+      Executors.newSingleThreadExecutor(
+          r -> {
+            Thread t = new Thread(r, "render-worker");
+            t.setDaemon(true);
+            return t;
+          });
 
   private void flagContextDirty(AppContext context) {
     this.context = context;
@@ -435,8 +446,21 @@ public class FileRenderApp {
   }
 
   private void reloadAllFiles() {
-    var allFiles = IntStream.range(0, tableModel.getRowCount()).toArray();
-    for (int row : allFiles) tableModel.flagReloadFile(row);
+    IntStream.range(0, tableModel.getRowCount())
+        .mapToObj(i -> Map.entry(i, tableModel.getFileAt(i)))
+        .sorted(Comparator.comparingLong(e -> e.getValue().length()))
+        .forEach(
+            entry -> {
+              int row = entry.getKey();
+              File file = entry.getValue();
+              tableModel.flagReloadFile(row);
+              tableModel.invalidateIconCache(file);
+              try {
+                Files.deleteIfExists(ResourceUtils.getRenderPathForFile(file));
+              } catch (IOException e) {
+                // ignore
+              }
+            });
   }
 
   private void removeAllFiles() {
@@ -696,7 +720,14 @@ public class FileRenderApp {
   private void reloadSelectedFiles() {
     var rows = getSelectedModelRows();
     for (int row : rows) {
+      File file = tableModel.getFileAt(row);
       tableModel.flagReloadFile(row);
+      tableModel.invalidateIconCache(file);
+      try {
+        Files.deleteIfExists(ResourceUtils.getRenderPathForFile(file));
+      } catch (IOException e) {
+        // ignore
+      }
     }
   }
 
@@ -1203,53 +1234,51 @@ public class FileRenderApp {
   }
 
   private void renderFilesToFile(List<File> files) {
-    new Thread(
-            () -> {
-              try {
-                ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
-                for (File file : files) {
-                  WPObject obj = tableModel.getSchematicFor(file);
-                  if (obj == null) {
-                    logger.warning("Schematic not loaded for " + file.getName());
-                    continue;
-                  }
-                  SchemReader.CubeSetup setup = SchemReader.prepareData(List.of(obj));
-                  if (setup == null) continue;
-                  Path renderPath = ResourceUtils.getRenderPathForFile(file);
-                  Files.createDirectories(renderPath.getParent());
-                  InstancedCubes.renderToFile(setup, renderPath, 256, 256);
-                  logger.info("Rendered to file: " + renderPath);
-                }
-                SwingUtilities.invokeLater(
-                    () -> {
-                      for (File file : files) {
-                        tableModel.invalidateIconCache(file);
-                        int idx = tableModel.indexOfFile(file);
-                        if (idx >= 0) tableModel.fireTableRowsUpdated(idx, idx);
-                      }
-                    });
-              } catch (Exception e) {
-                logger.log(Level.SEVERE, "Error rendering files to file", e);
+    renderExecutor.submit(
+        () -> {
+          try {
+            ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
+            for (File file : files) {
+              WPObject obj = tableModel.getSchematicFor(file);
+              if (obj == null) {
+                logger.warning("Schematic not loaded for " + file.getName());
+                continue;
               }
-            })
-        .start();
+              SchemReader.CubeSetup setup = SchemReader.prepareData(List.of(obj));
+              if (setup == null) continue;
+              Path renderPath = ResourceUtils.getRenderPathForFile(file);
+              Files.createDirectories(renderPath.getParent());
+              InstancedCubes.renderToFile(setup, renderPath, 256, 256);
+              logger.info("Rendered to file: " + renderPath);
+            }
+            SwingUtilities.invokeLater(
+                () -> {
+                  for (File file : files) {
+                    tableModel.invalidateIconCache(file);
+                    int idx = tableModel.indexOfFile(file);
+                    if (idx >= 0) tableModel.fireTableRowsUpdated(idx, idx);
+                  }
+                });
+          } catch (Exception e) {
+            logger.log(Level.SEVERE, "Error rendering files to file", e);
+          }
+        });
   }
 
   private void renderSchematicIcon(File file) {
     if (file == null) return;
-    new Thread(
+    Future<?> future =
+        renderExecutor.submit(
             () -> {
               try {
+                WPObject obj = tableModel.getSchematicFor(file);
+                if (obj == null) return;
+                ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
+                SchemReader.CubeSetup setup = SchemReader.prepareData(List.of(obj));
+                if (setup == null) return;
                 Path renderPath = ResourceUtils.getRenderPathForFile(file);
                 Files.createDirectories(renderPath.getParent());
-                var rng = new java.util.Random(file.hashCode());
-                var image = new java.awt.image.BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
-                for (int y = 0; y < 64; y++) {
-                  for (int x = 0; x < 64; x++) {
-                    image.setRGB(x, y, rng.nextInt(0xFFFFFF + 1) | 0xFF000000);
-                  }
-                }
-                javax.imageio.ImageIO.write(image, "png", renderPath.toFile());
+                InstancedCubes.renderToFile(setup, renderPath, 256, 256);
                 SwingUtilities.invokeLater(
                     () -> {
                       tableModel.invalidateIconCache(file);
@@ -1259,8 +1288,14 @@ public class FileRenderApp {
               } catch (Exception e) {
                 logger.log(Level.WARNING, "Failed to render icon for " + file.getName(), e);
               }
-            })
-        .start();
+            });
+    try {
+      future.get();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    } catch (ExecutionException e) {
+      logger.log(Level.WARNING, "Render failed for " + file.getName(), e);
+    }
   }
 
   private JFileChooser getFileChooser(boolean folder) {
