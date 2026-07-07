@@ -67,12 +67,13 @@ public class InstancedCubes {
   public InstancedCubes(SchemReader.CubeSetup setup) {
     this.setup = setup;
 
+    var dim = new Vector3f(setup.max).sub(setup.min);
     initialPos =
         new CameraState(
             new Vector3f(setup.min).add(setup.max).mul(0.5f), // center
-            (float) toRadians(30), // slightly from the side
+            (float) toRadians(210), // slightly from the side
             (float) toRadians(30), // slightly from above
-            new Vector3f(setup.max).sub(setup.min).length() // diagonal = radius
+            Math.max(dim.x, Math.max(dim.y, dim.z)) * 2 // longest side * 2 = radius
             );
 
     cameraState = initialPos;
