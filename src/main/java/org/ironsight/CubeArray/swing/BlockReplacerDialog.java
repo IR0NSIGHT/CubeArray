@@ -456,10 +456,12 @@ public class BlockReplacerDialog extends JDialog {
 
           SearchableTextField catField =
               new SearchableTextField(Arrays.asList(categoryChoices));
-          catField.setMultiSelect(true);
-          catField.setSuggestionRenderer(createCategoryRenderer(catField));
+          catField.setSuggestionRenderer(createCategoryRenderer());
           catField.addCommitListener(
-              () -> autoReplaceCategory(category, catField.getSelectedItems()));
+              () -> {
+                String tgt = catField.getTextField().getText();
+                if (tgt != null && !tgt.isEmpty()) autoReplaceCategory(category, tgt);
+              });
           rows.add(buildCategoryLabel(category), srcC);
           rows.add(catField, destC);
           srcC.gridy++;
@@ -490,25 +492,20 @@ public class BlockReplacerDialog extends JDialog {
   }
 
   /** Auto-replaces all blocks in a category when the header combo changes. */
-  private void autoReplaceCategory(String srcCategory, Set<String> tgtCategories) {
-    if (tgtCategories == null || tgtCategories.isEmpty()) return;
+  private void autoReplaceCategory(String srcCategory, String tgtCategory) {
+    if (tgtCategory == null || tgtCategory.isEmpty()) return;
     int[] range = categoryComboRanges.get(srcCategory);
     if (range == null) return;
     for (int i = range[0]; i < range[1]; i++) {
       SearchableTextField stf = combos.get(i);
       String srcBlock = stf.getTextField().getText();
       if (srcBlock == null || srcBlock.isEmpty()) continue;
-      // Try each target category in order; first match wins
-      for (String tgt : tgtCategories) {
-        if (tgt == null || tgt.isEmpty()) continue;
-        try {
-          String replaced = replacer.replaceBlockByCategory(srcBlock, tgt);
-          stf.getTextField().setText(replaced);
-          overrides.put(srcBlock, replaced);
-          break;
-        } catch (NotFoundExc ignored) {
-          // no equivalent in this target category — try next
-        }
+      try {
+        String replaced = replacer.replaceBlockByCategory(srcBlock, tgtCategory);
+        stf.getTextField().setText(replaced);
+        overrides.put(srcBlock, replaced);
+      } catch (NotFoundExc ignored) {
+        // no equivalent in target category — leave unchanged
       }
     }
   }
@@ -537,7 +534,7 @@ public class BlockReplacerDialog extends JDialog {
   private static final int MAX_CATEGORY_ICONS = 8;
 
   @SuppressWarnings("rawtypes")
-  private ListCellRenderer createCategoryRenderer(SearchableTextField catField) {
+  private ListCellRenderer createCategoryRenderer() {
     return (list, value, index, isSelected, cellHasFocus) -> {
       String category = value == null ? "" : (String) value;
 
@@ -546,11 +543,7 @@ public class BlockReplacerDialog extends JDialog {
       cell.setBackground(isSelected ? list.getSelectionBackground() : list.getBackground());
       cell.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
 
-      String prefix =
-          catField.isMultiSelect()
-              ? (catField.getSelectedItems().contains(category) ? "[x] " : "[ ] ")
-              : "";
-      JLabel nameLabel = new JLabel(prefix + category);
+      JLabel nameLabel = new JLabel(category);
       nameLabel.setForeground(isSelected ? list.getSelectionForeground() : list.getForeground());
       nameLabel.setFont(list.getFont());
       cell.add(nameLabel, BorderLayout.WEST);

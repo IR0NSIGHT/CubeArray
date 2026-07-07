@@ -7,8 +7,6 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.Set;
 import java.util.function.Function;
 
 public class SearchableTextField extends JPanel {
@@ -20,8 +18,6 @@ public class SearchableTextField extends JPanel {
   private final List<String> allItems;
   private final List<Runnable> commitListeners = new ArrayList<>();
   private Function<String, Icon> iconProvider;
-  private boolean multiSelect;
-  private final Set<String> selectedItems = new LinkedHashSet<>();
   private int commitGeneration = 0;
 
   public SearchableTextField(List<String> items) {
@@ -72,11 +68,9 @@ public class SearchableTextField extends JPanel {
               }
               case KeyEvent.VK_ENTER -> {
                 e.consume();
-                if (multiSelect) toggleSelected();
-                else commitSelected();
+                commitSelected();
               }
               case KeyEvent.VK_ESCAPE -> {
-                if (multiSelect) syncTextFieldToSelection();
                 popup.setVisible(false);
                 for (Runnable r : commitListeners) r.run();
               }
@@ -91,8 +85,7 @@ public class SearchableTextField extends JPanel {
             int index = suggestionList.locationToIndex(e.getPoint());
             if (index >= 0) {
               suggestionList.setSelectedIndex(index);
-              if (multiSelect) toggleSelected();
-              else commitSelected();
+              commitSelected();
             }
           }
         });
@@ -101,12 +94,7 @@ public class SearchableTextField extends JPanel {
         new FocusAdapter() {
           @Override
           public void focusLost(FocusEvent e) {
-            SwingUtilities.invokeLater(
-                () -> {
-                  if (multiSelect) syncTextFieldToSelection();
-                  popup.setVisible(false);
-                  for (Runnable r : commitListeners) r.run();
-                });
+            SwingUtilities.invokeLater(() -> popup.setVisible(false));
           }
         });
   }
@@ -138,9 +126,6 @@ public class SearchableTextField extends JPanel {
                 super.getListCellRendererComponent(
                     list, value, index, isSelected, cellHasFocus);
         if (value instanceof String s) {
-          if (multiSelect) {
-            label.setText((selectedItems.contains(s) ? "[x] " : "[ ] ") + s);
-          }
           if (iconProvider != null) {
             Icon icon = iconProvider.apply(s);
             if (icon != null) {
@@ -152,36 +137,6 @@ public class SearchableTextField extends JPanel {
         return label;
       }
     };
-  }
-
-  public void setMultiSelect(boolean multiSelect) {
-    this.multiSelect = multiSelect;
-  }
-
-  public Set<String> getSelectedItems() {
-    return new LinkedHashSet<>(selectedItems);
-  }
-
-  public boolean isMultiSelect() {
-    return multiSelect;
-  }
-
-  private void toggleSelected() {
-    String item = suggestionList.getSelectedValue();
-    if (item == null && listModel.getSize() > 0) {
-      item = listModel.getElementAt(0);
-    }
-    if (item == null) return;
-    if (selectedItems.contains(item)) selectedItems.remove(item);
-    else selectedItems.add(item);
-    syncTextFieldToSelection();
-    suggestionList.repaint();
-  }
-
-  private void syncTextFieldToSelection() {
-    String joined = String.join(", ", selectedItems);
-    textField.setText(joined);
-    textField.setCaretPosition(joined.length());
   }
 
   private void onTextChanged() {
@@ -210,9 +165,10 @@ public class SearchableTextField extends JPanel {
   }
 
   private void showPopup() {
+    int prefWidth = Math.max(suggestionList.getPreferredSize().width + 20, textField.getWidth());
     int rowEstimate = iconProvider != null ? 38 : 22;
     int prefHeight = Math.min(300, Math.max(60, listModel.getSize() * rowEstimate + 5));
-    popup.setPopupSize(new Dimension(textField.getWidth(), prefHeight));
+    popup.setPreferredSize(new Dimension(prefWidth, prefHeight));
     popup.show(textField, 0, textField.getHeight());
   }
 
