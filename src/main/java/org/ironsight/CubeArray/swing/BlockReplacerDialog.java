@@ -9,18 +9,23 @@ import java.net.URL;
 import java.nio.file.*;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
+import org.ironsight.CubeArray.InstancedCubes;
 import org.ironsight.CubeArray.ResourceUtils;
+import org.ironsight.CubeArray.SchemReader;
 import org.ironsight.schemEdit.BlockListUtil;
 import org.ironsight.schemEdit.BlockListUtil.CategoryEntry;
 import org.ironsight.schemEdit.BlockReplacer;
 import org.ironsight.schemEdit.NotFoundExc;
+import org.pepsoft.worldpainter.DefaultCustomObjectProvider;
+import org.pepsoft.worldpainter.objects.WPObject;
+import pitheguy.schemconvert.converter.Schematic;
 import org.ironsight.schemEdit.Replacer;
 
 /**
@@ -128,7 +133,7 @@ public class BlockReplacerDialog extends JDialog {
 
   private final Set<String> palette;
   private final Set<String> availableBlocks;
-  private final Collection<File> files;
+  private final Map<File, Schematic> loadedSchematics;
 
   // Blocks-mode data
   private final List<Map.Entry<String, List<String>>> groups;
@@ -173,15 +178,28 @@ public class BlockReplacerDialog extends JDialog {
   private JScrollPane mappingScroll;
   private JPanel centerWrapper;
 
+  // Right-column icon labels keyed by file, updated after each background render
+  private final Map<File, JLabel> rightIconLabels = new LinkedHashMap<>();
+
+  // Background render executor with 1-second debounce
+  private final ScheduledExecutorService renderExecutor =
+      Executors.newSingleThreadScheduledExecutor(
+          r -> {
+            Thread t = new Thread(r, "preview-renderer");
+            t.setDaemon(true);
+            return t;
+          });
+  private ScheduledFuture<?> pendingRender;
+
   // -------------------------------------------------------------------------
   // Constructor
   // -------------------------------------------------------------------------
 
-  private BlockReplacerDialog(Frame owner, Set<String> palette, Set<String> availableBlocks, Collection<File> files) {
+  private BlockReplacerDialog(Frame owner, Set<String> palette, Set<String> availableBlocks, Map<File, Schematic> loaded) {
     super(owner, "Replace blocks", true);
     this.palette = palette;
     this.availableBlocks = availableBlocks;
-    this.files = files;
+    this.loadedSchematics = loaded;
 
     // --- Load categories (needed by all modes) ---
     List<CategoryEntry> categoryEntries;
@@ -266,6 +284,7 @@ public class BlockReplacerDialog extends JDialog {
     pack();
     setMinimumSize(new Dimension(680, 200));
     setLocationRelativeTo(owner);
+    scheduleAfterPreviews();
   }
 
   // -------------------------------------------------------------------------
@@ -311,6 +330,7 @@ public class BlockReplacerDialog extends JDialog {
   private void rebuildScrollPane() {
     remove(centerWrapper);
     combos.clear();
+    rightIconLabels.clear();
     mappingScroll = buildMappingPanel();
     centerWrapper = buildCenterWrapper();
     add(centerWrapper, BorderLayout.CENTER);
@@ -333,6 +353,7 @@ public class BlockReplacerDialog extends JDialog {
     searchText = "";
     overrides.clear();
     rebuildScrollPane();
+    scheduleAfterPreviews();
   }
 
   private JScrollPane buildMappingPanel() {
@@ -471,6 +492,7 @@ public class BlockReplacerDialog extends JDialog {
               () -> {
                 String tgt = catField.getTextField().getText();
                 if (tgt != null && !tgt.isEmpty()) autoReplaceCategory(category, tgt);
+                scheduleAfterPreviews();
               });
           rows.add(buildCategoryLabel(category), srcC);
           rows.add(catField, destC);
@@ -623,6 +645,7 @@ public class BlockReplacerDialog extends JDialog {
               overrides.put(sourceKey, sel);
             }
           }
+          scheduleAfterPreviews();
         });
     // Restore any previously stored override
     String saved = overrides.get(sourceKey);
@@ -650,7 +673,7 @@ public class BlockReplacerDialog extends JDialog {
     column.setLayout(new BoxLayout(column, BoxLayout.Y_AXIS));
     column.setBorder(new EmptyBorder(4, 4, 4, 4));
 
-    for (File file : files) {
+    for (File file : loadedSchematics.keySet()) {
       JPanel entry = new JPanel();
       entry.setLayout(new BoxLayout(entry, BoxLayout.Y_AXIS));
       entry.setOpaque(false);
@@ -669,6 +692,10 @@ public class BlockReplacerDialog extends JDialog {
             }
           });
       entry.add(iconLabel);
+
+      if (isAfter) {
+        rightIconLabels.put(file, iconLabel);
+      }
 
       JLabel nameLabel = new JLabel("<html><div style='text-align:center;word-wrap:break-word'>" + file.getName() + "</div></html>", SwingConstants.CENTER);
       nameLabel.setFont(nameLabel.getFont().deriveFont(10f));
@@ -726,6 +753,71 @@ public class BlockReplacerDialog extends JDialog {
                 .getImage()
                 .getScaledInstance(640, 640, Image.SCALE_SMOOTH));
     JOptionPane.showMessageDialog(this, icon);
+  }
+
+  // -------------------------------------------------------------------------
+  // After-replacement preview rendering
+  // -------------------------------------------------------------------------
+
+  private void scheduleAfterPreviews() {
+    if (pendingRender != null) pendingRender.cancel(false);
+    pendingRender = renderExecutor.schedule(this::updateAfterPreviews, 1, TimeUnit.SECONDS);
+  }
+
+  private void updateAfterPreviews() {
+    var ref = new java.util.concurrent.atomic.AtomicReference<Map<String, String>>();
+    try {
+      SwingUtilities.invokeAndWait(() -> ref.set(buildResult().replacements()));
+    } catch (Exception e) {
+      return;
+    }
+    Map<String, String> replacements = ref.get();
+
+    for (Map.Entry<File, Schematic> entry : loadedSchematics.entrySet()) {
+      File file = entry.getKey();
+      Schematic schematic = entry.getValue();
+
+      try {
+        Schematic replaced = BlockReplacer.replace(schematic, replacements);
+
+        Path tmpSchem = Files.createTempFile("replace_preview_", ".schem");
+        try {
+          BlockReplacer.write(replaced, tmpSchem.toFile());
+
+          ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
+          WPObject wpObj = new DefaultCustomObjectProvider().loadObject(tmpSchem.toFile());
+          SchemReader.CubeSetup setup = SchemReader.prepareData(List.of(wpObj));
+          Path tmpRender = Files.createTempFile("render_preview_", ".png");
+          try {
+            InstancedCubes.renderToFile(setup, tmpRender, 640, 640);
+            ImageIcon icon =
+                new ImageIcon(
+                    new ImageIcon(tmpRender.toString())
+                        .getImage()
+                        .getScaledInstance(64, 64, Image.SCALE_SMOOTH));
+            SwingUtilities.invokeLater(
+                () -> {
+                  JLabel label = rightIconLabels.get(file);
+                  if (label != null) label.setIcon(icon);
+                });
+          } finally {
+            Files.deleteIfExists(tmpRender);
+          }
+        } finally {
+          Files.deleteIfExists(tmpSchem);
+        }
+      } catch (Exception e) {
+        String msg = e.getMessage();
+        if (msg == null) msg = e.getClass().getSimpleName();
+        System.err.println("Preview render failed for " + file.getName() + ": " + msg);
+      }
+    }
+  }
+
+  @Override
+  public void dispose() {
+    if (pendingRender != null) pendingRender.cancel(false);
+    super.dispose();
   }
 
   private JPanel buildButtonPanel() {
@@ -826,7 +918,7 @@ public class BlockReplacerDialog extends JDialog {
   // -------------------------------------------------------------------------
 
   public static Optional<ReplaceResult> show(
-      Component parent, Set<String> palette, Set<String> availableBlocks, Collection<File> files) {
+      Component parent, Set<String> palette, Set<String> availableBlocks, Map<File, Schematic> loaded) {
 
     Frame owner =
         parent == null
@@ -835,7 +927,7 @@ public class BlockReplacerDialog extends JDialog {
                 ? f
                 : (Frame) SwingUtilities.getAncestorOfClass(Frame.class, parent));
 
-    var dialog = new BlockReplacerDialog(owner, palette, availableBlocks, files);
+    var dialog = new BlockReplacerDialog(owner, palette, availableBlocks, loaded);
     dialog.setVisible(true);
 
     if (!dialog.confirmed) return Optional.empty();
