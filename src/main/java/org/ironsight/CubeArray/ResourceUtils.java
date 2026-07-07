@@ -67,6 +67,16 @@ public class ResourceUtils {
     return main;
   }
 
+  public static Path getRenderPathForFile(File file) {
+    String hash =
+        Integer.toHexString(
+            file.toPath().toAbsolutePath().normalize().toString().hashCode());
+    String name = file.getName();
+    int dot = name.lastIndexOf('.');
+    String baseName = (dot > 0) ? name.substring(0, dot) : name;
+    return getInstallPath().resolve("renders").resolve(baseName + "__" + hash + ".png");
+  }
+
   public static Path getInstallPath() {
     String os = System.getProperty("os.name").toLowerCase();
     Path base;

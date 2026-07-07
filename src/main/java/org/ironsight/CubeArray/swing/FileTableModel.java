@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.List;
@@ -163,7 +164,10 @@ class FileTableModel extends AbstractTableModel {
               try {
                 var schems = SchemReader.loadSchematics(List.of(f.toPath()), this::flagAsError);
                 loadingFiles.remove(f);
-                for (WPObject schem : schems) schematicObjects.put(f, schem);
+                for (WPObject schem : schems) {
+                  schematicObjects.put(f, schem);
+                  if (onSchematicLoadedCallback != null) onSchematicLoadedCallback.accept(f);
+                }
                 final int ii = i;
                 SwingUtilities.invokeLater(
                     () -> {
@@ -189,9 +193,14 @@ class FileTableModel extends AbstractTableModel {
   }
 
   private Consumer<Integer> remainingFileCountChangedCallback; // int = remainingFiles
+  private Consumer<File> onSchematicLoadedCallback;
 
   public void setFileQueueSizeChangedCallback(Consumer<Integer> callback) {
     this.remainingFileCountChangedCallback = callback;
+  }
+
+  public void setOnSchematicLoadedCallback(Consumer<File> callback) {
+    this.onSchematicLoadedCallback = callback;
   }
 
   public void flagReloadFile(int modelRow) {
@@ -343,8 +352,15 @@ class FileTableModel extends AbstractTableModel {
 
   private Icon getIconFromFile(File f) {
     return iconCache.computeIfAbsent(
-        "__screenshot__",
+        f.getAbsolutePath(),
         k -> {
+          Path renderPath = ResourceUtils.getRenderPathForFile(f);
+          if (renderPath.toFile().exists()) {
+            return new ImageIcon(
+                new ImageIcon(renderPath.toString())
+                    .getImage()
+                    .getScaledInstance(64, 64, Image.SCALE_SMOOTH));
+          }
           URL url = getClass().getClassLoader().getResource("icons/screenshot_file_icon.png");
           if (url != null) {
             return new ImageIcon(
@@ -389,6 +405,14 @@ class FileTableModel extends AbstractTableModel {
 
   public File getFileAt(int row) {
     return files.get(row);
+  }
+
+  public int indexOfFile(File f) {
+    return files.indexOf(f);
+  }
+
+  public void invalidateIconCache(File f) {
+    iconCache.remove(f.getAbsolutePath());
   }
 
   public void addFile(File f) {

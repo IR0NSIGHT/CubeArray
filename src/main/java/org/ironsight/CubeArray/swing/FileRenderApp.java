@@ -4,6 +4,7 @@ import static org.ironsight.CubeArray.ResourceUtils.isSupportedSchematicType;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -30,6 +31,7 @@ import org.ironsight.CubeArray.ResourceUtils;
 import org.ironsight.CubeArray.SchemReader;
 import org.ironsight.schemEdit.BatchConverter;
 import org.ironsight.schemEdit.BlockReplacer;
+import org.pepsoft.worldpainter.objects.WPObject;
 
 public class FileRenderApp {
   private static final Logger logger = AppLogger.get(FileRenderApp.class);
@@ -115,6 +117,7 @@ public class FileRenderApp {
           if (count == 0) this.setTextRemainingFiles("");
           else this.setTextRemainingFiles("Loading " + count + " file(s)");
         });
+    tableModel.setOnSchematicLoadedCallback(this::renderSchematicIcon);
 
     this.fileTable = new JTable(tableModel);
     this.rowSorter = new TableRowSorter<>(tableModel);
@@ -1179,6 +1182,34 @@ public class FileRenderApp {
     } catch (Exception ex) {
       logger.log(Level.SEVERE, "Error starting render", ex);
     }
+  }
+
+  private void renderSchematicIcon(File file) {
+    if (file == null) return;
+    new Thread(
+            () -> {
+              try {
+                Path renderPath = ResourceUtils.getRenderPathForFile(file);
+                Files.createDirectories(renderPath.getParent());
+                var rng = new java.util.Random(file.hashCode());
+                var image = new java.awt.image.BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
+                for (int y = 0; y < 64; y++) {
+                  for (int x = 0; x < 64; x++) {
+                    image.setRGB(x, y, rng.nextInt(0xFFFFFF + 1) | 0xFF000000);
+                  }
+                }
+                javax.imageio.ImageIO.write(image, "png", renderPath.toFile());
+                SwingUtilities.invokeLater(
+                    () -> {
+                      tableModel.invalidateIconCache(file);
+                      int idx = tableModel.indexOfFile(file);
+                      if (idx >= 0) tableModel.fireTableRowsUpdated(idx, idx);
+                    });
+              } catch (Exception e) {
+                logger.log(Level.WARNING, "Failed to render icon for " + file.getName(), e);
+              }
+            })
+        .start();
   }
 
   private JFileChooser getFileChooser(boolean folder) {
