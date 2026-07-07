@@ -1219,6 +1219,7 @@ public class FileRenderApp {
 
   private void renderSchematicIcon(File file) {
     if (file == null) return;
+    if (!ResourceUtils.needsNewRender(file)) return;
     Future<?> future =
         renderExecutor.submit(
             () -> {

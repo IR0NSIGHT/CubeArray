@@ -77,6 +77,12 @@ public class ResourceUtils {
     return getInstallPath().resolve("renders").resolve(baseName + "__" + hash + ".png");
   }
 
+  public static boolean needsNewRender(File schematicFile) {
+    Path renderPath = getRenderPathForFile(schematicFile);
+    if (!Files.exists(renderPath)) return true;
+    return schematicFile.lastModified() > renderPath.toFile().lastModified();
+  }
+
   public static Path getInstallPath() {
     String os = System.getProperty("os.name").toLowerCase();
     Path base;

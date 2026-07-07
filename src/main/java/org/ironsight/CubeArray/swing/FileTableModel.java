@@ -350,6 +350,22 @@ class FileTableModel extends AbstractTableModel {
     return schematicObjects.get(f);
   }
 
+  private Icon generatePlaceholderIcon(File f) {
+    var image = new java.awt.image.BufferedImage(64, 64, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+    var g = image.createGraphics();
+    g.setColor(new Color(0x33, 0x33, 0x33));
+    g.fillRect(0, 0, 64, 64);
+    g.setColor(new Color(0x88, 0x88, 0x88));
+    g.setFont(g.getFont().deriveFont(24f));
+    var fm = g.getFontMetrics();
+    String letter = f.getName().substring(0, 1).toUpperCase();
+    int x = (64 - fm.stringWidth(letter)) / 2;
+    int y = (64 - fm.getHeight()) / 2 + fm.getAscent();
+    g.drawString(letter, x, y);
+    g.dispose();
+    return new ImageIcon(image);
+  }
+
   private Icon getIconFromFile(File f) {
     return iconCache.computeIfAbsent(
         f.getAbsolutePath(),
@@ -361,12 +377,7 @@ class FileTableModel extends AbstractTableModel {
                     .getImage()
                     .getScaledInstance(64, 64, Image.SCALE_SMOOTH));
           }
-          URL url = getClass().getClassLoader().getResource("icons/screenshot_file_icon.png");
-          if (url != null) {
-            return new ImageIcon(
-                new ImageIcon(url).getImage().getScaledInstance(64, 64, Image.SCALE_SMOOTH));
-          }
-          return null;
+          return generatePlaceholderIcon(f);
         });
   }
 
