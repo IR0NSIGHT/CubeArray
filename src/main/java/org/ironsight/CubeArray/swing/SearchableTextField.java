@@ -19,6 +19,7 @@ public class SearchableTextField extends JPanel {
   private final List<Runnable> commitListeners = new ArrayList<>();
   private Function<String, Icon> iconProvider;
   private int commitGeneration = 0;
+  private String committedText = "";
 
   public SearchableTextField(List<String> items) {
     super(new BorderLayout());
@@ -150,13 +151,17 @@ public class SearchableTextField extends JPanel {
   }
 
   private void updateFilter(String query) {
+    if (query.equals(committedText)) {
+      popup.setVisible(false);
+      return;
+    }
     listModel.clear();
     for (String item : allItems) {
       if (item.toUpperCase().contains(query.toUpperCase())) {
         listModel.addElement(item);
       }
     }
-    if (listModel.getSize() > 0) {
+    if (listModel.getSize() > 0 && textField.hasFocus()) {
       showPopup();
       suggestionList.repaint();
     } else {
@@ -165,6 +170,7 @@ public class SearchableTextField extends JPanel {
   }
 
   private void showPopup() {
+    if (!textField.hasFocus()) return;
     int prefWidth = Math.max(suggestionList.getPreferredSize().width + 20, textField.getWidth());
     int rowEstimate = iconProvider != null ? 38 : 22;
     int prefHeight = Math.min(300, Math.max(60, listModel.getSize() * rowEstimate + 5));
@@ -186,6 +192,7 @@ public class SearchableTextField extends JPanel {
       selected = listModel.getElementAt(0);
     }
     if (selected == null) return;
+    committedText = selected;
     commitGeneration++;
     textField.setText(selected);
     textField.setCaretPosition(selected.length());
