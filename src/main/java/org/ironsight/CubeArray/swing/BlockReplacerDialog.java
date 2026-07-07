@@ -601,8 +601,8 @@ public class BlockReplacerDialog extends JDialog {
 
   private SearchableTextField makeCombo(String[] choices, String sourceKey) {
     SearchableTextField stf = new SearchableTextField(Arrays.asList(choices));
-    stf.setIconProvider(BlockReplacerDialog::loadIcon);
     stf.getTextField().setText(sourceKey);
+    stf.setIconProvider(BlockReplacerDialog::loadIcon);
     stf.addCommitListener(
         () -> {
           String sel = stf.getTextField().getText();

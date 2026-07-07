@@ -17,6 +17,7 @@ public class SearchableTextField extends JPanel {
   private final DefaultListModel<String> listModel;
   private final List<String> allItems;
   private final List<Runnable> commitListeners = new ArrayList<>();
+  private final JLabel iconLabel = new JLabel();
   private Function<String, Icon> iconProvider;
   private int commitGeneration = 0;
   private String committedText = "";
@@ -36,6 +37,9 @@ public class SearchableTextField extends JPanel {
     popup.setBorder(BorderFactory.createLineBorder(Color.GRAY));
     popup.add(new JScrollPane(suggestionList), BorderLayout.CENTER);
 
+    iconLabel.setPreferredSize(new Dimension(32, 32));
+    iconLabel.setVisible(false);
+    add(iconLabel, BorderLayout.WEST);
     add(textField, BorderLayout.CENTER);
 
     textField
@@ -110,6 +114,18 @@ public class SearchableTextField extends JPanel {
 
   public void setIconProvider(Function<String, Icon> iconProvider) {
     this.iconProvider = iconProvider;
+    iconLabel.setVisible(iconProvider != null);
+    updateCurrentIcon();
+  }
+
+  private void updateCurrentIcon() {
+    if (iconProvider == null) return;
+    String text = textField.getText();
+    if (allItems.contains(text)) {
+      iconLabel.setIcon(iconProvider.apply(text));
+    } else {
+      iconLabel.setIcon(null);
+    }
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
@@ -141,6 +157,7 @@ public class SearchableTextField extends JPanel {
   }
 
   private void onTextChanged() {
+    updateCurrentIcon();
     String query = textField.getText();
     int gen = commitGeneration;
     SwingUtilities.invokeLater(
@@ -196,6 +213,7 @@ public class SearchableTextField extends JPanel {
     commitGeneration++;
     textField.setText(selected);
     textField.setCaretPosition(selected.length());
+    updateCurrentIcon();
     popup.setVisible(false);
     textField.requestFocusInWindow();
     for (Runnable r : commitListeners) r.run();
