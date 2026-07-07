@@ -1049,7 +1049,7 @@ public class FileRenderApp {
     }
 
     // Show the mapping dialog — palette = rows, full block list = available choices
-    var mapping = BlockReplacerDialog.show(frame, palette, availableBlocks);
+    var mapping = BlockReplacerDialog.show(frame, palette, availableBlocks, loaded.keySet());
     if (mapping.isEmpty()) return;
     var replaceResult = mapping.get();
 

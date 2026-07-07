@@ -1,8 +1,12 @@
 package org.ironsight.CubeArray.swing;
 
 import java.awt.*;
+import java.awt.event.*;
+import java.awt.image.BufferedImage;
+import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.file.*;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,6 +16,7 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
+import org.ironsight.CubeArray.ResourceUtils;
 import org.ironsight.schemEdit.BlockListUtil;
 import org.ironsight.schemEdit.BlockListUtil.CategoryEntry;
 import org.ironsight.schemEdit.BlockReplacer;
@@ -123,6 +128,7 @@ public class BlockReplacerDialog extends JDialog {
 
   private final Set<String> palette;
   private final Set<String> availableBlocks;
+  private final Collection<File> files;
 
   // Blocks-mode data
   private final List<Map.Entry<String, List<String>>> groups;
@@ -165,15 +171,17 @@ public class BlockReplacerDialog extends JDialog {
   // UI references held for mode switching
   private final JButton modeBtn = new JButton("Blocks");
   private JScrollPane mappingScroll;
+  private JPanel centerWrapper;
 
   // -------------------------------------------------------------------------
   // Constructor
   // -------------------------------------------------------------------------
 
-  private BlockReplacerDialog(Frame owner, Set<String> palette, Set<String> availableBlocks) {
+  private BlockReplacerDialog(Frame owner, Set<String> palette, Set<String> availableBlocks, Collection<File> files) {
     super(owner, "Replace blocks", true);
     this.palette = palette;
     this.availableBlocks = availableBlocks;
+    this.files = files;
 
     // --- Load categories (needed by all modes) ---
     List<CategoryEntry> categoryEntries;
@@ -251,11 +259,12 @@ public class BlockReplacerDialog extends JDialog {
 
     add(buildTopBar(), BorderLayout.NORTH);
     mappingScroll = buildMappingPanel();
-    add(mappingScroll, BorderLayout.CENTER);
+    centerWrapper = buildCenterWrapper();
+    add(centerWrapper, BorderLayout.CENTER);
     add(buildButtonPanel(), BorderLayout.SOUTH);
 
     pack();
-    setMinimumSize(new Dimension(520, 200));
+    setMinimumSize(new Dimension(680, 200));
     setLocationRelativeTo(owner);
   }
 
@@ -298,12 +307,13 @@ public class BlockReplacerDialog extends JDialog {
     return bar;
   }
 
-  /** Tears down and rebuilds the center scroll pane. */
+  /** Tears down and rebuilds the center wrapper (file columns + mapping scroll pane). */
   private void rebuildScrollPane() {
-    remove(mappingScroll);
+    remove(centerWrapper);
     combos.clear();
     mappingScroll = buildMappingPanel();
-    add(mappingScroll, BorderLayout.CENTER);
+    centerWrapper = buildCenterWrapper();
+    add(centerWrapper, BorderLayout.CENTER);
     revalidate();
     repaint();
     pack();
@@ -623,6 +633,101 @@ public class BlockReplacerDialog extends JDialog {
     return stf;
   }
 
+  // -------------------------------------------------------------------------
+  // File icon columns
+  // -------------------------------------------------------------------------
+
+  private JPanel buildCenterWrapper() {
+    JPanel wrapper = new JPanel(new BorderLayout(8, 0));
+    wrapper.add(buildFileColumn(false), BorderLayout.WEST);
+    wrapper.add(mappingScroll, BorderLayout.CENTER);
+    wrapper.add(buildFileColumn(true), BorderLayout.EAST);
+    return wrapper;
+  }
+
+  private JScrollPane buildFileColumn(boolean isAfter) {
+    JPanel column = new JPanel();
+    column.setLayout(new BoxLayout(column, BoxLayout.Y_AXIS));
+    column.setBorder(new EmptyBorder(4, 4, 4, 4));
+
+    for (File file : files) {
+      JPanel entry = new JPanel();
+      entry.setLayout(new BoxLayout(entry, BoxLayout.Y_AXIS));
+      entry.setOpaque(false);
+
+      JLabel iconLabel = new JLabel(loadFileIcon(file));
+      iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+      iconLabel.setToolTipText(file.getName());
+      iconLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+      iconLabel.addMouseListener(
+          new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+              if (SwingUtilities.isLeftMouseButton(e)) {
+                showFilePreview(file);
+              }
+            }
+          });
+      entry.add(iconLabel);
+
+      JLabel nameLabel = new JLabel("<html><div style='text-align:center;word-wrap:break-word'>" + file.getName() + "</div></html>", SwingConstants.CENTER);
+      nameLabel.setFont(nameLabel.getFont().deriveFont(10f));
+      nameLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+      entry.add(nameLabel);
+
+      column.add(entry);
+      column.add(Box.createVerticalStrut(6));
+    }
+
+    JScrollPane scroll = new JScrollPane(column);
+    scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+    scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+    scroll.setPreferredSize(new Dimension(120, 1));
+    scroll.setMinimumSize(new Dimension(80, 1));
+    return scroll;
+  }
+
+  private Icon loadFileIcon(File file) {
+    Path renderPath = ResourceUtils.getRenderPathForFile(file);
+    if (Files.exists(renderPath)) {
+      return new ImageIcon(
+          new ImageIcon(renderPath.toString())
+              .getImage()
+              .getScaledInstance(64, 64, Image.SCALE_SMOOTH));
+    }
+    return generatePlaceholderIcon(file);
+  }
+
+  private static Icon generatePlaceholderIcon(File f) {
+    BufferedImage image = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
+    Graphics2D g = image.createGraphics();
+    g.setColor(new Color(0x33, 0x33, 0x33));
+    g.fillRect(0, 0, 64, 64);
+    g.setColor(new Color(0x88, 0x88, 0x88));
+    g.setFont(g.getFont().deriveFont(Font.BOLD, 24f));
+    FontMetrics fm = g.getFontMetrics();
+    String letter = f.getName().substring(0, 1).toUpperCase();
+    int x = (64 - fm.stringWidth(letter)) / 2;
+    int y = (64 - fm.getHeight()) / 2 + fm.getAscent();
+    g.drawString(letter, x, y);
+    g.dispose();
+    return new ImageIcon(image);
+  }
+
+  private void showFilePreview(File file) {
+    Path renderPath = ResourceUtils.getRenderPathForFile(file);
+    if (!Files.exists(renderPath)) {
+      JOptionPane.showMessageDialog(this, "No render available yet.");
+      return;
+    }
+    ImageIcon icon =
+        new ImageIcon(
+            new ImageIcon(renderPath.toString())
+                .getImage()
+                .getScaledInstance(640, 640, Image.SCALE_SMOOTH));
+    JOptionPane.showMessageDialog(this, icon);
+  }
+
   private JPanel buildButtonPanel() {
     JButton okBtn = new JButton("OK");
     JButton cancelBtn = new JButton("Cancel");
@@ -721,7 +826,7 @@ public class BlockReplacerDialog extends JDialog {
   // -------------------------------------------------------------------------
 
   public static Optional<ReplaceResult> show(
-      Component parent, Set<String> palette, Set<String> availableBlocks) {
+      Component parent, Set<String> palette, Set<String> availableBlocks, Collection<File> files) {
 
     Frame owner =
         parent == null
@@ -730,7 +835,7 @@ public class BlockReplacerDialog extends JDialog {
                 ? f
                 : (Frame) SwingUtilities.getAncestorOfClass(Frame.class, parent));
 
-    var dialog = new BlockReplacerDialog(owner, palette, availableBlocks);
+    var dialog = new BlockReplacerDialog(owner, palette, availableBlocks, files);
     dialog.setVisible(true);
 
     if (!dialog.confirmed) return Optional.empty();
