@@ -832,6 +832,10 @@ public class FileRenderApp {
                   () -> rightMenu.show(e.getComponent(), e.getX(), e.getY()));
             }
             if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
+              if (modelCol == CaColumn.ICON.ordinal()) {
+                showRenderPreview(modelRow);
+                return;
+              }
 
               logger.fine("Model row=" + modelRow + ", model col=" + modelCol);
 
@@ -1217,6 +1221,21 @@ public class FileRenderApp {
     }
   }
 
+  private void showRenderPreview(int modelRow) {
+    File file = tableModel.getFileAt(modelRow);
+    Path renderPath = ResourceUtils.getRenderPathForFile(file);
+    if (!Files.exists(renderPath)) {
+      JOptionPane.showMessageDialog(frame, "No render available yet.");
+      return;
+    }
+    ImageIcon icon =
+        new ImageIcon(
+            new ImageIcon(renderPath.toString())
+                .getImage()
+                .getScaledInstance(640, 640, Image.SCALE_SMOOTH));
+    JOptionPane.showMessageDialog(frame, icon);
+  }
+
   private void renderSchematicIcon(File file) {
     if (file == null) return;
     if (!ResourceUtils.needsNewRender(file)) return;
@@ -1231,7 +1250,7 @@ public class FileRenderApp {
                 if (setup == null) return;
                 Path renderPath = ResourceUtils.getRenderPathForFile(file);
                 Files.createDirectories(renderPath.getParent());
-                InstancedCubes.renderToFile(setup, renderPath, 256, 256);
+                InstancedCubes.renderToFile(setup, renderPath, 640, 640);
                 SwingUtilities.invokeLater(
                     () -> {
                       tableModel.invalidateIconCache(file);
