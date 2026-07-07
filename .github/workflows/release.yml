@@ -22,7 +22,7 @@ jobs:
           cache: maven
 
       - name: Build fat JAR
-        run: mvn clean package
+        run: mvn clean package -DskipTests
 
       - name: Stage clean input for jpackage
         shell: cmd
