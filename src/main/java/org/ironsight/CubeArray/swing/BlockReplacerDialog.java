@@ -11,7 +11,7 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.plaf.basic.BasicComboBoxEditor;
+
 import org.ironsight.schemEdit.BlockListUtil;
 import org.ironsight.schemEdit.BlockListUtil.CategoryEntry;
 import org.ironsight.schemEdit.BlockReplacer;
@@ -71,7 +71,7 @@ public class BlockReplacerDialog extends JDialog {
     return icon;
   }
 
-  private static Icon loadIcon(String bareId) {
+  static Icon loadIcon(String bareId) {
     // Strip [...] blockstate suffix and minecraft: namespace to get the bare icon key
     String iconKey = bareId.contains("[") ? bareId.substring(0, bareId.indexOf('[')) : bareId;
     if (iconKey.startsWith("minecraft:")) iconKey = iconKey.substring("minecraft:".length());
@@ -95,7 +95,7 @@ public class BlockReplacerDialog extends JDialog {
   }
 
   /** Loads a small 20×20 icon for use in the category icon strip. Cached separately. */
-  private static Icon loadIconSmall(String bareId) {
+  static Icon loadIconSmall(String bareId) {
     String iconKey = bareId.contains("[") ? bareId.substring(0, bareId.indexOf('[')) : bareId;
     if (iconKey.startsWith("minecraft:")) iconKey = iconKey.substring("minecraft:".length());
 
@@ -115,160 +115,6 @@ public class BlockReplacerDialog extends JDialog {
       return icon;
     }
     return null; // no fallback for strip icons — just skip missing ones
-  }
-
-  // -------------------------------------------------------------------------
-  // Renderers / editors
-  // -------------------------------------------------------------------------
-
-  private static class BlockIconRenderer extends DefaultListCellRenderer {
-    @Override
-    public Component getListCellRendererComponent(
-        JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-      JLabel label =
-          (JLabel) super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
-      if (value instanceof String id) {
-        label.setIcon(loadIcon(id));
-        label.setIconTextGap(6);
-      }
-      return label;
-    }
-  }
-
-  private static final ListCellRenderer<Object> BLOCK_ICON_RENDERER = new BlockIconRenderer();
-
-  /**
-   * Combo box editor for category mode. The editor panel shows the category name in an editable
-   * text field on the left and a live icon strip on the right, both updating whenever {@link
-   * #setItem} is called.
-   */
-  private static class CategoryComboEditor extends BasicComboBoxEditor {
-    private final JPanel panel = new JPanel(new BorderLayout(4, 0));
-    private final JPanel iconStrip = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
-    private final Map<String, List<String>> allCategoryBlocks;
-
-    CategoryComboEditor(Map<String, List<String>> allCategoryBlocks) {
-      this.allCategoryBlocks = allCategoryBlocks;
-      iconStrip.setOpaque(false);
-      panel.setOpaque(false);
-      panel.add(editor, BorderLayout.WEST);
-      panel.add(iconStrip, BorderLayout.CENTER);
-      // Give the text field a fixed width so it doesn't crowd the icon strip
-      editor.setPreferredSize(new Dimension(160, editor.getPreferredSize().height));
-    }
-
-    @Override
-    public Component getEditorComponent() {
-      return panel;
-    }
-
-    public JTextField getTextField() {
-      return editor;
-    }
-
-    @Override
-    public void setItem(Object item) {
-      super.setItem(item);
-      if (item == null || item.toString().isBlank()) return;
-      rebuildStrip(item.toString());
-    }
-
-    private void rebuildStrip(String category) {
-      iconStrip.removeAll();
-      List<String> blocks = allCategoryBlocks.getOrDefault(category, List.of());
-      blocks.stream()
-          .limit(MAX_CATEGORY_ICONS)
-          .forEach(
-              blockId -> {
-                Icon icon = loadIconSmall(blockId);
-                if (icon != null) {
-                  JLabel lbl = new JLabel(icon);
-                  lbl.setToolTipText(blockId);
-                  iconStrip.add(lbl);
-                }
-              });
-      iconStrip.revalidate();
-      iconStrip.repaint();
-    }
-  }
-
-  /**
-   * Renderer for the category dropdown: shows the category name on the left followed by small icons
-   * of all blocks belonging to that category (up to {@value #MAX_CATEGORY_ICONS}).
-   */
-  private static class CategoryIconRenderer implements ListCellRenderer<Object> {
-    private final Map<String, List<String>> allCategoryBlocks;
-
-    CategoryIconRenderer(Map<String, List<String>> allCategoryBlocks) {
-      this.allCategoryBlocks = allCategoryBlocks;
-    }
-
-    @Override
-    public Component getListCellRendererComponent(
-        JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
-
-      String category = value == null ? "" : value.toString();
-
-      JPanel cell = new JPanel(new BorderLayout(6, 0));
-      cell.setOpaque(true);
-      cell.setBackground(isSelected ? list.getSelectionBackground() : list.getBackground());
-      cell.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
-
-      // Category name label
-      JLabel nameLabel = new JLabel(category);
-      nameLabel.setForeground(isSelected ? list.getSelectionForeground() : list.getForeground());
-      nameLabel.setFont(list.getFont());
-      cell.add(nameLabel, BorderLayout.WEST);
-
-      // Icon strip
-      List<String> blocks = allCategoryBlocks.getOrDefault(category, List.of());
-      JPanel iconStrip = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
-      iconStrip.setOpaque(false);
-      blocks.stream()
-          .limit(MAX_CATEGORY_ICONS)
-          .forEach(
-              blockId -> {
-                Icon icon = loadIconSmall(blockId);
-                if (icon != null) {
-                  JLabel iconLabel = new JLabel(icon);
-                  iconLabel.setToolTipText(blockId);
-                  iconStrip.add(iconLabel);
-                }
-              });
-      cell.add(iconStrip, BorderLayout.CENTER);
-
-      return cell;
-    }
-  }
-
-  private static class IconComboBoxEditor extends BasicComboBoxEditor {
-    private final JPanel panel = new JPanel(new BorderLayout(4, 0));
-    private final JLabel iconLabel = new JLabel();
-
-    IconComboBoxEditor() {
-      iconLabel.setPreferredSize(new Dimension(32, 32));
-      iconLabel.setOpaque(false);
-      panel.setOpaque(false);
-      panel.add(iconLabel, BorderLayout.WEST);
-      panel.add(editor, BorderLayout.CENTER);
-    }
-
-    @Override
-    public Component getEditorComponent() {
-      return panel;
-    }
-
-    public JTextField getTextField() {
-      return editor;
-    }
-
-    @Override
-    public void setItem(Object item) {
-      super.setItem(item);
-      // Ignore null/blank calls from Swing internals (setModel, setEditor side-effects)
-      if (item == null || item.toString().isBlank()) return;
-      iconLabel.setIcon(loadIcon(item.toString()));
-    }
   }
 
   // -------------------------------------------------------------------------
@@ -293,8 +139,6 @@ public class BlockReplacerDialog extends JDialog {
       categoryToBlocks; // category → distinct stripped block IDs in palette
   private final Map<String, List<String>>
       allCategoryBlocks; // category → all blocks in that category (full data)
-  private final ListCellRenderer<Object>
-      categoryIconRenderer; // renderer showing icon strip per category row
 
   // Block → category map for grouping blocks-mode rows
   private final Map<String, String> blockToCategory;
@@ -304,7 +148,7 @@ public class BlockReplacerDialog extends JDialog {
   private Map<String, int[]> categoryComboRanges;
 
   // Active combo list — rebuilt on each mode switch
-  private final List<JComboBox<String>> combos = new ArrayList<>();
+  private final List<SearchableTextField> combos = new ArrayList<>();
 
   // Maps combo index → source entry index for result building
   private int[] comboToGroup;
@@ -402,9 +246,6 @@ public class BlockReplacerDialog extends JDialog {
       allCategoryBlocks.put(entry.id(), new ArrayList<>(entry.blocks()));
     }
     allCategoryBlocks.values().forEach(list -> list.sort(null));
-    // Renderer that shows a horizontal icon strip for each category in the dropdown
-    this.categoryIconRenderer = new CategoryIconRenderer(allCategoryBlocks);
-
     setLayout(new BorderLayout(8, 8));
     getRootPane().setBorder(new EmptyBorder(10, 10, 10, 10));
 
@@ -447,7 +288,7 @@ public class BlockReplacerDialog extends JDialog {
 
               private void onSearchChanged() {
                 searchText = searchField.getText().toLowerCase();
-                rebuildScrollPane();
+                SwingUtilities.invokeLater(BlockReplacerDialog.this::rebuildScrollPane);
               }
             });
 
@@ -613,20 +454,14 @@ public class BlockReplacerDialog extends JDialog {
           addCategorySeparator(rows, srcC);
           destC.gridy = srcC.gridy;
 
-          CategoryComboEditor catEditor = new CategoryComboEditor(allCategoryBlocks);
-          JComboBox<String> catCombo = new JComboBox<>(categoryChoices);
-          catCombo.setRenderer(categoryIconRenderer);
-          catCombo.setEditor(catEditor);
-          catCombo.setSelectedItem(null);
-          AutoCompletion.enable(
-              catCombo,
-              catEditor.getTextField(),
-              () -> {
-                String tgt = (String) catCombo.getSelectedItem();
-                if (tgt != null) autoReplaceCategory(category, tgt);
-              });
+          SearchableTextField catField =
+              new SearchableTextField(Arrays.asList(categoryChoices));
+          catField.setMultiSelect(true);
+          catField.setSuggestionRenderer(createCategoryRenderer(catField));
+          catField.addCommitListener(
+              () -> autoReplaceCategory(category, catField.getSelectedItems()));
           rows.add(buildCategoryLabel(category), srcC);
-          rows.add(catCombo, destC);
+          rows.add(catField, destC);
           srcC.gridy++;
           destC.gridy++;
         }
@@ -655,20 +490,25 @@ public class BlockReplacerDialog extends JDialog {
   }
 
   /** Auto-replaces all blocks in a category when the header combo changes. */
-  private void autoReplaceCategory(String srcCategory, String tgtCategory) {
-    if (tgtCategory == null) return;
+  private void autoReplaceCategory(String srcCategory, Set<String> tgtCategories) {
+    if (tgtCategories == null || tgtCategories.isEmpty()) return;
     int[] range = categoryComboRanges.get(srcCategory);
     if (range == null) return;
     for (int i = range[0]; i < range[1]; i++) {
-      JComboBox<String> combo = combos.get(i);
-      String srcBlock = (String) combo.getSelectedItem();
-      if (srcBlock == null) continue;
-      try {
-        String replaced = replacer.replaceBlockByCategory(srcBlock, tgtCategory);
-        combo.setSelectedItem(replaced);
-        overrides.put(srcBlock, replaced);
-      } catch (NotFoundExc ignored) {
-        // no equivalent in target category — leave unchanged
+      SearchableTextField stf = combos.get(i);
+      String srcBlock = stf.getTextField().getText();
+      if (srcBlock == null || srcBlock.isEmpty()) continue;
+      // Try each target category in order; first match wins
+      for (String tgt : tgtCategories) {
+        if (tgt == null || tgt.isEmpty()) continue;
+        try {
+          String replaced = replacer.replaceBlockByCategory(srcBlock, tgt);
+          stf.getTextField().setText(replaced);
+          overrides.put(srcBlock, replaced);
+          break;
+        } catch (NotFoundExc ignored) {
+          // no equivalent in this target category — try next
+        }
       }
     }
   }
@@ -695,6 +535,45 @@ public class BlockReplacerDialog extends JDialog {
   }
 
   private static final int MAX_CATEGORY_ICONS = 8;
+
+  @SuppressWarnings("rawtypes")
+  private ListCellRenderer createCategoryRenderer(SearchableTextField catField) {
+    return (list, value, index, isSelected, cellHasFocus) -> {
+      String category = value == null ? "" : (String) value;
+
+      JPanel cell = new JPanel(new BorderLayout(6, 0));
+      cell.setOpaque(true);
+      cell.setBackground(isSelected ? list.getSelectionBackground() : list.getBackground());
+      cell.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
+
+      String prefix =
+          catField.isMultiSelect()
+              ? (catField.getSelectedItems().contains(category) ? "[x] " : "[ ] ")
+              : "";
+      JLabel nameLabel = new JLabel(prefix + category);
+      nameLabel.setForeground(isSelected ? list.getSelectionForeground() : list.getForeground());
+      nameLabel.setFont(list.getFont());
+      cell.add(nameLabel, BorderLayout.WEST);
+
+      List<String> blocks = allCategoryBlocks.getOrDefault(category, List.of());
+      JPanel iconStrip = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
+      iconStrip.setOpaque(false);
+      blocks.stream()
+          .limit(MAX_CATEGORY_ICONS)
+          .forEach(
+              blockId -> {
+                Icon icon = loadIconSmall(blockId);
+                if (icon != null) {
+                  JLabel iconLabel = new JLabel(icon);
+                  iconLabel.setToolTipText(blockId);
+                  iconStrip.add(iconLabel);
+                }
+              });
+      cell.add(iconStrip, BorderLayout.CENTER);
+
+      return cell;
+    };
+  }
 
   /** Builds the source-cell component for a category row: name label + icon strip. */
   private JPanel buildCategoryLabel(String category) {
@@ -727,18 +606,13 @@ public class BlockReplacerDialog extends JDialog {
     return cell;
   }
 
-  private JComboBox<String> makeCombo(String[] choices, String sourceKey) {
-    JComboBox<String> combo = new JComboBox<>(choices);
-    combo.setRenderer(BLOCK_ICON_RENDERER);
-    combo.setSelectedItem(sourceKey);
-    IconComboBoxEditor iconEditor = new IconComboBoxEditor();
-    combo.setEditor(iconEditor);
-    iconEditor.setItem(sourceKey);
-    AutoCompletion.enable(
-        combo,
-        iconEditor.getTextField(),
+  private SearchableTextField makeCombo(String[] choices, String sourceKey) {
+    SearchableTextField stf = new SearchableTextField(Arrays.asList(choices));
+    stf.setIconProvider(BlockReplacerDialog::loadIcon);
+    stf.getTextField().setText(sourceKey);
+    stf.addCommitListener(
         () -> {
-          String sel = (String) combo.getSelectedItem();
+          String sel = stf.getTextField().getText();
           if (sel != null) {
             if (sel.equals(sourceKey)) {
               overrides.remove(sourceKey);
@@ -747,14 +621,13 @@ public class BlockReplacerDialog extends JDialog {
             }
           }
         });
-    // Restore any previously stored override (sets both model and editor)
+    // Restore any previously stored override
     String saved = overrides.get(sourceKey);
     if (saved != null) {
-      combo.setSelectedItem(saved);
-      iconEditor.setItem(saved);
+      stf.getTextField().setText(saved);
     }
-    combos.add(combo);
-    return combo;
+    combos.add(stf);
+    return stf;
   }
 
   private JPanel buildButtonPanel() {
@@ -803,8 +676,8 @@ public class BlockReplacerDialog extends JDialog {
     Map<String, String> result = new LinkedHashMap<>();
     for (int ci = 0; ci < combos.size(); ci++) {
       int gi = comboToGroup[ci];
-      String destDisplay = (String) combos.get(ci).getSelectedItem();
-      if (destDisplay == null) continue;
+      String destDisplay = combos.get(ci).getTextField().getText();
+      if (destDisplay == null || destDisplay.isEmpty()) continue;
       String srcStripped = groups.get(gi).getKey();
       if (destDisplay.equals(srcStripped)) continue;
 
@@ -843,8 +716,8 @@ public class BlockReplacerDialog extends JDialog {
     for (int ci = 0; ci < combos.size(); ci++) {
       int vi = comboToVariant[ci];
       String src = variants.get(vi);
-      String dest = (String) combos.get(ci).getSelectedItem();
-      if (dest == null || dest.equals(src)) continue;
+      String dest = combos.get(ci).getTextField().getText();
+      if (dest == null || dest.isEmpty() || dest.equals(src)) continue;
       result.put(src, dest);
     }
     return result;
