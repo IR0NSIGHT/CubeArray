@@ -750,6 +750,10 @@ public class FileRenderApp {
       renderFilesBtn.addActionListener(a -> this.renderSelectedFiles());
       rightMenu.add(renderFilesBtn);
 
+      JButton renderToFileBtn = new JButton("Render to file");
+      renderToFileBtn.addActionListener(a -> this.renderSelectedFilesToFile());
+      rightMenu.add(renderToFileBtn);
+
       JButton removeFilesBtn = new JButton("Remove");
       removeFilesBtn.addActionListener(a -> this.removeSelectedFiles());
       rightMenu.add(removeFilesBtn);
@@ -1182,6 +1186,53 @@ public class FileRenderApp {
     } catch (Exception ex) {
       logger.log(Level.SEVERE, "Error starting render", ex);
     }
+  }
+
+  private void renderSelectedFilesToFile() {
+    int[] viewRows = fileTable.getSelectedRows();
+    List<File> selected =
+        java.util.Arrays.stream(viewRows)
+            .map(fileTable::convertRowIndexToModel)
+            .mapToObj(tableModel::getFileAt)
+            .toList();
+    if (selected.isEmpty()) {
+      JOptionPane.showMessageDialog(null, "No files selected.");
+    } else {
+      renderFilesToFile(selected);
+    }
+  }
+
+  private void renderFilesToFile(List<File> files) {
+    new Thread(
+            () -> {
+              try {
+                ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
+                for (File file : files) {
+                  WPObject obj = tableModel.getSchematicFor(file);
+                  if (obj == null) {
+                    logger.warning("Schematic not loaded for " + file.getName());
+                    continue;
+                  }
+                  SchemReader.CubeSetup setup = SchemReader.prepareData(List.of(obj));
+                  if (setup == null) continue;
+                  Path renderPath = ResourceUtils.getRenderPathForFile(file);
+                  Files.createDirectories(renderPath.getParent());
+                  InstancedCubes.renderToFile(setup, renderPath, 256, 256);
+                  logger.info("Rendered to file: " + renderPath);
+                }
+                SwingUtilities.invokeLater(
+                    () -> {
+                      for (File file : files) {
+                        tableModel.invalidateIconCache(file);
+                        int idx = tableModel.indexOfFile(file);
+                        if (idx >= 0) tableModel.fireTableRowsUpdated(idx, idx);
+                      }
+                    });
+              } catch (Exception e) {
+                logger.log(Level.SEVERE, "Error rendering files to file", e);
+              }
+            })
+        .start();
   }
 
   private void renderSchematicIcon(File file) {
