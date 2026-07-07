@@ -118,6 +118,7 @@ public class FileRenderApp {
 
     this.fileTable = new JTable(tableModel);
     this.rowSorter = new TableRowSorter<>(tableModel);
+    rowSorter.setComparator(CaColumn.ICON.ordinal(), (a, b) -> 0);
 
     tableAddMouseClickListener(fileTable);
 
@@ -198,6 +199,7 @@ public class FileRenderApp {
     for (CaColumn c : CaColumn.values()) {
       fileTable.getColumnModel().getColumn(c.ordinal()).setCellRenderer(c.renderer);
     }
+    fileTable.setRowHeight(64);
 
     JTextField searchField = new JTextField(20);
     searchField.setText("Search");
@@ -464,6 +466,7 @@ public class FileRenderApp {
 
     IntStream.range(0, caColumnSet.length)
         .mapToObj(i -> new AbstractMap.SimpleEntry<>(i, caColumnSet[i]))
+        .filter(e -> e.getValue() != CaColumn.ICON)
         .sorted(Comparator.comparing(e -> e.getValue().displayName))
         .forEach(
             entry -> {
@@ -576,10 +579,24 @@ public class FileRenderApp {
       columToTableColumn.put(c, tc);
     }
 
+    // ensure ICON column is always visible and at the leftmost position
+    List<CaColumn> displayed = new ArrayList<>(contextClone.displayedColumns());
+    List<Integer> widths = new ArrayList<>(contextClone.columnWidths());
+    int iconIdx = displayed.indexOf(CaColumn.ICON);
+    if (iconIdx < 0) {
+      displayed.addFirst(CaColumn.ICON);
+      widths.addFirst(CaColumn.ICON.defaultWidth);
+    } else if (iconIdx > 0) {
+      displayed.remove(iconIdx);
+      widths.remove(iconIdx);
+      displayed.addFirst(CaColumn.ICON);
+      widths.addFirst(CaColumn.ICON.defaultWidth);
+    }
+
     // display only columns from saved context
     updateDisplayColumns(
-        contextClone.displayedColumns(),
-        contextClone.columnWidths(),
+        displayed,
+        widths,
         new HashSet<>(),
         fileTable.getColumnModel());
 

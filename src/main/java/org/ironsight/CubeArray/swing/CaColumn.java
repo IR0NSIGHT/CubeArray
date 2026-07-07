@@ -3,12 +3,14 @@ package org.ironsight.CubeArray.swing;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import javax.swing.Icon;
 
 /**
  * hardcoded enum list of columns that the table (and model) can display. comes with all info
  * required to store across restarts and display to user
  */
 public enum CaColumn {
+  ICON("", Icon.class, FileTableModel.iconRenderer, "File icon", 64),
   FILE("File", String.class, FileTableModel.defaultRenderer, "Name of the file", 240),
   LAST_CHANGED(
       "Last Changed",

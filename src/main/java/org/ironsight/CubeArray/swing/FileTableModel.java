@@ -3,6 +3,7 @@ package org.ironsight.CubeArray.swing;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.nio.file.InvalidPathException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -88,6 +89,24 @@ class FileTableModel extends AbstractTableModel {
         }
       };
   public static int NO_VALUE = -1;
+  public static final StringConverter iconRenderer =
+      new StringConverter() {
+        @Override
+        protected void setValue(Object value) {
+          if (value instanceof Icon icon) {
+            setIcon(icon);
+            setText("");
+          } else {
+            setIcon(null);
+            setText("");
+          }
+        }
+
+        @Override
+        public String convertToString(Object o) {
+          return "";
+        }
+      };
   public static final StringConverter dimensionRenderer =
       new StringConverter() {
         @Override
@@ -108,6 +127,7 @@ class FileTableModel extends AbstractTableModel {
   }
 
   private final HashSet<File> errorFiles = new HashSet<>();
+  private static final Map<String, Icon> iconCache = new HashMap<>();
 
   private void flagAsError(File file) {
     errorFiles.add(file);
@@ -230,6 +250,7 @@ class FileTableModel extends AbstractTableModel {
     File f = files.get(row);
     WPObject obj = getSchematicFor(f);
     return switch (CaColumn.values()[col]) {
+      case ICON -> getIconFromFile(f);
       case FILE -> f.getName();
       case PATH -> f.getAbsolutePath();
       case FILE_SIZE -> getSizeBytes(f);
@@ -318,6 +339,19 @@ class FileTableModel extends AbstractTableModel {
 
   public WPObject getSchematicFor(File f) {
     return schematicObjects.get(f);
+  }
+
+  private Icon getIconFromFile(File f) {
+    return iconCache.computeIfAbsent(
+        "__screenshot__",
+        k -> {
+          URL url = getClass().getClassLoader().getResource("icons/screenshot_file_icon.png");
+          if (url != null) {
+            return new ImageIcon(
+                new ImageIcon(url).getImage().getScaledInstance(64, 64, Image.SCALE_SMOOTH));
+          }
+          return null;
+        });
   }
 
   public boolean isFileLoaded(int modelRow) {
