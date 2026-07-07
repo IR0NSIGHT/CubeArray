@@ -492,7 +492,6 @@ class FileTableModel extends AbstractTableModel {
       Insets insets = getInsets();
 
       int textX = insets.left;
-      int textY = insets.top + fm.getAscent();
 
       // Measure prefix width
       String prefix = text.substring(0, index);
@@ -503,7 +502,7 @@ class FileTableModel extends AbstractTableModel {
       int matchWidth = fm.stringWidth(match);
 
       int highlightX = textX + prefixWidth;
-      int highlightY = insets.top;
+      int highlightY = insets.top + (getHeight() - insets.top - insets.bottom - fm.getHeight()) / 2;
       int highlightHeight = fm.getHeight();
 
       // Draw highlight background

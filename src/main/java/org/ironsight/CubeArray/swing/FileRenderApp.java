@@ -85,7 +85,7 @@ public class FileRenderApp {
           new RowFilter<>() {
             @Override
             public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
-              for (CaColumn c : CaColumn.values()) {
+              for (CaColumn c : context.columnContext().displayedColumns()) {
                 if (c.renderer
                     .convertToString(entry.getValue(c.ordinal()))
                     .toLowerCase()
