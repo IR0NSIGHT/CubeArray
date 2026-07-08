@@ -1225,7 +1225,7 @@ public class FileRenderApp {
     File file = tableModel.getFileAt(modelRow);
     Path renderPath = ResourceUtils.getRenderPathForFile(file);
     if (!Files.exists(renderPath)) {
-      JOptionPane.showMessageDialog(frame, "No render available yet.");
+      JOptionPane.showMessageDialog(frame, "No render available yet.", file.getName(), JOptionPane.PLAIN_MESSAGE);
       return;
     }
     ImageIcon icon =
@@ -1233,7 +1233,7 @@ public class FileRenderApp {
             new ImageIcon(renderPath.toString())
                 .getImage()
                 .getScaledInstance(640, 640, Image.SCALE_SMOOTH));
-    JOptionPane.showMessageDialog(frame, icon);
+    JOptionPane.showMessageDialog(frame, icon, file.getName(), JOptionPane.PLAIN_MESSAGE);
   }
 
   private void renderSchematicIcon(File file) {

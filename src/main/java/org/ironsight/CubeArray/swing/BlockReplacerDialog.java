@@ -181,6 +181,9 @@ public class BlockReplacerDialog extends JDialog {
   // Right-column icon labels keyed by file, updated after each background render
   private final Map<File, JLabel> rightIconLabels = new LinkedHashMap<>();
 
+  // Cached 640×640 after-replacement previews for the right column
+  private final Map<File, ImageIcon> afterPreviews = new HashMap<>();
+
   // Background render executor with 1-second debounce
   private final ScheduledExecutorService renderExecutor =
       Executors.newSingleThreadScheduledExecutor(
@@ -331,12 +334,24 @@ public class BlockReplacerDialog extends JDialog {
     remove(centerWrapper);
     combos.clear();
     rightIconLabels.clear();
+    // afterPreviews deliberately NOT cleared — only the UI is rebuilt;
+    // the underlying replacement data hasn't changed.
+    // We restore cached previews onto the new labels below.
     mappingScroll = buildMappingPanel();
     centerWrapper = buildCenterWrapper();
     add(centerWrapper, BorderLayout.CENTER);
     revalidate();
     repaint();
     pack();
+    // Restore any cached after-preview icons onto the fresh labels
+    for (Map.Entry<File, ImageIcon> entry : afterPreviews.entrySet()) {
+      JLabel label = rightIconLabels.get(entry.getKey());
+      if (label != null) {
+        label.setIcon(
+            new ImageIcon(
+                entry.getValue().getImage().getScaledInstance(64, 64, Image.SCALE_SMOOTH)));
+      }
+    }
   }
 
   private void toggleMode() {
@@ -352,6 +367,7 @@ public class BlockReplacerDialog extends JDialog {
         });
     searchText = "";
     overrides.clear();
+    afterPreviews.clear();
     rebuildScrollPane();
     scheduleAfterPreviews();
   }
@@ -682,12 +698,13 @@ public class BlockReplacerDialog extends JDialog {
       iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
       iconLabel.setToolTipText(file.getName());
       iconLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+      Runnable clickAction = isAfter ? () -> showAfterPreview(file) : () -> showFilePreview(file);
       iconLabel.addMouseListener(
           new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
               if (SwingUtilities.isLeftMouseButton(e)) {
-                showFilePreview(file);
+                clickAction.run();
               }
             }
           });
@@ -697,9 +714,12 @@ public class BlockReplacerDialog extends JDialog {
         rightIconLabels.put(file, iconLabel);
       }
 
-      JLabel nameLabel = new JLabel("<html><div style='text-align:center;word-wrap:break-word'>" + file.getName() + "</div></html>", SwingConstants.CENTER);
+      JLabel nameLabel = new JLabel(file.getName(), SwingConstants.CENTER);
       nameLabel.setFont(nameLabel.getFont().deriveFont(10f));
       nameLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+      Dimension iconDim = new Dimension(64, nameLabel.getPreferredSize().height);
+      nameLabel.setPreferredSize(iconDim);
+      nameLabel.setMaximumSize(iconDim);
       entry.add(nameLabel);
 
       column.add(entry);
@@ -709,8 +729,8 @@ public class BlockReplacerDialog extends JDialog {
     JScrollPane scroll = new JScrollPane(column);
     scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
     scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-    scroll.setPreferredSize(new Dimension(120, 1));
-    scroll.setMinimumSize(new Dimension(80, 1));
+    scroll.setPreferredSize(new Dimension(88, 1));
+    scroll.setMinimumSize(new Dimension(88, 1));
     return scroll;
   }
 
@@ -744,7 +764,7 @@ public class BlockReplacerDialog extends JDialog {
   private void showFilePreview(File file) {
     Path renderPath = ResourceUtils.getRenderPathForFile(file);
     if (!Files.exists(renderPath)) {
-      JOptionPane.showMessageDialog(this, "No render available yet.");
+      JOptionPane.showMessageDialog(this, "No render available yet.", file.getName(), JOptionPane.PLAIN_MESSAGE);
       return;
     }
     ImageIcon icon =
@@ -752,7 +772,16 @@ public class BlockReplacerDialog extends JDialog {
             new ImageIcon(renderPath.toString())
                 .getImage()
                 .getScaledInstance(640, 640, Image.SCALE_SMOOTH));
-    JOptionPane.showMessageDialog(this, icon);
+    JOptionPane.showMessageDialog(this, icon, file.getName(), JOptionPane.PLAIN_MESSAGE);
+  }
+
+  private void showAfterPreview(File file) {
+    ImageIcon preview = afterPreviews.get(file);
+    if (preview == null) {
+      JOptionPane.showMessageDialog(this, "Preview not yet available.", file.getName(), JOptionPane.PLAIN_MESSAGE);
+      return;
+    }
+    JOptionPane.showMessageDialog(this, preview, file.getName(), JOptionPane.PLAIN_MESSAGE);
   }
 
   // -------------------------------------------------------------------------
@@ -790,11 +819,11 @@ public class BlockReplacerDialog extends JDialog {
           Path tmpRender = Files.createTempFile("render_preview_", ".png");
           try {
             InstancedCubes.renderToFile(setup, tmpRender, 640, 640);
+            ImageIcon fullPreview = new ImageIcon(tmpRender.toString());
             ImageIcon icon =
                 new ImageIcon(
-                    new ImageIcon(tmpRender.toString())
-                        .getImage()
-                        .getScaledInstance(64, 64, Image.SCALE_SMOOTH));
+                    fullPreview.getImage().getScaledInstance(64, 64, Image.SCALE_SMOOTH));
+            afterPreviews.put(file, fullPreview);
             SwingUtilities.invokeLater(
                 () -> {
                   JLabel label = rightIconLabels.get(file);
