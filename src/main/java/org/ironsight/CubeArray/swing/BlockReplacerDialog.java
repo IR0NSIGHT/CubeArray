@@ -359,7 +359,11 @@ public class BlockReplacerDialog extends JDialog {
     JScrollPane scroll = new JScrollPane(rows);
     scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
     scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-    scroll.setPreferredSize(new Dimension(480, Math.min(400, rowCount * 40 + 48)));
+    Dimension contentPref = rows.getPreferredSize();
+    int prefHeight = Math.min(400, rowCount * 40 + 48);
+    int prefWidth = contentPref.width;
+    if (contentPref.height > prefHeight) prefWidth += 20;
+    scroll.setPreferredSize(new Dimension(prefWidth, prefHeight));
     return scroll;
   }
 
