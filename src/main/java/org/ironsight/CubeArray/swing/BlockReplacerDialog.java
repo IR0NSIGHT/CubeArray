@@ -267,7 +267,7 @@ public class BlockReplacerDialog extends JDialog {
     combos.clear();
     rightIconLabels.clear();
     // The cached previews are NOT cleared — only the UI is rebuilt;
-    // the underlying replacement data hasn't changed.
+    // the full replacement data is built from overrides, not from combos.
     // We restore cached preview icons onto the new labels below.
     mappingScroll = buildMappingPanel();
     centerWrapper = buildCenterWrapper();
@@ -767,12 +767,10 @@ public class BlockReplacerDialog extends JDialog {
    */
   private Map<String, String> buildResultBlocks() {
     Map<String, String> result = new LinkedHashMap<>();
-    for (int ci = 0; ci < combos.size(); ci++) {
-      int gi = comboToGroup[ci];
-      String destDisplay = combos.get(ci).getTextField().getText();
-      if (destDisplay == null || destDisplay.isEmpty()) continue;
-      String srcStripped = groups.get(gi).getKey();
-      if (destDisplay.equals(srcStripped)) continue;
+    for (var entry : overrides.entrySet()) {
+      String srcDisplay = entry.getKey();
+      String destDisplay = entry.getValue();
+      if (destDisplay == null || destDisplay.isEmpty() || destDisplay.equals(srcDisplay)) continue;
 
       String dest =
           Arrays.stream(choices)
@@ -791,10 +789,14 @@ public class BlockReplacerDialog extends JDialog {
                           .findFirst()
                           .orElse(destDisplay));
 
-      for (String variant : groups.get(gi).getValue()) {
-        int bracket = variant.indexOf('[');
-        String blockState = bracket >= 0 ? variant.substring(bracket) : "";
-        result.put(variant, BlockListUtil.toLegalBlockState(dest + blockState));
+      for (var group : groups) {
+        if (!group.getKey().equals(srcDisplay)) continue;
+        for (String variant : group.getValue()) {
+          int bracket = variant.indexOf('[');
+          String blockState = bracket >= 0 ? variant.substring(bracket) : "";
+          result.put(variant, BlockListUtil.toLegalBlockState(dest + blockState));
+        }
+        break;
       }
     }
     return result;
@@ -806,10 +808,9 @@ public class BlockReplacerDialog extends JDialog {
    */
   private Map<String, String> buildResultDetails() {
     Map<String, String> result = new LinkedHashMap<>();
-    for (int ci = 0; ci < combos.size(); ci++) {
-      int vi = comboToVariant[ci];
-      String src = variants.get(vi);
-      String dest = combos.get(ci).getTextField().getText();
+    for (var entry : overrides.entrySet()) {
+      String src = entry.getKey();
+      String dest = entry.getValue();
       if (dest == null || dest.isEmpty() || dest.equals(src)) continue;
       result.put(src, dest);
     }

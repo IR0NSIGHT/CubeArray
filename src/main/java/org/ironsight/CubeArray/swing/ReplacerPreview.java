@@ -90,8 +90,13 @@ public class ReplacerPreview {
 
     Map<String, String> replacements = safeGetReplacements();
     if (replacements == null) return;
+    System.out.println(replacements.entrySet().stream()
+            .map(e -> BlockReplacer.stripBlockId(e.getKey()) + " -> " +BlockReplacer.stripBlockId(e.getValue()) )
+            .distinct()
+            .toList())            ;
     for (Map.Entry<File, Schematic> entry : loadedSchematics.entrySet()) {
       renderOne(entry.getKey(), entry.getValue(), replacements);
+
     }
   }
 
