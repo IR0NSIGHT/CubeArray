@@ -5,7 +5,7 @@ import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.net.URL;
+
 import java.nio.file.*;
 import java.util.*;
 import java.util.List;
@@ -65,69 +65,6 @@ public class BlockReplacerDialog extends JDialog {
   public record ReplaceResult(Map<String, String> replacements) {}
 
   // -------------------------------------------------------------------------
-  // Icon loading
-  // -------------------------------------------------------------------------
-
-  private static final Map<String, Icon> ICON_CACHE = new ConcurrentHashMap<>();
-
-  private static Icon unknownIcon() {
-    Icon cached = ICON_CACHE.get("__unknown__");
-    if (cached != null) return cached;
-    URL url = BlockReplacerDialog.class.getClassLoader().getResource("icons/unknown.png");
-    if (url == null) return null;
-    Icon icon =
-        new ImageIcon(new ImageIcon(url).getImage().getScaledInstance(32, 32, Image.SCALE_SMOOTH));
-    ICON_CACHE.put("__unknown__", icon);
-    return icon;
-  }
-
-  static Icon loadIcon(String bareId) {
-    // Strip [...] blockstate suffix and minecraft: namespace to get the bare icon key
-    String iconKey = bareId.contains("[") ? bareId.substring(0, bareId.indexOf('[')) : bareId;
-    if (iconKey.startsWith("minecraft:")) iconKey = iconKey.substring("minecraft:".length());
-
-    // Cache and look up by the stripped key so partial/edited strings all hit the same entry
-    Icon cached = ICON_CACHE.get(iconKey);
-    if (cached != null) return cached;
-
-    URL url =
-        BlockReplacerDialog.class
-            .getClassLoader()
-            .getResource("icons/minecraft_" + iconKey + ".png");
-    if (url != null) {
-      Icon icon =
-          new ImageIcon(
-              new ImageIcon(url).getImage().getScaledInstance(32, 32, Image.SCALE_SMOOTH));
-      ICON_CACHE.put(iconKey, icon);
-      return icon;
-    }
-    return unknownIcon();
-  }
-
-  /** Loads a small 20×20 icon for use in the category icon strip. Cached separately. */
-  static Icon loadIconSmall(String bareId) {
-    String iconKey = bareId.contains("[") ? bareId.substring(0, bareId.indexOf('[')) : bareId;
-    if (iconKey.startsWith("minecraft:")) iconKey = iconKey.substring("minecraft:".length());
-
-    String cacheKey = iconKey + "__small__";
-    Icon cached = ICON_CACHE.get(cacheKey);
-    if (cached != null) return cached;
-
-    URL url =
-        BlockReplacerDialog.class
-            .getClassLoader()
-            .getResource("icons/minecraft_" + iconKey + ".png");
-    if (url != null) {
-      Icon icon =
-          new ImageIcon(
-              new ImageIcon(url).getImage().getScaledInstance(20, 20, Image.SCALE_SMOOTH));
-      ICON_CACHE.put(cacheKey, icon);
-      return icon;
-    }
-    return null; // no fallback for strip icons — just skip missing ones
-  }
-
-  // -------------------------------------------------------------------------
   // Dialog state
   // -------------------------------------------------------------------------
 
@@ -183,6 +120,8 @@ public class BlockReplacerDialog extends JDialog {
 
   // Cached 640×640 after-replacement previews for the right column
   private final Map<File, ImageIcon> afterPreviews = new HashMap<>();
+
+  private final BlockIconProvider iconProvider = new BlockIconProvider(32, 20);
 
   // Background render executor with 1-second debounce
   private final ScheduledExecutorService renderExecutor =
@@ -520,7 +459,7 @@ public class BlockReplacerDialog extends JDialog {
       List<String> varList = group.getValue();
       String label =
           varList.size() > 1 ? displayName + "  (" + varList.size() + " variants)" : displayName;
-      JLabel srcLabel = new JLabel(label, loadIcon(displayName), JLabel.LEADING);
+      JLabel srcLabel = new JLabel(label, iconProvider.getIcon(displayName), JLabel.LEADING);
       srcLabel.setIconTextGap(6);
       rows.add(srcLabel, srcC);
 
@@ -567,7 +506,7 @@ public class BlockReplacerDialog extends JDialog {
       if (filtering && !variant.toLowerCase().contains(searchText)) continue;
 
       JLabel srcLabel =
-          new JLabel(variant, loadIcon(BlockReplacer.stripBlockId(variant)), JLabel.LEADING);
+          new JLabel(variant, iconProvider.getIcon(variant), JLabel.LEADING);
       srcLabel.setIconTextGap(6);
       rows.add(srcLabel, srcC);
 
@@ -603,7 +542,7 @@ public class BlockReplacerDialog extends JDialog {
           .limit(MAX_CATEGORY_ICONS)
           .forEach(
               blockId -> {
-                Icon icon = loadIconSmall(blockId);
+                Icon icon = iconProvider.getIconSmall(blockId);
                 if (icon != null) {
                   JLabel iconLabel = new JLabel(icon);
                   iconLabel.setToolTipText(blockId);
@@ -635,7 +574,7 @@ public class BlockReplacerDialog extends JDialog {
         .limit(MAX_CATEGORY_ICONS)
         .forEach(
             blockId -> {
-              Icon icon = loadIconSmall(blockId);
+              Icon icon = iconProvider.getIconSmall(blockId);
               if (icon != null) {
                 JLabel iconLabel = new JLabel(icon);
                 iconLabel.setToolTipText(blockId);
@@ -650,7 +589,7 @@ public class BlockReplacerDialog extends JDialog {
   private SearchableTextField makeCombo(String[] choices, String sourceKey) {
     SearchableTextField stf = new SearchableTextField(Arrays.asList(choices));
     stf.getTextField().setText(sourceKey);
-    stf.setIconProvider(BlockReplacerDialog::loadIcon);
+    stf.setIconProvider(iconProvider::getIcon);
     stf.addCommitListener(
         () -> {
           String sel = stf.getTextField().getText();
