@@ -520,7 +520,6 @@ public class InstancedCubes {
       }
     }
     ImageIO.write(image, "png", out.toFile());
-    System.out.println("screenshot saved to " + out);
   }
 
   private void saveScreenshot() {
@@ -562,7 +561,6 @@ public class InstancedCubes {
 
   public static void renderToFile(
       SchemReader.CubeSetup setup, Path outputPath, int width, int height) throws Exception {
-    System.out.println("rendering " + setup.positions.length + " cubes to " + outputPath);
 
     GLFWErrorCallback.createPrint(System.err).set();
     if (!glfwInit()) throw new IllegalStateException("Unable to initialize GLFW");

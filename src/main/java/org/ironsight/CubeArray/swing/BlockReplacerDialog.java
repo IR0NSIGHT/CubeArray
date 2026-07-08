@@ -9,22 +9,17 @@ import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.*;
 import java.util.stream.Collectors;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
-import org.ironsight.CubeArray.InstancedCubes;
 import org.ironsight.CubeArray.ResourceUtils;
-import org.ironsight.CubeArray.SchemReader;
 import org.ironsight.schemEdit.BlockListUtil;
 import org.ironsight.schemEdit.BlockListUtil.CategoryEntry;
 import org.ironsight.schemEdit.BlockReplacer;
 import org.ironsight.schemEdit.NotFoundExc;
-import org.pepsoft.worldpainter.DefaultCustomObjectProvider;
-import org.pepsoft.worldpainter.objects.WPObject;
 import pitheguy.schemconvert.converter.Schematic;
 import org.ironsight.schemEdit.Replacer;
 
@@ -118,20 +113,8 @@ public class BlockReplacerDialog extends JDialog {
   // Right-column icon labels keyed by file, updated after each background render
   private final Map<File, JLabel> rightIconLabels = new LinkedHashMap<>();
 
-  // Cached 640×640 after-replacement previews for the right column
-  private final Map<File, ImageIcon> afterPreviews = new HashMap<>();
-
   private final BlockIconProvider iconProvider = new BlockIconProvider(32, 20);
-
-  // Background render executor with 1-second debounce
-  private final ScheduledExecutorService renderExecutor =
-      Executors.newSingleThreadScheduledExecutor(
-          r -> {
-            Thread t = new Thread(r, "preview-renderer");
-            t.setDaemon(true);
-            return t;
-          });
-  private ScheduledFuture<?> pendingRender;
+  private final ReplacerPreview preview;
 
   // -------------------------------------------------------------------------
   // Constructor
@@ -226,7 +209,17 @@ public class BlockReplacerDialog extends JDialog {
     pack();
     setMinimumSize(new Dimension(680, 200));
     setLocationRelativeTo(owner);
-    scheduleAfterPreviews();
+    preview = new ReplacerPreview(640, 64, loadedSchematics, this::buildReplacements);
+    preview.setCallback(
+        file -> {
+          JLabel label = rightIconLabels.get(file);
+          if (label != null) label.setIcon(preview.getIconPreview(file));
+        });
+    preview.flagRerender();
+  }
+
+  private Map<String, String> buildReplacements() {
+    return buildResult().replacements();
   }
 
   // -------------------------------------------------------------------------
@@ -273,9 +266,9 @@ public class BlockReplacerDialog extends JDialog {
     remove(centerWrapper);
     combos.clear();
     rightIconLabels.clear();
-    // afterPreviews deliberately NOT cleared — only the UI is rebuilt;
+    // The cached previews are NOT cleared — only the UI is rebuilt;
     // the underlying replacement data hasn't changed.
-    // We restore cached previews onto the new labels below.
+    // We restore cached preview icons onto the new labels below.
     mappingScroll = buildMappingPanel();
     centerWrapper = buildCenterWrapper();
     add(centerWrapper, BorderLayout.CENTER);
@@ -283,12 +276,11 @@ public class BlockReplacerDialog extends JDialog {
     repaint();
     pack();
     // Restore any cached after-preview icons onto the fresh labels
-    for (Map.Entry<File, ImageIcon> entry : afterPreviews.entrySet()) {
-      JLabel label = rightIconLabels.get(entry.getKey());
+    for (File file : loadedSchematics.keySet()) {
+      JLabel label = rightIconLabels.get(file);
       if (label != null) {
-        label.setIcon(
-            new ImageIcon(
-                entry.getValue().getImage().getScaledInstance(64, 64, Image.SCALE_SMOOTH)));
+        ImageIcon icon = preview.getIconPreview(file);
+        if (icon != null) label.setIcon(icon);
       }
     }
   }
@@ -306,9 +298,9 @@ public class BlockReplacerDialog extends JDialog {
         });
     searchText = "";
     overrides.clear();
-    afterPreviews.clear();
+    preview.clearCache();
     rebuildScrollPane();
-    scheduleAfterPreviews();
+    preview.flagRerender();
   }
 
   private JScrollPane buildMappingPanel() {
@@ -447,7 +439,7 @@ public class BlockReplacerDialog extends JDialog {
               () -> {
                 String tgt = catField.getTextField().getText();
                 if (tgt != null && !tgt.isEmpty()) autoReplaceCategory(category, tgt);
-                scheduleAfterPreviews();
+                preview.flagRerender();
               });
           rows.add(buildCategoryLabel(category), srcC);
           rows.add(catField, destC);
@@ -600,7 +592,7 @@ public class BlockReplacerDialog extends JDialog {
               overrides.put(sourceKey, sel);
             }
           }
-          scheduleAfterPreviews();
+          preview.flagRerender();
         });
     // Restore any previously stored override
     String saved = overrides.get(sourceKey);
@@ -715,76 +707,19 @@ public class BlockReplacerDialog extends JDialog {
   }
 
   private void showAfterPreview(File file) {
-    ImageIcon preview = afterPreviews.get(file);
-    if (preview == null) {
+    ImageIcon fp = this.preview.getFullPreview(file);
+    if (fp == null) {
       JOptionPane.showMessageDialog(this, "Preview not yet available.", file.getName(), JOptionPane.PLAIN_MESSAGE);
       return;
     }
-    JOptionPane.showMessageDialog(this, preview, file.getName(), JOptionPane.PLAIN_MESSAGE);
+    JOptionPane.showMessageDialog(this, fp, file.getName(), JOptionPane.PLAIN_MESSAGE);
   }
 
-  // -------------------------------------------------------------------------
-  // After-replacement preview rendering
-  // -------------------------------------------------------------------------
-
-  private void scheduleAfterPreviews() {
-    if (pendingRender != null) pendingRender.cancel(false);
-    pendingRender = renderExecutor.schedule(this::updateAfterPreviews, 1, TimeUnit.SECONDS);
-  }
-
-  private void updateAfterPreviews() {
-    var ref = new java.util.concurrent.atomic.AtomicReference<Map<String, String>>();
-    try {
-      SwingUtilities.invokeAndWait(() -> ref.set(buildResult().replacements()));
-    } catch (Exception e) {
-      return;
-    }
-    Map<String, String> replacements = ref.get();
-
-    for (Map.Entry<File, Schematic> entry : loadedSchematics.entrySet()) {
-      File file = entry.getKey();
-      Schematic schematic = entry.getValue();
-
-      try {
-        Schematic replaced = BlockReplacer.replace(schematic, replacements);
-
-        Path tmpSchem = Files.createTempFile("replace_preview_", ".schem");
-        try {
-          BlockReplacer.write(replaced, tmpSchem.toFile());
-
-          ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
-          WPObject wpObj = new DefaultCustomObjectProvider().loadObject(tmpSchem.toFile());
-          SchemReader.CubeSetup setup = SchemReader.prepareData(List.of(wpObj));
-          Path tmpRender = Files.createTempFile("render_preview_", ".png");
-          try {
-            InstancedCubes.renderToFile(setup, tmpRender, 640, 640);
-            ImageIcon fullPreview = new ImageIcon(tmpRender.toString());
-            ImageIcon icon =
-                new ImageIcon(
-                    fullPreview.getImage().getScaledInstance(64, 64, Image.SCALE_SMOOTH));
-            afterPreviews.put(file, fullPreview);
-            SwingUtilities.invokeLater(
-                () -> {
-                  JLabel label = rightIconLabels.get(file);
-                  if (label != null) label.setIcon(icon);
-                });
-          } finally {
-            Files.deleteIfExists(tmpRender);
-          }
-        } finally {
-          Files.deleteIfExists(tmpSchem);
-        }
-      } catch (Exception e) {
-        String msg = e.getMessage();
-        if (msg == null) msg = e.getClass().getSimpleName();
-        System.err.println("Preview render failed for " + file.getName() + ": " + msg);
-      }
-    }
-  }
+  // (preview rendering moved to ReplacerPreview)
 
   @Override
   public void dispose() {
-    if (pendingRender != null) pendingRender.cancel(false);
+    preview.dispose();
     super.dispose();
   }
 

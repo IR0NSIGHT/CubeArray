@@ -348,8 +348,6 @@ public class SchemReader {
       }
     }
 
-    mat_to_palette_idx.keySet().stream().map(m -> m.name).sorted().forEach(System.out::println);
-
     SpriteSheet spriteSheet =
         new SpriteSheet(
             ResourceUtils.getInstallPath().resolve(ResourceUtils.TEXTURE_PACK_ROOT).toFile(),
