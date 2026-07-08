@@ -115,6 +115,23 @@ public class BlockReplacer {
   }
 
   /**
+   * Checks whether the given string is a syntactically valid Minecraft block ID.
+   * <p>
+   * Accepted format: {@code [namespace:]block_id[key=value,...]} where the namespace and
+   * blockstate properties are optional.
+   */
+  public static boolean isValidBlockSyntax(String block) {
+    if (block == null || block.isEmpty()) return false;
+    return block.matches(
+        "^([a-z0-9_.-]+:)?[a-z0-9_.-]+(\\[[a-z0-9_]+=[a-z0-9_]+(,[a-z0-9_]+=[a-z0-9_]+)*\\])?$");
+  }
+
+  /** Placeholder validator for category names — accepts all non-blank strings. */
+  public static boolean isValidCategorySyntax(String category) {
+    return category != null && !category.isEmpty();
+  }
+
+  /**
    * Returns a palette with all {@code [...]} blockstate suffixes stripped, yielding only the bare
    * block IDs (e.g. {@code "minecraft:sandstone_stairs"} instead of {@code
    * "minecraft:sandstone_stairs[facing=north,half=bottom]"}). Duplicate entries that arise from

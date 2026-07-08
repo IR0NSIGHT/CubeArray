@@ -43,6 +43,15 @@ public class BlockIconProviderTest {
   }
 
   @Test
+  public void blockStateIsStrippedBeforeLookup() {
+    Icon bare = provider.getIcon("birch_leaves");
+    Icon withState =
+        provider.getIcon("minecraft:birch_leaves[distance=7,persistent=false,waterlogged=true]");
+    assertNotNull(bare);
+    assertSame(bare, withState);
+  }
+
+  @Test
   public void unknownBlockReturnsUnknownIcon() {
     Icon icon = provider.getIcon("this_does_not_exist");
     assertNotNull(icon);

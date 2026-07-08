@@ -435,6 +435,7 @@ public class BlockReplacerDialog extends JDialog {
           SearchableTextField catField =
               new SearchableTextField(Arrays.asList(categoryChoices));
           catField.setSuggestionRenderer(createCategoryRenderer());
+          catField.setSyntaxValidator(BlockReplacer::isValidCategorySyntax);
           catField.addCommitListener(
               () -> {
                 String tgt = catField.getTextField().getText();
@@ -455,7 +456,9 @@ public class BlockReplacerDialog extends JDialog {
       srcLabel.setIconTextGap(6);
       rows.add(srcLabel, srcC);
 
-      rows.add(makeCombo(displayChoices, displayName), destC);
+      SearchableTextField blockCombo = makeCombo(displayChoices, displayName);
+      blockCombo.setSyntaxValidator(BlockReplacer::isValidBlockSyntax);
+      rows.add(blockCombo, destC);
       srcC.gridy++;
       destC.gridy++;
       groupIndexMapping.add(gi);
@@ -493,6 +496,8 @@ public class BlockReplacerDialog extends JDialog {
   private void buildDetailsRows(JPanel rows, GridBagConstraints srcC, GridBagConstraints destC) {
     boolean filtering = !searchText.isEmpty();
     List<Integer> variantIndexMapping = new ArrayList<>();
+    List<SearchableTextField> detailsCombos = new ArrayList<>();
+    List<String> detailsSourceKeys = new ArrayList<>();
     for (int vi = 0; vi < variants.size(); vi++) {
       String variant = variants.get(vi);
       if (filtering && !variant.toLowerCase().contains(searchText)) continue;
@@ -502,10 +507,34 @@ public class BlockReplacerDialog extends JDialog {
       srcLabel.setIconTextGap(6);
       rows.add(srcLabel, srcC);
 
-      rows.add(makeCombo(detailChoices, variant), destC);
+      SearchableTextField detailCombo = makeCombo(detailChoices, variant);
+      detailCombo.setSyntaxValidator(BlockReplacer::isValidBlockSyntax);
+      detailsCombos.add(detailCombo);
+      detailsSourceKeys.add(variant);
+      rows.add(detailCombo, destC);
       srcC.gridy++;
       destC.gridy++;
       variantIndexMapping.add(vi);
+    }
+    // Wire up auto-rerender: when all details fields pass validation, update overrides and render
+    for (int i = 0; i < detailsCombos.size(); i++) {
+      SearchableTextField combo = detailsCombos.get(i);
+      String srcKey = detailsSourceKeys.get(i);
+      combo.setOnTextChangedCallback(() -> {
+        boolean allValid = detailsCombos.stream()
+            .allMatch(stf -> BlockReplacer.isValidBlockSyntax(stf.getTextField().getText()));
+        if (!allValid) return;
+        for (int j = 0; j < detailsCombos.size(); j++) {
+          String val = detailsCombos.get(j).getTextField().getText();
+          String src = detailsSourceKeys.get(j);
+          if (val.equals(src)) {
+            overrides.remove(src);
+          } else {
+            overrides.put(src, val);
+          }
+        }
+        preview.flagRerender();
+      });
     }
     this.comboToVariant = variantIndexMapping.stream().mapToInt(Integer::intValue).toArray();
   }

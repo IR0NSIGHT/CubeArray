@@ -8,6 +8,7 @@ import javax.swing.event.DocumentListener;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 public class SearchableTextField extends JPanel {
 
@@ -18,7 +19,10 @@ public class SearchableTextField extends JPanel {
   private final List<String> allItems;
   private final List<Runnable> commitListeners = new ArrayList<>();
   private final JLabel iconLabel = new JLabel();
+  private final JLabel indicatorLabel = new JLabel();
   private Function<String, Icon> iconProvider;
+  private Predicate<String> syntaxValidator;
+  private Runnable textChangeCallback;
   private int commitGeneration = 0;
   private String committedText = "";
 
@@ -41,6 +45,10 @@ public class SearchableTextField extends JPanel {
     iconLabel.setVisible(false);
     add(iconLabel, BorderLayout.WEST);
     add(textField, BorderLayout.CENTER);
+    indicatorLabel.setPreferredSize(new Dimension(20, 20));
+    indicatorLabel.setHorizontalAlignment(SwingConstants.CENTER);
+    indicatorLabel.setVisible(false);
+    add(indicatorLabel, BorderLayout.EAST);
 
     textField
         .getDocument()
@@ -118,13 +126,45 @@ public class SearchableTextField extends JPanel {
     updateCurrentIcon();
   }
 
+  public void setSyntaxValidator(Predicate<String> validator) {
+    this.syntaxValidator = validator;
+    updateIndicator();
+  }
+
+  public void setOnTextChangedCallback(Runnable callback) {
+    this.textChangeCallback = callback;
+  }
+
   private void updateCurrentIcon() {
     if (iconProvider == null) return;
     String text = textField.getText();
-    if (allItems.contains(text)) {
-      iconLabel.setIcon(iconProvider.apply(text));
-    } else {
+    if (text.isEmpty()) {
       iconLabel.setIcon(null);
+    } else {
+      iconLabel.setIcon(iconProvider.apply(text));
+    }
+  }
+
+  private void updateIndicator() {
+    if (syntaxValidator == null) {
+      indicatorLabel.setVisible(false);
+      return;
+    }
+    String text = textField.getText();
+    if (text.isEmpty()) {
+      indicatorLabel.setVisible(true);
+      indicatorLabel.setText(" ");
+      indicatorLabel.setForeground(UIManager.getColor("Panel.background"));
+      return;
+    }
+    if (syntaxValidator.test(text)) {
+      indicatorLabel.setVisible(true);
+      indicatorLabel.setText("\u2713");
+      indicatorLabel.setForeground(new Color(0, 160, 0));
+    } else {
+      indicatorLabel.setVisible(true);
+      indicatorLabel.setText("\u2717");
+      indicatorLabel.setForeground(new Color(200, 0, 0));
     }
   }
 
@@ -158,6 +198,10 @@ public class SearchableTextField extends JPanel {
 
   private void onTextChanged() {
     updateCurrentIcon();
+    updateIndicator();
+    if (textChangeCallback != null) {
+      textChangeCallback.run();
+    }
     String query = textField.getText();
     int gen = commitGeneration;
     SwingUtilities.invokeLater(
