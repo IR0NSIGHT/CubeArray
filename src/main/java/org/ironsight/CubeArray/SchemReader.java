@@ -29,6 +29,14 @@ public class SchemReader {
 
   private static final Logger logger = AppLogger.get(SchemReader.class);
 
+  // synthetic material property used to distinguish the fence post from its per-direction
+  // arm bars, all of which come from the same schematic block; see addFenceArmInstances
+  private static final String FENCE_ARM_PROPERTY = "cubearray_fence_arm";
+
+  private static boolean isFence(Material mat) {
+    return mat.name.contains("fence") && !mat.name.contains("gate");
+  }
+
   // TEST
   public static void main(String[] args) {
     Material mat = Material.COBBLESTONE_STAIRS;
@@ -157,6 +165,19 @@ public class SchemReader {
                         x + offset.x + gridOffset.x, z + offset.z, y + offset.y + gridOffset.y));
                 blockTypeIndicesList.add(materialPaletteIdx);
               }
+
+              if (isFence(mat)) {
+                maxColorIdx =
+                    addFenceArmInstances(
+                        mat,
+                        x + offset.x + gridOffset.x,
+                        z + offset.z,
+                        y + offset.y + gridOffset.y,
+                        positions,
+                        blockTypeIndicesList,
+                        mat_to_palette_idx,
+                        maxColorIdx);
+              }
             }
           }
         }
@@ -227,11 +248,32 @@ public class SchemReader {
         offsetPalette[matIdx] = new Vector3f(0, -sizePalette[matIdx].y / 2f, 0);
       }
 
-      if (mat.name.contains("fence")) {
-        boolean facing = (mat.is(WEST) || mat.is(NORTH) || mat.is(EAST) || mat.is(SOUTH));
-        if (!facing) {
-          sizePalette[matIdx] = new Vector3f((1 / 4f), 1f, (1 / 4f));
-        }
+      // fence post, from the pixel perfection "fence_post" model: from [6,0,6] to [10,16,10]
+      if (isFence(mat)) {
+        sizePalette[matIdx] = new Vector3f(0.25f, 1f, 0.25f);
+        offsetPalette[matIdx] = new Vector3f(0, 0, 0);
+      }
+
+      // synthetic fence arm instance (see addFenceArmInstances below), geometry taken from the
+      // pixel perfection "fence_side" model: top bar from [7,12,0] to [9,15,9],
+      // lower bar from [7,6,0] to [9,9,9], both rotated to face the connected direction
+      String fenceArm = mat.getProperty(FENCE_ARM_PROPERTY);
+      if (fenceArm != null) {
+        boolean topBar = fenceArm.endsWith("_top");
+        String direction = fenceArm.substring(0, fenceArm.indexOf('_'));
+        float rotationDeg =
+            switch (direction) {
+              case "north" -> 0f;
+              case "east" -> 90f;
+              case "south" -> 180f;
+              case "west" -> 270f;
+              default -> throw new IllegalStateException("unknown fence arm direction: " + fenceArm);
+            };
+        sizePalette[matIdx] = new Vector3f(2 / 16f, 3 / 16f, 9 / 16f);
+        offsetPalette[matIdx] =
+            new Vector3f(0f, (topBar ? 13.5f : 7.5f) / 16f - 0.5f, 4.5f / 16f - 0.5f);
+        rotationPalette[matIdx] = new Vector3f(0, (float) Math.toRadians(rotationDeg), 0);
+        continue;
       }
 
       if (mat.name.contains("banner")) {
@@ -380,6 +422,49 @@ public class SchemReader {
         min,
         max,
         name);
+  }
+
+  /**
+   * A fence block's post is emitted like any other block. This additionally emits one instance
+   * per top/bottom arm bar for every side the fence connects to (per the "north"/"east"/"south"/
+   * "west" blockstate properties), each tagged with a synthetic {@link #FENCE_ARM_PROPERTY} so
+   * the geometry loop above can give it its own size/offset/rotation independent of the post.
+   */
+  private static int addFenceArmInstances(
+      Material fenceMat,
+      float px,
+      float py,
+      float pz,
+      List<Vector3f> positions,
+      List<Integer> blockTypeIndicesList,
+      HashMap<Material, Integer> mat_to_palette_idx,
+      int maxColorIdx) {
+    String[] directions = {"north", "east", "south", "west"};
+    for (String direction : directions) {
+      boolean connected =
+          switch (direction) {
+            case "north" -> fenceMat.is(NORTH);
+            case "east" -> fenceMat.is(EAST);
+            case "south" -> fenceMat.is(SOUTH);
+            case "west" -> fenceMat.is(WEST);
+            default -> false;
+          };
+      if (!connected) continue;
+
+      for (String bar : new String[] {"top", "bottom"}) {
+        Material armMat = fenceMat.withProperty(FENCE_ARM_PROPERTY, direction + "_" + bar);
+        int armIdx;
+        if (mat_to_palette_idx.containsKey(armMat)) {
+          armIdx = mat_to_palette_idx.get(armMat);
+        } else {
+          armIdx = maxColorIdx++;
+          mat_to_palette_idx.put(armMat, armIdx);
+        }
+        positions.add(new Vector3f(px, py, pz));
+        blockTypeIndicesList.add(armIdx);
+      }
+    }
+    return maxColorIdx;
   }
 
   public static List<Path> findAllFiles(Path dir) throws IOException {

@@ -54,8 +54,8 @@ public class Sponge2Schematic extends AbstractNBTItem {
 
   /**
    * @param x width
-   * @param y height
-   * @param z length
+   * @param y length
+   * @param z height
    * @param block
    */
   public void setBlockAt(int x, int y, int z, String block) {

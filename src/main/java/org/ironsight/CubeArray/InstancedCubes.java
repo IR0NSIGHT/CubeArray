@@ -611,12 +611,15 @@ public class InstancedCubes {
     glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, setup.positions.length);
     glBindVertexArray(0);
 
-    glfwSwapBuffers(window);
     glFinish();
 
+    // read pixels from the back buffer (the default read target) before swapping, otherwise
+    // glReadPixels would read the other, not-yet-drawn-to buffer and produce a blank image
     Path parent = outputPath.getParent();
     if (parent != null) Files.createDirectories(parent);
     renderer.saveScreenshot(outputPath);
+
+    glfwSwapBuffers(window);
 
     glDeleteVertexArrays(renderer.vao);
     glDeleteBuffers(renderer.vbo);
