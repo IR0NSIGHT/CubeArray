@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -19,7 +20,6 @@ import java.util.zip.ZipException;
 import javax.vecmath.Point3i;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
-import org.pepsoft.minecraft.Direction;
 import org.pepsoft.minecraft.Material;
 import org.pepsoft.util.mdc.MDCCapturingRuntimeException;
 import org.pepsoft.worldpainter.DefaultCustomObjectProvider;
@@ -29,12 +29,90 @@ public class SchemReader {
 
   private static final Logger logger = AppLogger.get(SchemReader.class);
 
-  // synthetic material property used to distinguish the fence post from its per-direction
-  // arm bars, all of which come from the same schematic block; see addFenceArmInstances
-  private static final String FENCE_ARM_PROPERTY = "cubearray_fence_arm";
+  // synthetic material property tagging which piece (one element of one blockstate-selected model
+  // placement) a render instance represents, since one schematic block can expand into several
+  // pieces (e.g. a fence post + arms, or a stair's slab + step) that each need their own
+  // size/offset/rotation palette entry; see addPieces and the palette loop in prepareData.
+  private static final String PIECE_PROPERTY = "cubearray_piece";
 
-  private static boolean isFence(Material mat) {
-    return mat.name.contains("fence") && !mat.name.contains("gate");
+  // bundled vanilla assets, parsed once by ensureAssetsLoaded(); see BlockModelParser /
+  // BlockStateParser and BlockModelFormat.md
+  private static Map<String, BlockModel> blockModels = Map.of();
+  private static Map<String, BlockStateParser.BlockState> blockStates = Map.of();
+  private static boolean assetsLoaded = false;
+
+  // cache of the render pieces a material expands into (deterministic per material)
+  private static final Map<Material, List<Piece>> pieceCache = new ConcurrentHashMap<>();
+
+  /** One renderable cuboid: a model element positioned by a blockstate placement's rotation. */
+  private record Piece(Vector3f size, Vector3f offset, Vector3f rotation) {}
+
+  /**
+   * Parses the bundled vanilla block models and blockstates (see {@link BlockModelParser} and
+   * {@link BlockStateParser}), once. Called at the top of {@link #prepareData} so the first render
+   * (or icon render) triggers the parse; later calls are no-ops. Geometry AND orientation come
+   * entirely from these vanilla assets (see src/main/resources/vanilla_assets) - a texture pack
+   * only ships texture-stub models, so the real cuboids and the state->model mapping live in
+   * vanilla.
+   */
+  private static synchronized void ensureAssetsLoaded() {
+    if (assetsLoaded) return;
+    assetsLoaded = true;
+    try {
+      ResourceUtils.copyResourcesToFile(ResourceUtils.VANILLA_ASSETS_RESOURCES);
+      Path root = ResourceUtils.getInstallPath().resolve(ResourceUtils.VANILLA_ASSETS_RESOURCES);
+      blockModels = BlockModelParser.parseAll(root);
+      blockStates = BlockStateParser.parseAll(root);
+      logger.info(
+          "parsed "
+              + blockModels.size()
+              + " vanilla block models and "
+              + blockStates.size()
+              + " blockstates");
+    } catch (IOException e) {
+      logger.log(
+          Level.WARNING, "failed to parse vanilla assets; blocks will render as default cubes", e);
+    }
+  }
+
+  /**
+   * Selects which model(s) + rotation to render for a material, from its blockstate (see {@link
+   * BlockStateParser}). Falls back to the conventional "block/&lt;name&gt;" model with no rotation
+   * when the block has no blockstate, or none of its variants matched.
+   */
+  private static List<BlockStateParser.ModelPlacement> selectPlacements(Material mat) {
+    BlockStateParser.BlockState state = blockStates.get(mat.namespace + ":" + mat.simpleName);
+    if (state != null) {
+      List<BlockStateParser.ModelPlacement> placements = state.select(key -> mat.getProperty(key));
+      if (!placements.isEmpty()) return placements;
+    }
+    return List.of(
+        new BlockStateParser.ModelPlacement(
+            mat.namespace + ":block/" + mat.simpleName, 0, 0, false));
+  }
+
+  /** Render pieces a material expands into: one per element of each selected model placement. */
+  private static List<Piece> piecesFor(Material mat) {
+    return pieceCache.computeIfAbsent(mat, SchemReader::computePieces);
+  }
+
+  private static List<Piece> computePieces(Material mat) {
+    List<Piece> pieces = new ArrayList<>();
+    for (BlockStateParser.ModelPlacement placement : selectPlacements(mat)) {
+      BlockModel model = blockModels.get(placement.model());
+      if (model == null) continue;
+      Vector3f rotation =
+          new Vector3f(
+              (float) Math.toRadians(placement.x()), (float) Math.toRadians(placement.y()), 0f);
+      for (SubBlock sub : model.subBlocks()) {
+        pieces.add(new Piece(sub.size(), sub.offset(), rotation));
+      }
+    }
+    if (pieces.isEmpty()) {
+      // no resolvable geometry (missing/empty model) -> render as a default full cube
+      pieces.add(new Piece(new Vector3f(1, 1, 1), new Vector3f(), new Vector3f()));
+    }
+    return pieces;
   }
 
   // TEST
@@ -68,6 +146,7 @@ public class SchemReader {
   }
 
   public static CubeSetup prepareData(List<WPObject> schematics) throws Exception {
+    ensureAssetsLoaded();
     if (schematics.isEmpty()) return null;
     final String name = schematics.size() == 1 ? schematics.get(0).getName() : "schematics";
     List<Vector3f> positions = new ArrayList<>();
@@ -118,65 +197,18 @@ public class SchemReader {
                   }
               if (!hasNonSolidNeighbour) continue;
 
-              positions.add(
+              Vector3f pos =
                   new Vector3f(
-                      x + offset.x + gridOffset.x, z + offset.z, y + offset.y + gridOffset.y));
-              int materialPaletteIdx = 0;
-              if (mat_to_palette_idx.containsKey(mat)) {
-                materialPaletteIdx = mat_to_palette_idx.get(mat);
-              } else {
-                materialPaletteIdx = maxColorIdx++;
-                mat_to_palette_idx.put(mat, materialPaletteIdx);
-              }
-              blockTypeIndicesList.add(materialPaletteIdx);
+                      x + offset.x + gridOffset.x, z + offset.z, y + offset.y + gridOffset.y);
 
-              if (mat.name.contains("stairs")) { // add a bottom slab
-
-                Material slab = Material.get(mat.name.replace("stairs", "slab"));
-                if (Objects.equals(mat.getProperty(HALF), "top")) {
-                  slab = slab.withProperty(TYPE, "top");
-                } else {
-                  slab = slab.withProperty(TYPE, "bottom");
-                }
-                if (mat_to_palette_idx.containsKey(slab)) {
-                  materialPaletteIdx = mat_to_palette_idx.get(slab);
-                } else {
-                  materialPaletteIdx = maxColorIdx++;
-                  mat_to_palette_idx.put(slab, materialPaletteIdx);
-                }
-
-                positions.add(
-                    new Vector3f(
-                        x + offset.x + gridOffset.x, z + offset.z, y + offset.y + gridOffset.y));
-                blockTypeIndicesList.add(materialPaletteIdx);
-              }
+              maxColorIdx =
+                  addPieces(
+                      mat, pos, positions, blockTypeIndicesList, mat_to_palette_idx, maxColorIdx);
 
               if (mat.is(WATERLOGGED) || mat.watery) {
-                Material water = WATER;
-                if (mat_to_palette_idx.containsKey(water)) {
-                  materialPaletteIdx = mat_to_palette_idx.get(water);
-                } else {
-                  materialPaletteIdx = maxColorIdx++;
-                  mat_to_palette_idx.put(water, materialPaletteIdx);
-                }
-
-                positions.add(
-                    new Vector3f(
-                        x + offset.x + gridOffset.x, z + offset.z, y + offset.y + gridOffset.y));
-                blockTypeIndicesList.add(materialPaletteIdx);
-              }
-
-              if (isFence(mat)) {
                 maxColorIdx =
-                    addFenceArmInstances(
-                        mat,
-                        x + offset.x + gridOffset.x,
-                        z + offset.z,
-                        y + offset.y + gridOffset.y,
-                        positions,
-                        blockTypeIndicesList,
-                        mat_to_palette_idx,
-                        maxColorIdx);
+                    addPieces(
+                        WATER, pos, positions, blockTypeIndicesList, mat_to_palette_idx, maxColorIdx);
               }
             }
           }
@@ -201,193 +233,23 @@ public class SchemReader {
     Arrays.fill(rotationPalette, new Vector3f(0, 0, 0));
 
     for (var entry : mat_to_palette_idx.entrySet()) {
-      Material mat = entry.getKey();
+      Material keyed = entry.getKey();
       int matIdx = entry.getValue();
 
-      // ADD color to palette
-      Color color = new Color(mat.colour);
+      // color from the material; the synthetic piece tag doesn't affect its colour
+      Color color = new Color(keyed.colour);
       colorPalette[matIdx] =
           new Vector3f(color.getRed() / 255f, color.getGreen() / 255f, color.getBlue() / 255f);
 
-      // ADD size and offset to palette
-      if (mat.name.contains("slab") && mat.hasProperty(TYPE)) {
-        if (Objects.equals(mat.getProperty(TYPE), "top")) {
-          offsetPalette[matIdx] = new Vector3f(0, 0.5f / 2, 0);
-          sizePalette[matIdx] = new Vector3f(1, 0.5f, 1);
-        } else if (Objects.equals(mat.getProperty(TYPE), "bottom")) {
-          offsetPalette[matIdx] = new Vector3f(0, -0.5f / 2f, 0);
-          sizePalette[matIdx] = new Vector3f(1, 0.5f, 1);
-        }
-
-      } else {
-        sizePalette[matIdx] = new Vector3f(1, 1, 1);
-      }
-
-      if (mat.name.contains("torch")) {
-        sizePalette[matIdx] = new Vector3f(0.1f, 0.5f, 0.1f);
-        offsetPalette[matIdx] = new Vector3f(0, 0.25f / 2f, 0);
-      }
-      if (mat.name.contains("lantern")) {
-        sizePalette[matIdx] = new Vector3f(0.4f, 0.7f, 0.4f);
-        offsetPalette[matIdx] = new Vector3f(0, 0.3f / 2f, 0);
-      }
-      if (mat.hasProperty(LEVEL)) {
-        int level = mat.getProperty(LEVEL, 0);
-        if (level == 8) level = 0; // falling water is a fully block
-        sizePalette[matIdx] = new Vector3f(1, 1 - (level / 8f), 1); // zero is full, 8 is empty
-        offsetPalette[matIdx] = new Vector3f(0, -(level / 8f) / 2f, 0);
-      }
-      if (mat.name.contains("water")) {
-        offsetPalette[matIdx].y -= .1f; // shift water down slighty
-        sizePalette[matIdx].x = 0.999f; // slightly less wide than 1x1 for waterlogged blocks
-        sizePalette[matIdx].z = 0.999f;
-      }
-
-      if (mat.name.contains("carpet")) {
-        sizePalette[matIdx] = new Vector3f(1, (1 / 16f), 1);
-        offsetPalette[matIdx] = new Vector3f(0, -sizePalette[matIdx].y / 2f, 0);
-      }
-
-      // fence post, from the pixel perfection "fence_post" model: from [6,0,6] to [10,16,10]
-      if (isFence(mat)) {
-        sizePalette[matIdx] = new Vector3f(0.25f, 1f, 0.25f);
-        offsetPalette[matIdx] = new Vector3f(0, 0, 0);
-      }
-
-      // synthetic fence arm instance (see addFenceArmInstances below), geometry taken from the
-      // pixel perfection "fence_side" model: top bar from [7,12,0] to [9,15,9],
-      // lower bar from [7,6,0] to [9,9,9], both rotated to face the connected direction
-      String fenceArm = mat.getProperty(FENCE_ARM_PROPERTY);
-      if (fenceArm != null) {
-        boolean topBar = fenceArm.endsWith("_top");
-        String direction = fenceArm.substring(0, fenceArm.indexOf('_'));
-        float rotationDeg =
-            switch (direction) {
-              case "north" -> 0f;
-              case "east" -> 90f;
-              case "south" -> 180f;
-              case "west" -> 270f;
-              default -> throw new IllegalStateException("unknown fence arm direction: " + fenceArm);
-            };
-        sizePalette[matIdx] = new Vector3f(2 / 16f, 3 / 16f, 9 / 16f);
-        offsetPalette[matIdx] =
-            new Vector3f(0f, (topBar ? 13.5f : 7.5f) / 16f - 0.5f, 4.5f / 16f - 0.5f);
-        rotationPalette[matIdx] = new Vector3f(0, (float) Math.toRadians(rotationDeg), 0);
-        continue;
-      }
-
-      if (mat.name.contains("banner")) {
-        Vector3f size = new Vector3f(.8f, 1.8f, .1f);
-        sizePalette[matIdx] = size;
-        offsetPalette[matIdx] = new Vector3f(0, -.5f, (1 - size.z) / 2f);
-        colorPalette[matIdx] = new Vector3f(1, 1, 1);
-      }
-      if (mat.name.endsWith("_door")) {
-        Vector3f size = new Vector3f(1f, 1f, .2f);
-        sizePalette[matIdx] = size;
-        offsetPalette[matIdx] = new Vector3f(0, 0, (1 - size.z) / 2f);
-      }
-
-      if (mat.name.contains("ladder")) {
-        Vector3f size = new Vector3f(1f, 1f, .01f);
-        sizePalette[matIdx] = size;
-        offsetPalette[matIdx] = new Vector3f(0, 0, (1 - size.z) / 2f);
-      }
-
-      if (mat.name.contains("stairs")) {
-        Vector3f size = new Vector3f(1, .5f, .5f);
-        sizePalette[matIdx] = size;
-        if (Objects.equals(mat.getProperty(HALF), "top")) {
-          offsetPalette[matIdx] =
-              new Vector3f(0, -(1 - size.y) / 2f, -(1 - size.z) / 2f); // shift up on y
-        } else {
-          offsetPalette[matIdx] =
-              new Vector3f(0, (1 - size.y) / 2f, -(1 - size.z) / 2f); // shift down on y
-        }
-      }
-
-      if (mat.name.contains("_grass") || mat.vegetation && !mat.leafBlock) {
-        sizePalette[matIdx] = new Vector3f(1, 1, 0.0f);
-        rotationPalette[matIdx] = new Vector3f(0, (float) Math.toRadians(45), 0);
-      }
-
-      // implicit: no rotation for north
-      if (Direction.EAST.equals(mat.getDirection()) || mat.is(EAST)) {
-        rotationPalette[matIdx] = new Vector3f(0, (float) Math.toRadians(90), 0);
-      }
-      if (Direction.SOUTH.equals(mat.getDirection()) || mat.is(SOUTH)) {
-        rotationPalette[matIdx] = new Vector3f(0, (float) Math.toRadians(180), 0);
-      }
-      if (Direction.WEST.equals(mat.getDirection()) || mat.is(WEST)) {
-        rotationPalette[matIdx] = new Vector3f(0, (float) Math.toRadians(270), 0);
-      }
-
-      if (mat.name.endsWith("_wall")) {
-        Vector3f size = new Vector3f(0.5f, 1, 0.5f);
-        Vector3f offset = new Vector3f(0, 0, 0);
-        Vector3f rotation = new Vector3f(0, 0, 0);
-
-        boolean north = !Objects.equals(mat.getProperty("north"), "none");
-        boolean south = !Objects.equals(mat.getProperty("south"), "none");
-
-        boolean east = !Objects.equals(mat.getProperty("east"), "none");
-        boolean west = !Objects.equals(mat.getProperty("west"), "none");
-
-        if (east) {
-          size.x += .25f;
-          offset.x += .125f;
-        }
-        if (west) {
-          size.x += .25f;
-          offset.x -= .125f;
-        }
-        if (south) {
-          size.z += .25f;
-          offset.z += .125f;
-        }
-        if (north) {
-          size.z += .25f;
-          offset.z -= .125f;
-        }
-
-        if (!(north || south || east || west)) {
-          size = new Vector3f(0.5f, .7f, 0.5f);
-        }
-        if (mat.is(UP)) size.y = 1;
-
-        offset.y = -(1 - size.y) / 2f;
-
-        sizePalette[matIdx] = size;
-        offsetPalette[matIdx] = offset;
-        rotationPalette[matIdx] = rotation;
-      }
-      if (mat.name.endsWith("_trapdoor")) {
-        Vector3f size = new Vector3f(1f, 1f, .2f); // open to north
-        Vector3f offset = new Vector3f(0, 0, .4f);
-        Vector3f rotation = new Vector3f(0, 0, 0);
-
-        if (!Objects.equals(mat.getProperty("open"), "true")) {
-          size = new Vector3f(1f, .2f, 1f);
-          offset.z = 0;
-          if (Objects.equals(mat.getProperty(HALF), "top")) {
-            offset.y = 0.4f;
-          } else {
-            offset.y = -.4f;
-          }
-        } else if (mat.getProperty(FACING) == Direction.SOUTH) {
-          rotation.y = (float) Math.toRadians(180);
-        } else if (mat.getProperty(FACING) == Direction.NORTH) {
-          rotation.y = (float) Math.toRadians(0);
-        } else if (mat.getProperty(FACING) == Direction.EAST) {
-          rotation.y = (float) Math.toRadians(90);
-        } else if (mat.getProperty(FACING) == Direction.WEST) {
-          rotation.y = (float) Math.toRadians(270);
-        }
-
-        sizePalette[matIdx] = size;
-        offsetPalette[matIdx] = offset;
-        rotationPalette[matIdx] = rotation;
-      }
+      // size/offset/rotation come entirely from the material's selected render piece
+      // (blockstate -> model placement -> element); see computePieces
+      String pieceTag = keyed.getProperty(PIECE_PROPERTY);
+      int pieceIdx = pieceTag != null ? Integer.parseInt(pieceTag) : 0;
+      List<Piece> pieces = piecesFor(keyed);
+      Piece piece = pieces.get(Math.min(pieceIdx, pieces.size() - 1));
+      sizePalette[matIdx] = piece.size();
+      offsetPalette[matIdx] = piece.offset();
+      rotationPalette[matIdx] = piece.rotation();
     }
 
     SpriteSheet spriteSheet =
@@ -425,44 +287,48 @@ public class SchemReader {
   }
 
   /**
-   * A fence block's post is emitted like any other block. This additionally emits one instance
-   * per top/bottom arm bar for every side the fence connects to (per the "north"/"east"/"south"/
-   * "west" blockstate properties), each tagged with a synthetic {@link #FENCE_ARM_PROPERTY} so
-   * the geometry loop above can give it its own size/offset/rotation independent of the post.
+   * Adds one render instance for {@code mat} at {@code pos} to the given palette-index-keyed
+   * material, creating a new palette entry if needed.
    */
-  private static int addFenceArmInstances(
-      Material fenceMat,
-      float px,
-      float py,
-      float pz,
+  private static int addInstance(
+      Material mat,
+      Vector3f pos,
       List<Vector3f> positions,
       List<Integer> blockTypeIndicesList,
       HashMap<Material, Integer> mat_to_palette_idx,
       int maxColorIdx) {
-    String[] directions = {"north", "east", "south", "west"};
-    for (String direction : directions) {
-      boolean connected =
-          switch (direction) {
-            case "north" -> fenceMat.is(NORTH);
-            case "east" -> fenceMat.is(EAST);
-            case "south" -> fenceMat.is(SOUTH);
-            case "west" -> fenceMat.is(WEST);
-            default -> false;
-          };
-      if (!connected) continue;
+    int idx;
+    if (mat_to_palette_idx.containsKey(mat)) {
+      idx = mat_to_palette_idx.get(mat);
+    } else {
+      idx = maxColorIdx++;
+      mat_to_palette_idx.put(mat, idx);
+    }
+    positions.add(pos);
+    blockTypeIndicesList.add(idx);
+    return maxColorIdx;
+  }
 
-      for (String bar : new String[] {"top", "bottom"}) {
-        Material armMat = fenceMat.withProperty(FENCE_ARM_PROPERTY, direction + "_" + bar);
-        int armIdx;
-        if (mat_to_palette_idx.containsKey(armMat)) {
-          armIdx = mat_to_palette_idx.get(armMat);
-        } else {
-          armIdx = maxColorIdx++;
-          mat_to_palette_idx.put(armMat, armIdx);
-        }
-        positions.add(new Vector3f(px, py, pz));
-        blockTypeIndicesList.add(armIdx);
-      }
+  /**
+   * Emits one render instance per {@link Piece} the material expands into (see {@link
+   * #piecesFor}). A single-piece material is emitted untagged, so identical blocks dedup to one
+   * palette entry and textures resolve by simple name; a multi-piece material tags each instance
+   * with its piece index via {@link #PIECE_PROPERTY} so the palette loop can give each piece its
+   * own size/offset/rotation.
+   */
+  private static int addPieces(
+      Material mat,
+      Vector3f pos,
+      List<Vector3f> positions,
+      List<Integer> blockTypeIndicesList,
+      HashMap<Material, Integer> mat_to_palette_idx,
+      int maxColorIdx) {
+    List<Piece> pieces = piecesFor(mat);
+    boolean single = pieces.size() == 1;
+    for (int i = 0; i < pieces.size(); i++) {
+      Material keyed = single ? mat : mat.withProperty(PIECE_PROPERTY, String.valueOf(i));
+      maxColorIdx =
+          addInstance(keyed, pos, positions, blockTypeIndicesList, mat_to_palette_idx, maxColorIdx);
     }
     return maxColorIdx;
   }

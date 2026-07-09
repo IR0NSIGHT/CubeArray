@@ -28,6 +28,9 @@ public class ResourceUtils {
       SUPPORTED_FILE_TYPES.stream().map(s -> s.replace(".", "")).collect(Collectors.toSet());
   public static String TEXTURE_RESOURCES = "textures/";
   public static String TEXTURE_PACK_ROOT = "textures/Faithful_32x_1_21_7/";
+  // bundled complete vanilla asset layer (models + blockstates); see
+  // src/main/resources/vanilla_assets/README.md
+  public static String VANILLA_ASSETS_RESOURCES = "vanilla_assets/";
   public static String SCHEMATICS_ROOT = "schematics/", SCHEMATIC_RESOURCES = "schematics/";
 
   public static final Predicate<? super Path> isSupportedSchematicType =
