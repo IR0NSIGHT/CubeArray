@@ -86,7 +86,10 @@ public class VertexShaderSource {
 
 
              vec3 scaledVertex = aPos * blockSize + blockOffset;
-             vec3 rotatedPosition =  rotationY(blockRotation.y) * scaledVertex;
+             // blockstate rotation around the block centre: Minecraft rotates by x (around the
+             // X axis) then y (around the Y axis), so compose as Ry * Rx
+             vec3 rotatedPosition =
+                 rotationY(blockRotation.y) * rotationX(blockRotation.x) * scaledVertex;
              vec3 worldPos     = rotatedPosition + aInstancePos;
 
              // Outputs
