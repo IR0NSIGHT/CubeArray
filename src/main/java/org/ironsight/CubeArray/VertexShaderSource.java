@@ -8,8 +8,11 @@ public class VertexShaderSource {
             // Per-vertex cube geometry
             layout(location = 0) in vec3 aPos;
 
-            // Per-instance attributes
+            // Per-vertex attributes
             layout(location = 1) in vec2 vertexUV;
+            layout(location = 4) in float aFaceId; // which of the 6 cube faces this vertex belongs to
+
+            // Per-instance attributes
             layout(location = 2) in vec3 aInstancePos;
             layout(location = 3) in int  aInstanceColorIndex;
 
@@ -25,6 +28,7 @@ public class VertexShaderSource {
             uniform sampler2D rotationPaletteTex;
             uniform sampler2D uvPaletteTex;
             uniform int paletteSize; // total number of entries
+            uniform float atlasSize; // block texture atlas width/height in pixels
 
             // Pass to fragment shader
             out vec3 vColor;
@@ -81,7 +85,9 @@ public class VertexShaderSource {
              vec3 blockSize  = texture(sizePaletteTex,  vec2(texCoord, 0.5)).rgb;
              vec3 blockOffset = texture(offsetPaletteTex,  vec2(texCoord, 0.5)).rgb;
              vec3 blockRotation = texture(rotationPaletteTex,  vec2(texCoord, 0.5)).rgb;
-             vec4 uvCoords =  texture(uvPaletteTex, vec2(texCoord, 0.5)).rgba;
+             // uv palette is 2D: column = block type, row = face. Pick this vertex's face row.
+             float faceCoord = (aFaceId + 0.5) / 6.0;
+             vec4 uvCoords =  texture(uvPaletteTex, vec2(texCoord, faceCoord)).rgba;
              // Scale + translate block vertex into world space
 
 
@@ -99,9 +105,10 @@ public class VertexShaderSource {
 
              vec2 uvStart = uvCoords.rg;
              vec2 uvEnd = uvCoords.ba;
-             if (uvCoords != vec4(0,0,0,0)) { // make the texture square slightly smaller, so the edges dont flicker in the render. skip for 0,0,0,0 uvs which have no texture
-                uvStart = uvCoords.rg + 0.001;
-                uvEnd = uvCoords.ba - 0.001;
+             if (uvCoords != vec4(0,0,0,0)) { // inset by half a texel so edges dont flicker/bleed; scales with atlas size so small crops (e.g. a torch strip) survive. skip 0,0,0,0 uvs which have no texture
+                float halfTexel = 0.5 / atlasSize;
+                uvStart = uvCoords.rg + halfTexel;
+                uvEnd = uvCoords.ba - halfTexel;
              }
 
              UV = (vertexUV * (uvEnd - uvStart)) + uvStart;

@@ -20,6 +20,7 @@ import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import javax.imageio.ImageIO;
 import org.joml.Matrix4f;
@@ -139,7 +140,9 @@ public class InstancedCubes {
       Vector3f[] sizePalette = new Vector3f[] {new Vector3f(1, 1, 1), new Vector3f(1, 1, 1)};
       Vector3f[] offSetPalette = new Vector3f[] {new Vector3f(0, 0, 0), new Vector3f(0, 0, 0)};
       Vector3f[] rotationPalette = new Vector3f[] {new Vector3f(0, 0, 0), new Vector3f(0, 0, 0)};
-      Vector4f[] uvPalette = new Vector4f[] {new Vector4f(0, 0, 0, 0), new Vector4f(0, 0, 0, 0)};
+      // uv palette is 2D (block type x 6 faces); untextured -> all zero (flat colour)
+      Vector4f[] uvPalette = new Vector4f[offSetPalette.length * Face.values().length];
+      Arrays.fill(uvPalette, new Vector4f(0, 0, 0, 0));
       setup =
           new SchemReader.CubeSetup(
               positions,
@@ -717,43 +720,52 @@ public class InstancedCubes {
 
   private void setupBuffers() throws IOException {
     // --- Cube geometry ---
-    final float uv_d = 0.5f;
-    final float uv_u = 1.5f;
-    final float uv_l = 0.5f;
-    final float uv_r = 1.5f;
+    // 6 floats per vertex: x, y, z, u, v, faceId. Each face carries its own [0,1] UV rect and a
+    // faceId matching the Face enum ordinal (NORTH 0, SOUTH 1, EAST 2, WEST 3, UP 4, DOWN 5); the
+    // vertex shader uses faceId to look up that face's atlas rect in the per-face uv palette, so
+    // every face can sample a different sprite. Local axes follow Minecraft: -X west, +X east,
+    // -Y down, +Y up, -Z north, +Z south.
+    final int UP = Face.UP.ordinal();
+    final int DOWN = Face.DOWN.ordinal();
+    final int NORTH = Face.NORTH.ordinal();
+    final int SOUTH = Face.SOUTH.ordinal();
+    final int EAST = Face.EAST.ordinal();
+    final int WEST = Face.WEST.ordinal();
     float[] cubeVertices = {
-      // top and bottom have uv shifted one to the right, bc they use a special texture _top
-      0, 1, 0, uv_d + 1, uv_l,
-      1, 1, 0, uv_d + 1, uv_r,
-      1, 1, 1, uv_u + 1, uv_r,
-      0, 1, 1, uv_u + 1, uv_l, // BOTTOM QUAD
-      0, 0, 0, uv_d + 1, uv_l,
-      1, 0, 0, uv_d + 1, uv_r,
-      1, 0, 1, uv_u + 1, uv_r,
-      0, 0, 1, uv_u + 1, uv_l, // TOP QUAD
+      // +Y (UP) and -Y (DOWN) horizontal faces
+      0, 1, 0, 0, 0, UP,
+      1, 1, 0, 0, 1, UP,
+      1, 1, 1, 1, 1, UP,
+      0, 1, 1, 1, 0, UP,
+      0, 0, 0, 0, 0, DOWN,
+      1, 0, 0, 0, 1, DOWN,
+      1, 0, 1, 1, 1, DOWN,
+      0, 0, 1, 1, 0, DOWN,
 
-      // FRONT + BACK QUAD
-      0, 1, 0, uv_u, uv_l, //  0
-      1, 1, 0, uv_d, uv_l, //  1
-      1, 1, 1, uv_u, uv_l, //  2
-      0, 1, 1, uv_d, uv_l, //  3
-      0, 0, 0, uv_u, uv_r, //  4
-      1, 0, 0, uv_d, uv_r, //  5
-      1, 0, 1, uv_u, uv_r, //  6
-      0, 0, 1, uv_d, uv_r, //  7
+      // -Z (NORTH) and +Z (SOUTH) faces
+      0, 1, 0, 1, 0, NORTH, //  8
+      1, 1, 0, 0, 0, NORTH, //  9
+      1, 1, 1, 1, 0, SOUTH, // 10
+      0, 1, 1, 0, 0, SOUTH, // 11
+      0, 0, 0, 1, 1, NORTH, // 12
+      1, 0, 0, 0, 1, NORTH, // 13
+      1, 0, 1, 1, 1, SOUTH, // 14
+      0, 0, 1, 0, 1, SOUTH, // 15
 
-      // LEFT 0 4 7 3  RIGHT 2 6 5 1
-      0, 1, 0, uv_d, uv_l, //  0
-      1, 1, 0, uv_u, uv_l, //  1
-      1, 1, 1, uv_d, uv_l, //  2
-      0, 1, 1, uv_u, uv_l, //  3
-      0, 0, 0, uv_d, uv_r, //  4
-      1, 0, 0, uv_u, uv_r, //  5
-      1, 0, 1, uv_d, uv_r, //  6
-      0, 0, 1, uv_u, uv_r, //  7
+      // -X (WEST) and +X (EAST) faces
+      0, 1, 0, 0, 0, WEST, // 16
+      1, 1, 0, 1, 0, EAST, // 17
+      1, 1, 1, 0, 0, EAST, // 18
+      0, 1, 1, 1, 0, WEST, // 19
+      0, 0, 0, 0, 1, WEST, // 20
+      1, 0, 0, 1, 1, EAST, // 21
+      1, 0, 1, 0, 1, EAST, // 22
+      0, 0, 1, 1, 1, WEST, // 23
     };
+    final int floatsPerVertex = 6;
+    // centre the cube on the origin - only shift the xyz position components, not uv/faceId
     for (int i = 0; i < cubeVertices.length; i++) {
-      cubeVertices[i] -= 0.5f;
+      if (i % floatsPerVertex < 3) cubeVertices[i] -= 0.5f;
     }
 
     int[] cubeIndices = {
@@ -782,11 +794,16 @@ public class InstancedCubes {
     final int attribIndexUVPOS = 1;
     final int attribIndexINSTANCEPOS = 2;
     final int attribIndexCOLORINDEX = 3;
-    glVertexAttribPointer(attribIndexVERTEXPOS, 3, GL_FLOAT, false, 5 * Float.BYTES, 0);
+    final int attribIndexFACEID = 4;
+    final int stride = floatsPerVertex * Float.BYTES;
+    glVertexAttribPointer(attribIndexVERTEXPOS, 3, GL_FLOAT, false, stride, 0);
     glEnableVertexAttribArray(attribIndexVERTEXPOS);
 
-    glVertexAttribPointer(attribIndexUVPOS, 2, GL_FLOAT, false, 5 * Float.BYTES, 3 * Float.BYTES);
+    glVertexAttribPointer(attribIndexUVPOS, 2, GL_FLOAT, false, stride, 3 * Float.BYTES);
     glEnableVertexAttribArray(attribIndexUVPOS);
+
+    glVertexAttribPointer(attribIndexFACEID, 1, GL_FLOAT, false, stride, 5 * Float.BYTES);
+    glEnableVertexAttribArray(attribIndexFACEID);
 
     // --- Instance positions ---
     FloatBuffer instancePositionsFlat = BufferUtils.createFloatBuffer(setup.positions.length * 3);
@@ -834,9 +851,15 @@ public class InstancedCubes {
     int rotationPaletteTexID =
         GlUtils.bind1DTexturePalette(
             setup.rotationPalette, "rotationPaletteTex", GL_TEXTURE3, shaderProgram);
+    // uv palette is 2D: one column per block type, one row per face (see CubeSetup.uvCoordsPalette)
     int uvPaletteTexId =
-        GlUtils.bind1DTexturePalette(
-            setup.uvCoordsPalette, "uvPaletteTex", GL_TEXTURE4, shaderProgram);
+        GlUtils.bind2DTexturePalette(
+            setup.uvCoordsPalette,
+            setup.offsetPalette.length,
+            Face.values().length,
+            "uvPaletteTex",
+            GL_TEXTURE4,
+            shaderProgram);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, colorPaletteTexID);
@@ -880,6 +903,9 @@ public class InstancedCubes {
     // -------------
     int paletteSizeLoc = glGetUniformLocation(shaderProgram, "paletteSize");
     glUniform1i(paletteSizeLoc, setup.offsetPalette.length);
+
+    int atlasSizeLoc = glGetUniformLocation(shaderProgram, "atlasSize");
+    glUniform1f(atlasSizeLoc, setup.textureAtlas.getWidth());
 
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);

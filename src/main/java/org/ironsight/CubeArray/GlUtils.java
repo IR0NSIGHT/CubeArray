@@ -40,6 +40,38 @@ public class GlUtils {
     return colorPaletteTexID;
   }
 
+  /**
+   * Uploads a {@code width x height} RGBA32F palette. Used for the per-face uv palette, laid out
+   * with one column per block type (material index) and one row per {@link Face} (height 6), so the
+   * vertex shader can look a face's atlas rect up at {@code (typeTexCoord, (faceId+0.5)/6)}.
+   * {@code inputData} is row-major: {@code inputData[faceId * width + typeIndex]}.
+   */
+  public static int bind2DTexturePalette(
+      Vector4f[] inputData,
+      int width,
+      int height,
+      String textureName,
+      int textureId,
+      int shaderProgram) {
+    int paletteTexID = glGenTextures();
+    glBindTexture(GL_TEXTURE_2D, paletteTexID);
+    {
+      FloatBuffer buffer = BufferUtils.createFloatBuffer(inputData.length * 4);
+      for (Vector4f c : inputData) buffer.put(c.x).put(c.y).put(c.z).put(c.w);
+      buffer.flip();
+
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, buffer);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    }
+    int loc = glGetUniformLocation(shaderProgram, textureName);
+    glUniform1i(loc, textureId - GL_TEXTURE0);
+
+    return paletteTexID;
+  }
+
   public static int bind1DTexturePalette(
       Vector3f[] inputData, String textureName, int textureId, int shaderProgram) {
     // --- Color palette ---

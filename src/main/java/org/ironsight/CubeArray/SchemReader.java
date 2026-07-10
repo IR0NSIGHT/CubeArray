@@ -44,8 +44,12 @@ public class SchemReader {
   // cache of the render pieces a material expands into (deterministic per material)
   private static final Map<Material, List<Piece>> pieceCache = new ConcurrentHashMap<>();
 
-  /** One renderable cuboid: a model element positioned by a blockstate placement's rotation. */
-  private record Piece(Vector3f size, Vector3f offset, Vector3f rotation) {}
+  /**
+   * One renderable cuboid: a model element positioned by a blockstate placement's rotation, plus
+   * the per-face textures ({@link SubBlock#faces()}) so each cube face can sample its own sprite.
+   */
+  private record Piece(
+      Vector3f size, Vector3f offset, Vector3f rotation, Map<Face, FaceTexture> faces) {}
 
   /**
    * Parses the bundled vanilla block models and blockstates (see {@link BlockModelParser} and
@@ -111,14 +115,35 @@ public class SchemReader {
         // its rescale factor - together these reproduce e.g. block/cross's 45deg X for grass
         Vector3f rotation = new Vector3f(blockRotation).add(sub.rotation());
         Vector3f size = sub.size().mul(sub.rescale());
-        pieces.add(new Piece(size, sub.offset(), rotation));
+        pieces.add(new Piece(size, sub.offset(), rotation, sub.faces()));
       }
     }
     if (pieces.isEmpty()) {
-      // no resolvable geometry (missing/empty model) -> render as a default full cube
-      pieces.add(new Piece(new Vector3f(1, 1, 1), new Vector3f(), new Vector3f()));
+      // no resolvable geometry (missing/empty model) -> render as a default full cube (flat colour)
+      pieces.add(new Piece(new Vector3f(1, 1, 1), new Vector3f(), new Vector3f(), Map.of()));
     }
     return pieces;
+  }
+
+  // model face "uv" is in 0..16 texel space regardless of the pack's texture resolution
+  private static final float MODEL_UV_SPAN = 16f;
+
+  /**
+   * Crops a sprite's full atlas cell {@code (u1,v1,u2,v2)} to the sub-rect a model face's {@code
+   * "uv"} selects. Model uv is 0..16 with a top-left origin, matching the atlas' UV space, so this
+   * is a straight linear remap into the cell. Small elements (torches, lanterns, fence arms) draw
+   * only a strip of their sprite and rely on this; a null uv or an untextured cell uses the whole
+   * cell.
+   */
+  private static Vector4f cropToFaceUv(Vector4f cell, Vector4f uv) {
+    if (uv == null || (cell.x == 0 && cell.y == 0 && cell.z == 0 && cell.w == 0)) return cell;
+    float cw = cell.z - cell.x;
+    float ch = cell.w - cell.y;
+    return new Vector4f(
+        cell.x + (uv.x / MODEL_UV_SPAN) * cw,
+        cell.y + (uv.y / MODEL_UV_SPAN) * ch,
+        cell.x + (uv.z / MODEL_UV_SPAN) * cw,
+        cell.y + (uv.w / MODEL_UV_SPAN) * ch);
   }
 
   // TEST
@@ -238,6 +263,11 @@ public class SchemReader {
     Vector3f[] rotationPalette = new Vector3f[mat_to_palette_idx.size()];
     Arrays.fill(rotationPalette, new Vector3f(0, 0, 0));
 
+    // the render piece each palette entry resolves to; reused below to build the per-face uv palette
+    Piece[] pieceByIdx = new Piece[mat_to_palette_idx.size()];
+    // per material, the sprite names its faces reference - the atlas allocates one cell per sprite
+    Map<Material, Set<String>> materialSprites = new HashMap<>();
+
     for (var entry : mat_to_palette_idx.entrySet()) {
       Material keyed = entry.getKey();
       int matIdx = entry.getValue();
@@ -247,21 +277,46 @@ public class SchemReader {
       colorPalette[matIdx] =
           new Vector3f(color.getRed() / 255f, color.getGreen() / 255f, color.getBlue() / 255f);
 
-      // size/offset/rotation come entirely from the material's selected render piece
+      // size/offset/rotation/faces come entirely from the material's selected render piece
       // (blockstate -> model placement -> element); see computePieces
       String pieceTag = keyed.getProperty(PIECE_PROPERTY);
       int pieceIdx = pieceTag != null ? Integer.parseInt(pieceTag) : 0;
       List<Piece> pieces = piecesFor(keyed);
       Piece piece = pieces.get(Math.min(pieceIdx, pieces.size() - 1));
+      pieceByIdx[matIdx] = piece;
       sizePalette[matIdx] = piece.size();
       offsetPalette[matIdx] = piece.offset();
       rotationPalette[matIdx] = piece.rotation();
+
+      Set<String> sprites = new HashSet<>();
+      for (FaceTexture face : piece.faces().values()) {
+        if (face.texture() != null) sprites.add(face.texture());
+      }
+      materialSprites.put(keyed, sprites);
     }
 
     SpriteSheet spriteSheet =
         new SpriteSheet(
             ResourceUtils.getInstallPath().resolve(ResourceUtils.TEXTURE_PACK_ROOT).toFile(),
-            mat_to_palette_idx.keySet());
+            materialSprites);
+
+    // per-face uv palette, laid out for the shader's 2D lookup: row per face (Face ordinal), column
+    // per block type -> uvCoordsPalette[face.ordinal() * numTypes + matIdx]. A face with no texture
+    // stays (0,0,0,0), which the fragment shader renders as flat block colour.
+    int numTypes = mat_to_palette_idx.size();
+    Vector4f[] uvCoordsPalette = new Vector4f[numTypes * Face.values().length];
+    Arrays.fill(uvCoordsPalette, new Vector4f(0, 0, 0, 0));
+    for (var entry : mat_to_palette_idx.entrySet()) {
+      Material keyed = entry.getKey();
+      int matIdx = entry.getValue();
+      for (Map.Entry<Face, FaceTexture> faceEntry : pieceByIdx[matIdx].faces().entrySet()) {
+        FaceTexture face = faceEntry.getValue();
+        if (face.texture() == null) continue;
+        Vector4f cell = spriteSheet.uvFor(keyed, face.texture());
+        uvCoordsPalette[faceEntry.getKey().ordinal() * numTypes + matIdx] =
+            cropToFaceUv(cell, face.uv());
+      }
+    }
 
     int[] blockTypeIndices = blockTypeIndicesList.stream().mapToInt(i -> i).toArray();
 
@@ -285,7 +340,7 @@ public class SchemReader {
         sizePalette,
         offsetPalette,
         rotationPalette,
-        spriteSheet.getUvCoords(mat_to_palette_idx),
+        uvCoordsPalette,
         spriteSheet.getTextureAtlas(),
         min,
         max,
@@ -358,7 +413,9 @@ public class SchemReader {
     // how to shift blocks from their origin at 0.5 0.5 0.5 (width height depth)
     final Vector3f[] offsetPalette;
     final Vector3f[] rotationPalette;
-    final Vector4f[] uvCoordsPalette; // uv1 uv2 for each block type
+    // atlas rect (u1,v1,u2,v2) per (face, block type), row-major by Face ordinal:
+    // uvCoordsPalette[face.ordinal() * colorPalette.length + typeIdx]; uploaded as a 2D palette
+    final Vector4f[] uvCoordsPalette;
     final BufferedImage textureAtlas;
     final Vector3f min;
     final Vector3f max;

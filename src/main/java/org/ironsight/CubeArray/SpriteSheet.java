@@ -7,6 +7,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
@@ -14,8 +15,19 @@ import javax.imageio.ImageIO;
 import org.joml.Vector4f;
 import org.pepsoft.minecraft.Material;
 
+/**
+ * Builds a texture atlas holding one 16x16 cell per distinct sprite that a material's model faces
+ * reference, and records each cell's atlas rect keyed by (material, sprite name). This lets the
+ * renderer texture every cube face independently: {@link FaceTexture#texture()} carries the
+ * resolved sprite name for a face (e.g. "block/oak_log_top"), and {@link #uvFor(Material, String)}
+ * maps that back to the atlas rect the shader samples.
+ *
+ * <p>Cells are keyed per material (not globally) so biome-tinted grayscale sprites (grass, leaves)
+ * can be colourised with that material's colour; see {@link #colorizeLeaf}.
+ */
 public class SpriteSheet {
   private static final Logger logger = AppLogger.get(SpriteSheet.class);
+  private static final Vector4f NO_TEXTURE = new Vector4f(0, 0, 0, 0);
   private static final String[] EXTENSIONS = {
     "",
     "s",
@@ -31,15 +43,21 @@ public class SpriteSheet {
   }; // Try adding these
   private static final String[] PREFIXES = {"", "infested_", "smooth_"}; // Try removing these
   private final BufferedImage textureAtlas;
-  private final HashMap<Material, Vector4f> uvCoords;
+  // (material -> (resolved sprite name -> atlas rect)); one cell per distinct sprite per material
+  private final Map<Material, Map<String, Vector4f>> rects;
 
-  public SpriteSheet(File texturePackDir, Set<Material> materialSet) throws IOException {
+  /**
+   * @param materialSprites for each render material, the set of resolved sprite names its faces
+   *     reference (from {@link FaceTexture#texture()}); a material with no textured faces maps to an
+   *     empty set and simply gets no atlas cells.
+   */
+  public SpriteSheet(File texturePackDir, Map<Material, Set<String>> materialSprites)
+      throws IOException {
     assert texturePackDir != null && texturePackDir.exists() && texturePackDir.isDirectory();
     var nameToFile = nameToFile(texturePackDir);
-    HashMap<Material, File> matToFile = matToFile(nameToFile, materialSet);
     int textureSize = 16; // FIXME dont hardcode
-    uvCoords = new HashMap<>(materialSet.size());
-    textureAtlas = buildAtlas(matToFile, textureSize, uvCoords, nameToFile);
+    rects = new HashMap<>(materialSprites.size());
+    textureAtlas = buildAtlas(materialSprites, textureSize, nameToFile);
   }
 
   public HashMap<String, File> nameToFile(File texturePackDir) throws IOException {
@@ -71,74 +89,64 @@ public class SpriteSheet {
     return result;
   }
 
-  public HashMap<Material, File> matToFile(
-      HashMap<String, File> nameToFile, Set<Material> materialSet) {
-    HashMap<Material, File> outMap = new HashMap<>();
-    for (Material mat : materialSet) {
-      String name = mat.simpleName;
-      File textureFile = tryFindMatch(name, nameToFile);
-
-      if (textureFile != null) {
-        outMap.put(mat, textureFile);
-      } else {
-        logger.warning("CAN NOT LOCATE TEXTURE FOR: " + mat.simpleName);
-      }
-    }
-    return outMap;
+  /**
+   * Resolves a model sprite reference (e.g. "minecraft:block/oak_log_top" or "block/oak_log") to a
+   * texture file in the pack's block directory, falling back to the fuzzy name matching that used
+   * to key textures by material simple-name when no exact file exists.
+   */
+  private File spriteFile(String sprite, HashMap<String, File> nameToFile) {
+    String name = sprite;
+    int colon = name.indexOf(':');
+    if (colon >= 0) name = name.substring(colon + 1); // drop namespace
+    int slash = name.lastIndexOf('/');
+    if (slash >= 0) name = name.substring(slash + 1); // drop "block/" path prefix
+    File exact = nameToFile.get(name);
+    return exact != null ? exact : tryFindMatch(name, nameToFile);
   }
 
-  public BufferedImage buildAtlas(
-      HashMap<Material, File> matToFile,
-      int textureSize,
-      HashMap<Material, Vector4f> uvCoords,
-      HashMap<String, File> nameToFile)
+  private BufferedImage buildAtlas(
+      Map<Material, Set<String>> materialSprites, int textureSize, HashMap<String, File> nameToFile)
       throws IOException {
-    int numTextures = matToFile.size();
-    int gridSize = (int) Math.ceil(Math.sqrt(numTextures));
+    // one atlas cell per (material, sprite) pair
+    int numTextures = 0;
+    for (Set<String> sprites : materialSprites.values()) numTextures += sprites.size();
+    int gridSize = Math.max(1, (int) Math.ceil(Math.sqrt(numTextures)));
 
     int atlasSize = 1;
     while (atlasSize < gridSize * textureSize) {
       atlasSize *= 2; // round up to next power of two
     }
-    atlasSize *= 2; // 2 textures per type (one side, one top)
     BufferedImage atlas = new BufferedImage(atlasSize, atlasSize, BufferedImage.TYPE_INT_ARGB);
     Graphics2D g = atlas.createGraphics();
 
     int i = 0;
-    for (Map.Entry<Material, File> entry : matToFile.entrySet()) {
-      int x = (i % gridSize) * textureSize;
-      int y = (i / gridSize) * textureSize;
+    for (Map.Entry<Material, Set<String>> matEntry : materialSprites.entrySet()) {
+      Material mat = matEntry.getKey();
+      boolean tinted = mat.leafBlock || mat.vegetation || mat.name.contains("grass");
+      Map<String, Vector4f> matRects = new LinkedHashMap<>();
+      rects.put(mat, matRects);
 
-      { // draw side
-        BufferedImage tex = ImageIO.read(entry.getValue());
-        if (entry.getKey().leafBlock
-            || entry.getKey().vegetation
-            || entry.getKey().name.contains("grass")) {
-          tex = colorizeLeaf(tex, entry.getKey().colour);
+      for (String sprite : matEntry.getValue()) {
+        File file = spriteFile(sprite, nameToFile);
+        if (file == null) {
+          logger.warning("CAN NOT LOCATE TEXTURE FOR: " + sprite + " (" + mat.simpleName + ")");
+          matRects.put(sprite, NO_TEXTURE);
+          continue;
         }
+
+        int x = (i % gridSize) * textureSize;
+        int y = (i / gridSize) * textureSize;
+        BufferedImage tex = ImageIO.read(file);
+        if (tinted) tex = colorizeLeaf(tex, mat.colour);
         g.drawImage(tex, x, y, textureSize, textureSize, null);
+
+        float u1 = x / (float) atlasSize;
+        float v1 = y / (float) atlasSize;
+        float u2 = (x + textureSize) / (float) atlasSize;
+        float v2 = (y + textureSize) / (float) atlasSize;
+        matRects.put(sprite, new Vector4f(u1, v1, u2, v2));
+        i++;
       }
-
-      File topMatFile =
-          nameToFile.getOrDefault(
-              entry.getValue().getName().replace(".png", "") + "_top", entry.getValue());
-      { // draw top
-        BufferedImage tex = ImageIO.read(topMatFile);
-        if (entry.getKey().leafBlock
-            || entry.getKey().vegetation
-            || entry.getKey().name.contains("grass")) {
-          tex = colorizeLeaf(tex, entry.getKey().colour);
-        }
-        g.drawImage(tex, x + textureSize, y, textureSize, textureSize, null);
-      }
-
-      float u1 = x / (float) atlasSize;
-      float v1 = y / (float) atlasSize;
-      float u2 = (x + textureSize) / (float) atlasSize;
-      float v2 = (y + textureSize) / (float) atlasSize;
-      uvCoords.put(entry.getKey(), new Vector4f(u1, v1, u2, v2));
-
-      i += 2;
     }
     g.dispose();
 
@@ -200,24 +208,15 @@ public class SpriteSheet {
   // TESTING
   public static void main(String[] args) throws IOException {
     File texturePackDir = new File("C:\\Users\\Max1M\\Downloads\\Faithful 32x - 1.21.7");
-    var spriteSheet = new SpriteSheet(texturePackDir, Set.of());
+    var spriteSheet = new SpriteSheet(texturePackDir, Map.of());
   }
 
   public BufferedImage getTextureAtlas() {
     return textureAtlas;
   }
 
-  public HashMap<Material, Vector4f> getUvCoords() {
-    return uvCoords;
-  }
-
-  public Vector4f[] getUvCoords(HashMap<Material, Integer> materialToId) {
-    Vector4f[] uvCoordList = new Vector4f[materialToId.size()];
-    for (var entry : materialToId.entrySet()) {
-      var uvCoord = uvCoords.getOrDefault(entry.getKey(), new Vector4f(0, 0, 0, 0));
-      assert uvCoord != null;
-      uvCoordList[entry.getValue()] = uvCoord;
-    }
-    return uvCoordList;
+  /** The atlas rect for a material's sprite, or (0,0,0,0) if it has no cell (renders flat colour). */
+  public Vector4f uvFor(Material mat, String sprite) {
+    return rects.getOrDefault(mat, Map.of()).getOrDefault(sprite, NO_TEXTURE);
   }
 }
