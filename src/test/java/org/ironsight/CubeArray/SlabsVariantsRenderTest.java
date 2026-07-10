@@ -6,7 +6,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import org.ironsight.schemEdit.BlockReplacer;
 import org.junit.Test;
+import pitheguy.schemconvert.converter.Schematic;
 
 /**
  * Builds a synthetic schematic containing every "type" variant of a slab block (bottom, top,
@@ -23,11 +25,13 @@ public class SlabsVariantsRenderTest {
     int spacing = 3;
     short width = (short) (1 + (TYPES.length - 1) * spacing + 2);
     short length = 3;
-    Sponge2Schematic schem = new Sponge2Schematic(width, (short) 1, length);
+    // SchemConvert axis order is (x=width, y=height, z=length); height is always 1 here, so cells
+    // are addressed as setBlockAt(widthIdx, 0, lengthIdx). dataVersion 1343 = MC 1.12.2.
+    Schematic.Builder schem = new Schematic.Builder(null, 1343, width, 1, length);
 
     for (int x = 0; x < width; x++) {
       for (int y = 0; y < length; y++) {
-        schem.setBlockAt(x, y, 0, "minecraft:air");
+        schem.setBlockAt(x, 0, y, "minecraft:air");
       }
     }
 
@@ -35,13 +39,13 @@ public class SlabsVariantsRenderTest {
     for (String type : TYPES) {
       String block = String.format("minecraft:oak_slab[type=%s,waterlogged=false]", type);
       int x = 1 + col * spacing;
-      schem.setBlockAt(x, 1, 0, block);
+      schem.setBlockAt(x, 0, 1, block);
       col++;
     }
 
     Files.createDirectories(SCHEMATIC_DIR);
     Path schemPath = SCHEMATIC_DIR.resolve("slabs_variants.schem");
-    schem.save(schemPath.toString());
+    BlockReplacer.write(schem.build(), schemPath.toFile());
     return schemPath;
   }
 

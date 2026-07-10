@@ -11,7 +11,9 @@ import java.util.Map;
 import java.util.function.Function;
 import org.ironsight.CubeArray.BlockStateParser.BlockState;
 import org.ironsight.CubeArray.BlockStateParser.ModelPlacement;
+import org.ironsight.schemEdit.BlockReplacer;
 import org.junit.Test;
+import pitheguy.schemconvert.converter.Schematic;
 
 /**
  * Builds a synthetic schematic containing every facing/half/shape combination of a stairs block,
@@ -61,11 +63,13 @@ public class StairsVariantsRenderTest {
     int numRows = FACINGS.length * HALVES.length;
     short width = (short) (1 + (numCols - 1) * spacing + 2);
     short length = (short) (1 + (numRows - 1) * spacing + 2);
-    Sponge2Schematic schem = new Sponge2Schematic(width, (short) 1, length);
+    // SchemConvert axis order is (x=width, y=height, z=length); height is always 1 here, so cells
+    // are addressed as setBlockAt(widthIdx, 0, lengthIdx). dataVersion 1343 = MC 1.12.2.
+    Schematic.Builder schem = new Schematic.Builder(null, 1343, width, 1, length);
 
     for (int x = 0; x < width; x++) {
       for (int y = 0; y < length; y++) {
-        schem.setBlockAt(x, y, 0, "minecraft:air");
+        schem.setBlockAt(x, 0, y, "minecraft:air");
       }
     }
 
@@ -80,10 +84,10 @@ public class StairsVariantsRenderTest {
                   facing, half, shape);
           int x = 1 + col * spacing;
           int y = 1 + row * spacing;
-          schem.setBlockAt(x, y, 0, block);
+          schem.setBlockAt(x, 0, y, block);
           // an axis-aligned reference cube next to each stair, so facing/half orientation is
           // verifiable against it
-          schem.setBlockAt(x, y + 1, 0, "minecraft:pink_wool");
+          schem.setBlockAt(x, 0, y + 1, "minecraft:pink_wool");
           col++;
         }
         row++;
@@ -92,7 +96,7 @@ public class StairsVariantsRenderTest {
 
     Files.createDirectories(SCHEMATIC_DIR);
     Path schemPath = SCHEMATIC_DIR.resolve("stairs_variants.schem");
-    schem.save(schemPath.toString());
+    BlockReplacer.write(schem.build(), schemPath.toFile());
     return schemPath;
   }
 

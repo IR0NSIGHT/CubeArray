@@ -6,7 +6,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import org.ironsight.schemEdit.BlockReplacer;
 import org.junit.Test;
+import pitheguy.schemconvert.converter.Schematic;
 
 /**
  * Builds a synthetic schematic containing all 16 north/east/south/west connection combinations of
@@ -22,11 +24,13 @@ public class FenceConnectionsRenderTest {
     // width (x) and length (y-param of setBlockAt) form the horizontal grid; height stays 1
     // (z-param of setBlockAt is always 0, the only valid height index).
     short size = 12;
-    Sponge2Schematic schem = new Sponge2Schematic(size, (short) 1, size);
+    // SchemConvert axis order is (x=width, y=height, z=length); height is always 1 here, so cells
+    // are addressed as setBlockAt(widthIdx, 0, lengthIdx). dataVersion 1343 = MC 1.12.2.
+    Schematic.Builder schem = new Schematic.Builder(null, 1343, size, 1, size);
 
     for (int x = 0; x < size; x++) {
       for (int lengthIdx = 0; lengthIdx < size; lengthIdx++) {
-        schem.setBlockAt(x, lengthIdx, 0, "minecraft:air");
+        schem.setBlockAt(x, 0, lengthIdx, "minecraft:air");
       }
     }
 
@@ -41,12 +45,12 @@ public class FenceConnectionsRenderTest {
               north, east, south, west);
       int x = 1 + (i % 4) * 3;
       int lengthIdx = 1 + (i / 4) * 3;
-      schem.setBlockAt(x, lengthIdx, 0, block);
+      schem.setBlockAt(x, 0, lengthIdx, block);
     }
 
     Files.createDirectories(SCHEMATIC_DIR);
     Path schemPath = SCHEMATIC_DIR.resolve("fence_connections.schem");
-    schem.save(schemPath.toString());
+    BlockReplacer.write(schem.build(), schemPath.toFile());
     return schemPath;
   }
 

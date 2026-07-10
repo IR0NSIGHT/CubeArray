@@ -6,7 +6,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import org.ironsight.schemEdit.BlockReplacer;
 import org.junit.Test;
+import pitheguy.schemconvert.converter.Schematic;
 
 /**
  * Builds a synthetic schematic containing a grid of "plant" blocks - flowers, a sapling, and
@@ -61,25 +63,27 @@ public class PlantsRenderTest {
     int ySpacing = 3; // plant row + its pink_wool row + one gap row
     short width = (short) (1 + (cols - 1) * xSpacing + 2);
     short length = (short) (1 + (rows - 1) * ySpacing + 2);
-    Sponge2Schematic schem = new Sponge2Schematic(width, (short) 1, length);
+    // SchemConvert axis order is (x=width, y=height, z=length); height is always 1 here, so cells
+    // are addressed as setBlockAt(widthIdx, 0, lengthIdx). dataVersion 1343 = MC 1.12.2.
+    Schematic.Builder schem = new Schematic.Builder(null, 1343, width, 1, length);
 
     for (int x = 0; x < width; x++) {
       for (int y = 0; y < length; y++) {
-        schem.setBlockAt(x, y, 0, "minecraft:air");
+        schem.setBlockAt(x, 0, y, "minecraft:air");
       }
     }
 
     for (int i = 0; i < PLANTS.length; i++) {
       int x = 1 + (i % cols) * xSpacing;
       int y = 1 + (i / cols) * ySpacing;
-      schem.setBlockAt(x, y, 0, "minecraft:" + PLANTS[i]);
+      schem.setBlockAt(x, 0, y, "minecraft:" + PLANTS[i]);
       // an axis-aligned reference cube next to each plant, so the 45deg cross tilt is verifiable
-      schem.setBlockAt(x, y + 1, 0, "minecraft:pink_wool");
+      schem.setBlockAt(x, 0, y + 1, "minecraft:pink_wool");
     }
 
     Files.createDirectories(SCHEMATIC_DIR);
     Path schemPath = SCHEMATIC_DIR.resolve("plants.schem");
-    schem.save(schemPath.toString());
+    BlockReplacer.write(schem.build(), schemPath.toFile());
     return schemPath;
   }
 

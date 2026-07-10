@@ -2,23 +2,28 @@ package org.ironsight.CubeArray;
 
 import static org.junit.Assert.*;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import org.ironsight.schemEdit.BlockReplacer;
 import org.junit.Test;
 import org.pepsoft.minecraft.Material;
 import org.pepsoft.worldpainter.objects.WPObject;
+import pitheguy.schemconvert.converter.Schematic;
 
 /**
- * Regression test for the setBlockAt flat-index formula. A schematic with width == length (or
- * height == 1) can't distinguish a correct x + y*width + z*width*length formula from a buggy one
- * that mixes up which axis is "length" and which is "height" - the terms happen to collide. This
- * uses a volume where width, length and height are all different (and height > 1) so a wrong
- * axis/multiplier produces either an out-of-bounds crash or a block landing at the wrong
- * coordinate.
+ * Round-trips a schematic through the exact I/O path the app uses: build with a SchemConvert {@link
+ * Schematic.Builder}, write it with {@link BlockReplacer#write} (Sponge v3), then read it back with
+ * {@link SchemReader#loadSchematics} (WorldPainter). A volume where width, length and height are all
+ * different (and height &gt; 1) is used so a swapped axis or wrong multiplier anywhere in that chain
+ * produces either an out-of-bounds crash or a block landing at the wrong coordinate.
+ *
+ * <p>Axis conventions in play: SchemConvert's {@code Builder.setBlockAt} is {@code (x=width,
+ * y=height, z=length)}, whereas the loaded {@link WPObject} addresses cells as {@code (x=width,
+ * y=length, z=height)} — so a block written at builder {@code (w, h, l)} reads back at WPObject
+ * {@code (w, l, h)}.
  */
-public class Sponge2SchematicRoundTripTest {
+public class SchematicRoundTripTest {
 
   private static final Path SCHEMATIC_DIR = Path.of("target", "test-schematics");
 
@@ -28,27 +33,30 @@ public class Sponge2SchematicRoundTripTest {
     final short length = 9;
     final short height = 3;
 
-    Sponge2Schematic schem = new Sponge2Schematic(width, height, length);
+    // SchemConvert Builder order is (xSize=width, ySize=height, zSize=length). dataVersion 1343 = MC
+    // 1.12.2. Cells are addressed as setBlockAt(widthIdx, heightIdx, lengthIdx).
+    Schematic.Builder schem = new Schematic.Builder(null, 1343, width, height, length);
 
     for (int x = 0; x < width; x++) {
-      for (int y = 0; y < length; y++) {
-        for (int z = 0; z < height; z++) {
-          schem.setBlockAt(x, y, z, "minecraft:air");
+      for (int l = 0; l < length; l++) {
+        for (int h = 0; h < height; h++) {
+          schem.setBlockAt(x, h, l, "minecraft:air");
         }
       }
     }
 
     // markers at each axis' extreme corner, so a swapped axis or wrong multiplier lands the
     // block at a different coordinate than expected (or throws ArrayIndexOutOfBounds).
+    // setBlockAt args are (width, height, length).
     schem.setBlockAt(0, 0, 0, "minecraft:stone");
     schem.setBlockAt(width - 1, 0, 0, "minecraft:diamond_block");
-    schem.setBlockAt(0, length - 1, 0, "minecraft:gold_block");
-    schem.setBlockAt(0, 0, height - 1, "minecraft:emerald_block");
-    schem.setBlockAt(width - 1, length - 1, height - 1, "minecraft:redstone_block");
+    schem.setBlockAt(0, 0, length - 1, "minecraft:gold_block");
+    schem.setBlockAt(0, height - 1, 0, "minecraft:emerald_block");
+    schem.setBlockAt(width - 1, height - 1, length - 1, "minecraft:redstone_block");
 
     Files.createDirectories(SCHEMATIC_DIR);
     Path schemPath = SCHEMATIC_DIR.resolve("roundtrip_noncubic.schem");
-    schem.save(schemPath.toString());
+    BlockReplacer.write(schem.build(), schemPath.toFile());
 
     List<WPObject> loaded =
         SchemReader.loadSchematics(List.of(schemPath), f -> fail("load error: " + f.getName()));

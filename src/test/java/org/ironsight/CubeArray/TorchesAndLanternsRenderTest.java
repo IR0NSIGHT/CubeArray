@@ -6,7 +6,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import org.ironsight.schemEdit.BlockReplacer;
 import org.junit.Test;
+import pitheguy.schemconvert.converter.Schematic;
 
 /**
  * Builds a synthetic schematic containing a standing torch, one wall torch per facing, and both
@@ -52,11 +54,13 @@ public class TorchesAndLanternsRenderTest {
     int rows = (numVariants + cols - 1) / cols;
     short width = (short) (3 + (cols - 1) * cell + 3);
     short length = (short) (3 + (rows - 1) * cell + 3);
-    Sponge2Schematic schem = new Sponge2Schematic(width, (short) 1, length);
+    // SchemConvert axis order is (x=width, y=height, z=length); height is always 1 here, so cells
+    // are addressed as setBlockAt(widthIdx, 0, lengthIdx). dataVersion 1343 = MC 1.12.2.
+    Schematic.Builder schem = new Schematic.Builder(null, 1343, width, 1, length);
 
     for (int x = 0; x < width; x++) {
       for (int y = 0; y < length; y++) {
-        schem.setBlockAt(x, y, 0, "minecraft:air");
+        schem.setBlockAt(x, 0, y, "minecraft:air");
       }
     }
 
@@ -69,9 +73,9 @@ public class TorchesAndLanternsRenderTest {
       int x = 3 + (idx % cols) * cell;
       int y = 3 + (idx / cols) * cell;
       idx++;
-      schem.setBlockAt(x, y, 0, "minecraft:wall_torch[facing=" + facing + "]");
+      schem.setBlockAt(x, 0, y, "minecraft:wall_torch[facing=" + facing + "]");
       int[] d = wallDelta(facing);
-      schem.setBlockAt(x + d[0], y + d[1], 0, "minecraft:pink_wool");
+      schem.setBlockAt(x + d[0], 0, y + d[1], "minecraft:pink_wool");
     }
     for (String lanternType : new String[] {"lantern", "soul_lantern"}) {
       for (boolean hanging : new boolean[] {false, true}) {
@@ -83,17 +87,17 @@ public class TorchesAndLanternsRenderTest {
 
     Files.createDirectories(SCHEMATIC_DIR);
     Path schemPath = SCHEMATIC_DIR.resolve("torches_and_lanterns.schem");
-    schem.save(schemPath.toString());
+    BlockReplacer.write(schem.build(), schemPath.toFile());
     return schemPath;
   }
 
   /** Places a non-wall variant at its grid cell with a pink_wool size reference beside it. */
   private static void placeStandingOrLantern(
-      Sponge2Schematic schem, int idx, int cols, int cell, String block) {
+      Schematic.Builder schem, int idx, int cols, int cell, String block) {
     int x = 3 + (idx % cols) * cell;
     int y = 3 + (idx / cols) * cell;
-    schem.setBlockAt(x, y, 0, block);
-    schem.setBlockAt(x, y + 1, 0, "minecraft:pink_wool");
+    schem.setBlockAt(x, 0, y, block);
+    schem.setBlockAt(x, 0, y + 1, "minecraft:pink_wool");
   }
 
   @Test
