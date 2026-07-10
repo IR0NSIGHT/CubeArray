@@ -219,7 +219,53 @@ public class BlockModelParser {
           faces.put(face, toFaceTexture(entry.getValue(), textures));
         }
       }
-      return new SubBlock(toVector3(element.from), toVector3(element.to), faces);
+      Vector3f from = toVector3(element.from);
+      Vector3f to = toVector3(element.to);
+      if (element.rotation == null || element.rotation.angle == 0f) {
+        return new SubBlock(from, to, faces);
+      }
+      return new SubBlock(
+          from, to, faces, elementRotation(element.rotation), elementRescale(element.rotation));
+    }
+
+    /**
+     * An element's {@code "rotation"} as Euler angles (radians). Vanilla element rotation is about a
+     * single named axis; downstream only X and Y are applied (which is what {@code block/cross}
+     * needs - a 45deg turn about Y), so a Z-axis rotation is parsed but warned about as unsupported.
+     */
+    private static Vector3f elementRotation(RotationJson rot) {
+      float rad = (float) Math.toRadians(rot.angle);
+      return switch (rot.axis == null ? "" : rot.axis.toLowerCase(Locale.ROOT)) {
+        case "x" -> new Vector3f(rad, 0f, 0f);
+        case "y" -> new Vector3f(0f, rad, 0f);
+        case "z" -> {
+          logger.warning("block model element rotation about Z is not rendered: angle=" + rot.angle);
+          yield new Vector3f(0f, 0f, rad);
+        }
+        default -> {
+          logger.warning("unknown/absent block model rotation axis: " + rot.axis);
+          yield new Vector3f();
+        }
+      };
+    }
+
+    /**
+     * The per-axis size multiplier implied by an element rotation's {@code "rescale"} flag: vanilla
+     * scales the two axes perpendicular to the rotation axis by {@code 1/cos(angle)} so the rotated
+     * element still reaches the block faces (e.g. the {@code block/cross} quads span corner to
+     * corner). Because that scale is isotropic in the plane perpendicular to the rotation axis, it
+     * commutes with the rotation and can be applied to the element's size before rotating - which is
+     * exactly how {@code SchemReader.computePieces} consumes it. Unit (no-op) when rescale is off.
+     */
+    private static Vector3f elementRescale(RotationJson rot) {
+      if (!rot.rescale) return new Vector3f(1f, 1f, 1f);
+      float f = 1f / (float) Math.cos(Math.toRadians(rot.angle));
+      return switch (rot.axis == null ? "" : rot.axis.toLowerCase(Locale.ROOT)) {
+        case "x" -> new Vector3f(1f, f, f);
+        case "y" -> new Vector3f(f, 1f, f);
+        case "z" -> new Vector3f(f, f, 1f);
+        default -> new Vector3f(1f, 1f, 1f);
+      };
     }
 
     private FaceTexture toFaceTexture(FaceJson faceJson, Map<String, String> textures) {
@@ -245,6 +291,15 @@ public class BlockModelParser {
     public float[] from;
     public float[] to;
     public Map<String, FaceJson> faces;
+    public RotationJson rotation;
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private static final class RotationJson {
+    public float[] origin;
+    public String axis;
+    public float angle;
+    public boolean rescale;
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)

@@ -40,17 +40,25 @@ public class TorchesAndLanternsRenderTest {
       }
     }
 
+    // a pink_wool reference cube sits behind (y+1) every variant, so orientation - and, for the
+    // wall torches, that they hang off the right face - is verifiable against an axis-aligned block
     int col = 0;
-    schem.setBlockAt(1 + col++ * spacing, 1, 0, "minecraft:torch");
+    int x = 1 + col++ * spacing;
+    schem.setBlockAt(x, 1, 0, "minecraft:torch");
+    schem.setBlockAt(x, 2, 0, "minecraft:pink_wool");
     for (String facing : FACINGS) {
-      schem.setBlockAt(1 + col++ * spacing, 1, 0, "minecraft:wall_torch[facing=" + facing + "]");
+      x = 1 + col++ * spacing;
+      schem.setBlockAt(x, 1, 0, "minecraft:wall_torch[facing=" + facing + "]");
+      schem.setBlockAt(x, 2, 0, "minecraft:pink_wool");
     }
     for (String lanternType : new String[] {"lantern", "soul_lantern"}) {
       for (boolean hanging : new boolean[] {false, true}) {
+        x = 1 + col++ * spacing;
         String block =
             String.format(
                 "minecraft:%s[hanging=%b,waterlogged=false]", lanternType, hanging);
-        schem.setBlockAt(1 + col++ * spacing, 1, 0, block);
+        schem.setBlockAt(x, 1, 0, block);
+        schem.setBlockAt(x, 2, 0, "minecraft:pink_wool");
       }
     }
 
@@ -86,11 +94,14 @@ public class TorchesAndLanternsRenderTest {
             + instancesFor(vanillaRoot, "block/lantern_hanging") // hanging=true
             + instancesFor(vanillaRoot, "block/soul_lantern")
             + instancesFor(vanillaRoot, "block/soul_lantern_hanging");
+    // plus one reference cube (pink_wool) behind each variant placement
+    int variantCount = 1 + FACINGS.length + 4; // standing torch + wall torches + lanterns
+    expectedInstances += variantCount * instancesFor(vanillaRoot, "block/pink_wool");
     assertEquals("unexpected instance count", expectedInstances, setup.positions.length);
 
     Path outputPath = OUTPUT_DIR.resolve("torches_and_lanterns.png");
     Files.createDirectories(outputPath.getParent());
-    InstancedCubes.renderToFile(setup, outputPath, 1600, 600);
+    InstancedCubes.renderToFile(setup, outputPath, 640, 640);
 
     assertTrue("Output file missing", outputPath.toFile().exists());
     assertTrue("Output file empty", outputPath.toFile().length() > 0);

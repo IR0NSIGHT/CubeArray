@@ -101,11 +101,17 @@ public class SchemReader {
     for (BlockStateParser.ModelPlacement placement : selectPlacements(mat)) {
       BlockModel model = blockModels.get(placement.model());
       if (model == null) continue;
-      Vector3f rotation =
+      // blockstate rotation about the block centre (the renderer applies it as Ry * Rx)
+      Vector3f blockRotation =
           new Vector3f(
               (float) Math.toRadians(placement.x()), (float) Math.toRadians(placement.y()), 0f);
       for (SubBlock sub : model.subBlocks()) {
-        pieces.add(new Piece(sub.size(), sub.offset(), rotation));
+        // add the element's own local rotation to the blockstate rotation (both share the block
+        // centre; the renderer only applies the X/Y components), and stretch the element's size by
+        // its rescale factor - together these reproduce e.g. block/cross's 45deg X for grass
+        Vector3f rotation = new Vector3f(blockRotation).add(sub.rotation());
+        Vector3f size = sub.size().mul(sub.rescale());
+        pieces.add(new Piece(size, sub.offset(), rotation));
       }
     }
     if (pieces.isEmpty()) {

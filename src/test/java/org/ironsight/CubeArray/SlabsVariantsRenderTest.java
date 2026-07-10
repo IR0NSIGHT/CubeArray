@@ -61,7 +61,7 @@ public class SlabsVariantsRenderTest {
 
     Path outputPath = OUTPUT_DIR.resolve("slabs_variants.png");
     Files.createDirectories(outputPath.getParent());
-    InstancedCubes.renderToFile(setup, outputPath, 1200, 600);
+    InstancedCubes.renderToFile(setup, outputPath, 640, 640);
 
     assertTrue("Output file missing", outputPath.toFile().exists());
     assertTrue("Output file empty", outputPath.toFile().length() > 0);

@@ -44,7 +44,7 @@ public class SchematicRenderIntegrationTest {
                     List.of(schemFile.toPath()), f -> failures.add("load error: " + f.getName())));
 
         assertNotNull("Failed to prepare data for: " + schemFile.getName(), setup);
-        InstancedCubes.renderToFile(setup, outputPath, 640, 480);
+        InstancedCubes.renderToFile(setup, outputPath, 640, 640);
 
         assertTrue("Output file missing for " + schemFile.getName(), outputPath.toFile().exists());
         assertTrue(
@@ -80,7 +80,7 @@ public class SchematicRenderIntegrationTest {
                     List.of(schemFile.toPath()), f -> failures.add("load error: " + f.getName())));
 
         assertNotNull("Failed to prepare data for: " + schemFile.getName(), setup);
-        InstancedCubes.renderToFile(setup, outputPath, 640, 480);
+        InstancedCubes.renderToFile(setup, outputPath, 640, 640);
 
         assertTrue("Output file missing for " + schemFile.getName(), outputPath.toFile().exists());
         assertTrue(

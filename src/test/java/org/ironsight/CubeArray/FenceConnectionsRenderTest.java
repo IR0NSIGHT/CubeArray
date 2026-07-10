@@ -71,7 +71,7 @@ public class FenceConnectionsRenderTest {
 
     Path outputPath = OUTPUT_DIR.resolve("fence_connections.png");
     Files.createDirectories(outputPath.getParent());
-    InstancedCubes.renderToFile(setup, outputPath, 1600, 1200);
+    InstancedCubes.renderToFile(setup, outputPath, 640, 640);
 
     assertTrue("Output file missing", outputPath.toFile().exists());
     assertTrue("Output file empty", outputPath.toFile().length() > 0);

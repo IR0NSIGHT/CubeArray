@@ -81,6 +81,9 @@ public class StairsVariantsRenderTest {
           int x = 1 + col * spacing;
           int y = 1 + row * spacing;
           schem.setBlockAt(x, y, 0, block);
+          // an axis-aligned reference cube next to each stair, so facing/half orientation is
+          // verifiable against it
+          schem.setBlockAt(x, y + 1, 0, "minecraft:pink_wool");
           col++;
         }
         row++;
@@ -126,11 +129,15 @@ public class StairsVariantsRenderTest {
         }
       }
     }
+    // plus one reference cube (pink_wool) placed next to each stair variant
+    int woolInstances =
+        Math.max(1, BlockModelParser.parseModel(vanillaRoot, "block/pink_wool").subBlocks().size());
+    expected += FACINGS.length * HALVES.length * SHAPES.length * woolInstances;
     assertEquals("unexpected instance count", expected, setup.positions.length);
 
     Path outputPath = OUTPUT_DIR.resolve("stairs_variants.png");
     Files.createDirectories(outputPath.getParent());
-    InstancedCubes.renderToFile(setup, outputPath, 1920, 1200);
+    InstancedCubes.renderToFile(setup, outputPath, 640, 640);
 
     assertTrue("Output file missing", outputPath.toFile().exists());
     assertTrue("Output file empty", outputPath.toFile().length() > 0);
