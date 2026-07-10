@@ -11,19 +11,29 @@ import org.joml.Vector3f;
  * "cullface" in the source model).
  *
  * <p>{@code rotation} is the element's own local rotation (vanilla's {@code "rotation"} block) as
- * Euler angles in radians, and {@code rescale} the per-axis size multiplier its {@code rescale}
- * flag implies (the stretch that fits a rotated element back to the block faces). Both default to
- * "none" (zero rotation, unit rescale) for elements with no rotation. These are consumed by {@code
- * SchemReader.computePieces}, which folds them into the render piece's rotation and size so the
- * renderer needs no per-element-rotation support of its own. See {@code BlockModelParser} for how
- * they are derived; only rotation about the X or Y axis is representable downstream (matching what
- * the vanilla {@code block/cross} grass/flower model needs).
+ * Euler angles in radians, {@code rescale} the per-axis size multiplier its {@code rescale} flag
+ * implies (the stretch that fits a rotated element back to the block faces), and {@code origin} the
+ * point that rotation pivots about, in the same [0,16] space as from/to (default block centre
+ * (8,8,8)). All default to "none" (zero rotation, unit rescale, centre origin) for elements with no
+ * rotation. These are consumed by {@code SchemReader.computePieces}, which folds them into the
+ * render piece's rotation and size so the renderer needs no per-element-rotation support of its
+ * own. See {@code BlockModelParser} for how they are derived.
  */
 public record SubBlock(
-    Vector3f from, Vector3f to, Map<Face, FaceTexture> faces, Vector3f rotation, Vector3f rescale) {
+    Vector3f from,
+    Vector3f to,
+    Map<Face, FaceTexture> faces,
+    Vector3f rotation,
+    Vector3f rescale,
+    Vector3f origin) {
 
   public SubBlock(Vector3f from, Vector3f to, Map<Face, FaceTexture> faces) {
-    this(from, to, faces, new Vector3f(0, 0, 0), new Vector3f(1, 1, 1));
+    this(from, to, faces, new Vector3f(0, 0, 0), new Vector3f(1, 1, 1), new Vector3f(8, 8, 8));
+  }
+
+  public SubBlock(
+      Vector3f from, Vector3f to, Map<Face, FaceTexture> faces, Vector3f rotation, Vector3f rescale) {
+    this(from, to, faces, rotation, rescale, new Vector3f(8, 8, 8));
   }
 
   public SubBlock(Vector3f from, Vector3f to) {
@@ -42,5 +52,10 @@ public record SubBlock(
   /** Offset of this cuboid's center from the block's center, in normalized block units. */
   public Vector3f offset() {
     return new Vector3f(from).add(to).mul(0.5f / 16f).sub(0.5f, 0.5f, 0.5f);
+  }
+
+  /** The element rotation's pivot, as an offset from the block's center, in normalized units. */
+  public Vector3f originOffset() {
+    return new Vector3f(origin).mul(1 / 16f).sub(0.5f, 0.5f, 0.5f);
   }
 }

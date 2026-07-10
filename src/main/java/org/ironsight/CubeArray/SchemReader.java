@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.ZipException;
 import javax.vecmath.Point3i;
+import org.joml.Matrix3f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.pepsoft.minecraft.Material;
@@ -110,12 +111,19 @@ public class SchemReader {
           new Vector3f(
               (float) Math.toRadians(placement.x()), (float) Math.toRadians(placement.y()), 0f);
       for (SubBlock sub : model.subBlocks()) {
-        // add the element's own local rotation to the blockstate rotation (both share the block
-        // centre; the renderer only applies the X/Y components), and stretch the element's size by
-        // its rescale factor - together these reproduce e.g. block/cross's 45deg X for grass
-        Vector3f rotation = new Vector3f(blockRotation).add(sub.rotation());
+        // stretch the element's size by its rescale factor (e.g. block/cross's corner-to-corner
+        // quads for grass)
         Vector3f size = sub.size().mul(sub.rescale());
-        pieces.add(new Piece(size, sub.offset(), rotation, sub.faces()));
+        if (sub.rotation().z != 0f) {
+          // a Z-axis element tilt (e.g. a wall torch) can't be written as the renderer's Ry * Rx;
+          // re-express it for that rotation without touching the shader (see tiltedPiece)
+          pieces.add(tiltedPiece(blockRotation, sub, size));
+        } else {
+          // add the element's own X/Y rotation to the blockstate rotation (both share the block
+          // centre and the renderer applies Ry * Rx), reproducing e.g. block/cross's 45deg X
+          Vector3f rotation = new Vector3f(blockRotation).add(sub.rotation());
+          pieces.add(new Piece(size, sub.offset(), rotation, sub.faces()));
+        }
       }
     }
     if (pieces.isEmpty()) {
@@ -123,6 +131,51 @@ public class SchemReader {
       pieces.add(new Piece(new Vector3f(1, 1, 1), new Vector3f(), new Vector3f(), Map.of()));
     }
     return pieces;
+  }
+
+  /**
+   * Builds a render piece for an element whose rotation includes a Z-axis tilt (e.g. a wall torch
+   * leaning off its wall), which the renderer's {@code Ry * Rx} rotation cannot express directly -
+   * without any shader change. It computes the true target orientation {@code Rblock * Relem}, then
+   * re-expresses it as the {@code (rx, ry)} whose {@code Ry * Rx} reproduces the same long axis (the
+   * leftover twist about that axis is invisible on the near-square, uniformly side-textured torch),
+   * and pre-rotates the offset so the cuboid still lands where the model's rotation origin puts it.
+   */
+  private static Piece tiltedPiece(Vector3f blockRotation, SubBlock sub, Vector3f size) {
+    // orientation the renderer applies for this blockstate, in the shader's own (angle-negating)
+    // convention, composed with the element's own rotation of the geometry
+    Matrix3f rblock = shaderRotation(blockRotation.x, blockRotation.y);
+    Vector3f er = sub.rotation();
+    Matrix3f relem = new Matrix3f().rotateXYZ(er.x, er.y, er.z);
+    Matrix3f target = new Matrix3f(rblock).mul(relem); // full orientation the renderer must match
+
+    // stored (ax, ay) such that the shader's Ry*Rx sends +Y onto the target's up axis (its Ry/Rx
+    // negate the angle, so solve against shaderRotation, not the standard matrices)
+    Vector3f up = target.transform(new Vector3f(0, 1, 0));
+    float ax = (float) Math.acos(Math.max(-1f, Math.min(1f, up.y)));
+    float ay =
+        (Math.abs(up.x) < 1e-4f && Math.abs(up.z) < 1e-4f) ? 0f : (float) Math.atan2(up.x, -up.z);
+    Matrix3f applied = shaderRotation(ax, ay);
+
+    // where the cuboid centre should end up: rotate the element about its own origin, then apply
+    // the blockstate rotation about the block centre
+    Vector3f center = new Vector3f(sub.offset()).sub(sub.originOffset());
+    relem.transform(center).add(sub.originOffset());
+    rblock.transform(center);
+    // undo the rotation the renderer will apply to the offset, so it lands the centre where we want
+    Vector3f offset = new Matrix3f(applied).transpose().transform(new Vector3f(center));
+
+    return new Piece(size, offset, new Vector3f(ax, ay, 0f), sub.faces());
+  }
+
+  /**
+   * The exact orientation the vertex shader produces for stored palette angles {@code (ax, ay)}. The
+   * shader's rotationX/rotationY (see {@link VertexShaderSource}) are built so they rotate by the
+   * negative of their argument, i.e. {@code Ry(-ay) * Rx(-ax)} in standard terms; matching that here
+   * lets {@link #tiltedPiece} invert it exactly.
+   */
+  private static Matrix3f shaderRotation(float ax, float ay) {
+    return new Matrix3f().rotateY(-ay).rotateX(-ax);
   }
 
   // model face "uv" is in 0..16 texel space regardless of the pack's texture resolution

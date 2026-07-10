@@ -225,28 +225,37 @@ public class BlockModelParser {
         return new SubBlock(from, to, faces);
       }
       return new SubBlock(
-          from, to, faces, elementRotation(element.rotation), elementRescale(element.rotation));
+          from,
+          to,
+          faces,
+          elementRotation(element.rotation),
+          elementRescale(element.rotation),
+          elementOrigin(element.rotation));
     }
 
     /**
      * An element's {@code "rotation"} as Euler angles (radians). Vanilla element rotation is about a
-     * single named axis; downstream only X and Y are applied (which is what {@code block/cross}
-     * needs - a 45deg turn about Y), so a Z-axis rotation is parsed but warned about as unsupported.
+     * single named axis; all three axes are folded into the render piece by {@code
+     * SchemReader.computePieces} (a Z-axis tilt, e.g. a wall torch, is re-expressed there for the
+     * renderer's X/Y-only rotation).
      */
     private static Vector3f elementRotation(RotationJson rot) {
       float rad = (float) Math.toRadians(rot.angle);
       return switch (rot.axis == null ? "" : rot.axis.toLowerCase(Locale.ROOT)) {
         case "x" -> new Vector3f(rad, 0f, 0f);
         case "y" -> new Vector3f(0f, rad, 0f);
-        case "z" -> {
-          logger.warning("block model element rotation about Z is not rendered: angle=" + rot.angle);
-          yield new Vector3f(0f, 0f, rad);
-        }
+        case "z" -> new Vector3f(0f, 0f, rad);
         default -> {
           logger.warning("unknown/absent block model rotation axis: " + rot.axis);
           yield new Vector3f();
         }
       };
+    }
+
+    /** The pivot an element rotation turns about, in [0,16] space; defaults to block centre. */
+    private static Vector3f elementOrigin(RotationJson rot) {
+      if (rot.origin == null || rot.origin.length != 3) return new Vector3f(8, 8, 8);
+      return new Vector3f(rot.origin[0], rot.origin[1], rot.origin[2]);
     }
 
     /**

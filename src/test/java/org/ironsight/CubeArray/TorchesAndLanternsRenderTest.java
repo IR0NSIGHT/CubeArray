@@ -26,12 +26,32 @@ public class TorchesAndLanternsRenderTest {
     return Math.max(1, elements);
   }
 
+  /**
+   * Where each wall_torch's supporting wall sits relative to the torch, as a {dx, dy} schematic
+   * offset. A wall torch mounts to the block opposite its facing (facing=east hangs off a wall to
+   * its west), so its base should touch a block placed here.
+   */
+  private static int[] wallDelta(String facing) {
+    return switch (facing) {
+      case "north" -> new int[] {0, 1};
+      case "south" -> new int[] {0, -1};
+      case "east" -> new int[] {-1, 0};
+      case "west" -> new int[] {1, 0};
+      default -> new int[] {0, 1};
+    };
+  }
+
   private static Path buildTorchesAndLanternsSchematic() throws IOException {
-    int spacing = 1;
+    // Lay the variants out on a near-square 3-column grid (rather than one long row) so the camera
+    // frames them large enough to inspect. Each cell is 3x3 so a wall torch's supporting wall block
+    // can sit on any side without colliding with a neighbour.
+    int cols = 3;
+    int cell = 3;
     // 1 standing torch + one wall torch per facing + lantern/soul_lantern, each hanging or not
     int numVariants = 1 + FACINGS.length + 4;
-    short width = (short) (1 + (numVariants - 1) * spacing + 2);
-    short length = 3;
+    int rows = (numVariants + cols - 1) / cols;
+    short width = (short) (3 + (cols - 1) * cell + 3);
+    short length = (short) (3 + (rows - 1) * cell + 3);
     Sponge2Schematic schem = new Sponge2Schematic(width, (short) 1, length);
 
     for (int x = 0; x < width; x++) {
@@ -40,25 +60,24 @@ public class TorchesAndLanternsRenderTest {
       }
     }
 
-    // a pink_wool reference cube sits behind (y+1) every variant, so orientation - and, for the
-    // wall torches, that they hang off the right face - is verifiable against an axis-aligned block
-    int col = 0;
-    int x = 1 + col++ * spacing;
-    schem.setBlockAt(x, 1, 0, "minecraft:torch");
-    schem.setBlockAt(x, 2, 0, "minecraft:pink_wool");
+    int idx = 0;
+    // standing torch, with a pink_wool size reference beside it
+    placeStandingOrLantern(schem, idx++, cols, cell, "minecraft:torch");
+    // each wall torch, with a pink_wool "wall" on the exact side it mounts to, so a correctly
+    // placed torch has its base touching that wool and tilts away from it
     for (String facing : FACINGS) {
-      x = 1 + col++ * spacing;
-      schem.setBlockAt(x, 1, 0, "minecraft:wall_torch[facing=" + facing + "]");
-      schem.setBlockAt(x, 2, 0, "minecraft:pink_wool");
+      int x = 3 + (idx % cols) * cell;
+      int y = 3 + (idx / cols) * cell;
+      idx++;
+      schem.setBlockAt(x, y, 0, "minecraft:wall_torch[facing=" + facing + "]");
+      int[] d = wallDelta(facing);
+      schem.setBlockAt(x + d[0], y + d[1], 0, "minecraft:pink_wool");
     }
     for (String lanternType : new String[] {"lantern", "soul_lantern"}) {
       for (boolean hanging : new boolean[] {false, true}) {
-        x = 1 + col++ * spacing;
         String block =
-            String.format(
-                "minecraft:%s[hanging=%b,waterlogged=false]", lanternType, hanging);
-        schem.setBlockAt(x, 1, 0, block);
-        schem.setBlockAt(x, 2, 0, "minecraft:pink_wool");
+            String.format("minecraft:%s[hanging=%b,waterlogged=false]", lanternType, hanging);
+        placeStandingOrLantern(schem, idx++, cols, cell, block);
       }
     }
 
@@ -66,6 +85,15 @@ public class TorchesAndLanternsRenderTest {
     Path schemPath = SCHEMATIC_DIR.resolve("torches_and_lanterns.schem");
     schem.save(schemPath.toString());
     return schemPath;
+  }
+
+  /** Places a non-wall variant at its grid cell with a pink_wool size reference beside it. */
+  private static void placeStandingOrLantern(
+      Sponge2Schematic schem, int idx, int cols, int cell, String block) {
+    int x = 3 + (idx % cols) * cell;
+    int y = 3 + (idx / cols) * cell;
+    schem.setBlockAt(x, y, 0, block);
+    schem.setBlockAt(x, y + 1, 0, "minecraft:pink_wool");
   }
 
   @Test
