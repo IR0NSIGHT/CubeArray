@@ -32,6 +32,11 @@ import org.lwjgl.opengl.GL;
 
 public class InstancedCubes {
 
+  // Serializes the process-global GLFW lifecycle (glfwInit/glfwCreateWindow/glfwTerminate),
+  // shared by the interactive viewer and every offscreen renderToFile call, so concurrent
+  // renders on different threads cannot destroy each other's window/context.
+  private static final Object GLFW_LOCK = new Object();
+
   int gridX = 1000;
   int gridY = 10;
   int gridZ = 1000;
@@ -154,10 +159,15 @@ public class InstancedCubes {
   }
 
   public void run() throws Exception {
-    init();
+    // Hold the GLFW lock for the whole interactive session so background offscreen renders
+    // (list icons / previews) cannot call glfwTerminate while this window is alive. Queued
+    // renders run after the viewer window is closed.
+    synchronized (GLFW_LOCK) {
+      init();
 
-    loop();
-    cleanup();
+      loop();
+      cleanup();
+    }
   }
 
   private void init() throws Exception {
@@ -503,8 +513,10 @@ public class InstancedCubes {
   }
 
   private void saveScreenshot(Path out) throws IOException {
+    // Reads from whatever framebuffer is currently bound as GL_READ_FRAMEBUFFER. The caller
+    // is responsible for binding the correct source (the visible window's default framebuffer
+    // for the interactive path, or the offscreen resolve FBO for renderToFile).
     ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * 4);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
 
     BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
@@ -529,6 +541,9 @@ public class InstancedCubes {
               .resolve(
                   "screenshot_CubeArray_" + setup.name + "_" + System.currentTimeMillis() + ".png");
       if (out.toFile().exists()) return;
+      // interactive viewer: read from the visible window's default framebuffer
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+      glReadBuffer(GL_BACK);
       saveScreenshot(out);
     } catch (IOException ex) {
       System.out.println(ex);
@@ -562,72 +577,122 @@ public class InstancedCubes {
   public static void renderToFile(
       SchemReader.CubeSetup setup, Path outputPath, int width, int height) throws Exception {
 
-    GLFWErrorCallback.createPrint(System.err).set();
-    if (!glfwInit()) throw new IllegalStateException("Unable to initialize GLFW");
+    // glfwInit/glfwTerminate are process-global, not per-thread. The app renders on
+    // several background threads (list-icon renderer, preview renderer, interactive viewer),
+    // so serialize the whole GLFW lifecycle to stop one render from tearing down another's
+    // window/context.
+    synchronized (GLFW_LOCK) {
+      GLFWErrorCallback.createPrint(System.err).set();
+      if (!glfwInit()) throw new IllegalStateException("Unable to initialize GLFW");
 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+      glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+      glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
 
-    long window = glfwCreateWindow(width, height, "", NULL, NULL);
-    if (window == NULL) throw new RuntimeException("Failed to create GLFW window");
+      long window = glfwCreateWindow(width, height, "", NULL, NULL);
+      if (window == NULL) throw new RuntimeException("Failed to create GLFW window");
 
-    glfwMakeContextCurrent(window);
-    GL.createCapabilities();
+      glfwMakeContextCurrent(window);
+      GL.createCapabilities();
 
-    InstancedCubes renderer = new InstancedCubes(setup);
-    renderer.width = width;
-    renderer.height = height;
-    renderer.window = window;
-    renderer.setupShaders();
-    renderer.setupBuffers();
+      InstancedCubes renderer = new InstancedCubes(setup);
+      renderer.width = width;
+      renderer.height = height;
+      renderer.window = window;
+      renderer.setupShaders();
+      renderer.setupBuffers();
 
-    renderer.cameraState = renderer.initialPos;
+      renderer.cameraState = renderer.initialPos;
 
-    glClearColor(0.53f, 0.81f, 0.92f, 1f);
+      // Render into an explicit offscreen framebuffer rather than the hidden window's default
+      // framebuffer, whose contents are driver-dependent/undefined ("pixel ownership") and read
+      // back as all-zero (blank) when driven off the main thread. A multisampled FBO preserves
+      // the 8x MSAA of the on-screen path; it is then blit-resolved into a single-sample FBO
+      // that glReadPixels can read.
+      final int samples = 8;
+      int msaaFbo = glGenFramebuffers();
+      glBindFramebuffer(GL_FRAMEBUFFER, msaaFbo);
+      int colorRb = glGenRenderbuffers();
+      glBindRenderbuffer(GL_RENDERBUFFER, colorRb);
+      glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_RGBA8, width, height);
+      glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, colorRb);
+      int depthRb = glGenRenderbuffers();
+      glBindRenderbuffer(GL_RENDERBUFFER, depthRb);
+      glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_DEPTH_COMPONENT24, width, height);
+      glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthRb);
+      if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        throw new RuntimeException("Offscreen MSAA framebuffer incomplete");
 
-    Matrix4f projection =
-        new Matrix4f().perspective((float) toRadians(45.0f), (float) width / height, .1f, 10000.0f);
+      // single-sample resolve target used for read-back
+      int resolveFbo = glGenFramebuffers();
+      glBindFramebuffer(GL_FRAMEBUFFER, resolveFbo);
+      int resolveColorRb = glGenRenderbuffers();
+      glBindRenderbuffer(GL_RENDERBUFFER, resolveColorRb);
+      glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, width, height);
+      glFramebufferRenderbuffer(
+          GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, resolveColorRb);
+      if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        throw new RuntimeException("Offscreen resolve framebuffer incomplete");
 
-    CameraState cam = renderer.cameraState;
-    float camX = (float) (cam.radius() * Math.cos(cam.pitch()) * Math.sin(cam.yaw()));
-    float camY = (float) (cam.radius() * Math.sin(cam.pitch()));
-    float camZ = (float) (cam.radius() * Math.cos(cam.pitch()) * Math.cos(cam.yaw()));
-    Vector3f cameraPos = new Vector3f(camX, camY, camZ).add(cam.target());
-    Matrix4f view = new Matrix4f().lookAt(cameraPos, cam.target(), new Vector3f(0, 1, 0));
+      glBindFramebuffer(GL_FRAMEBUFFER, msaaFbo);
+      glViewport(0, 0, width, height); // FBOs do not get an automatic viewport
 
-    FloatBuffer projBuffer = BufferUtils.createFloatBuffer(16);
-    FloatBuffer viewBuffer = BufferUtils.createFloatBuffer(16);
-    projection.get(projBuffer);
-    view.get(viewBuffer);
+      glClearColor(0.53f, 0.81f, 0.92f, 1f);
 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glUseProgram(renderer.shaderProgram);
-    glUniformMatrix4fv(
-        glGetUniformLocation(renderer.shaderProgram, "projection"), false, projBuffer);
-    glUniformMatrix4fv(glGetUniformLocation(renderer.shaderProgram, "view"), false, viewBuffer);
-    glBindVertexArray(renderer.vao);
-    glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, setup.positions.length);
-    glBindVertexArray(0);
+      Matrix4f projection =
+          new Matrix4f()
+              .perspective((float) toRadians(45.0f), (float) width / height, .1f, 10000.0f);
 
-    glFinish();
+      CameraState cam = renderer.cameraState;
+      float camX = (float) (cam.radius() * Math.cos(cam.pitch()) * Math.sin(cam.yaw()));
+      float camY = (float) (cam.radius() * Math.sin(cam.pitch()));
+      float camZ = (float) (cam.radius() * Math.cos(cam.pitch()) * Math.cos(cam.yaw()));
+      Vector3f cameraPos = new Vector3f(camX, camY, camZ).add(cam.target());
+      Matrix4f view = new Matrix4f().lookAt(cameraPos, cam.target(), new Vector3f(0, 1, 0));
 
-    // read pixels from the back buffer (the default read target) before swapping, otherwise
-    // glReadPixels would read the other, not-yet-drawn-to buffer and produce a blank image
-    Path parent = outputPath.getParent();
-    if (parent != null) Files.createDirectories(parent);
-    renderer.saveScreenshot(outputPath);
+      FloatBuffer projBuffer = BufferUtils.createFloatBuffer(16);
+      FloatBuffer viewBuffer = BufferUtils.createFloatBuffer(16);
+      projection.get(projBuffer);
+      view.get(viewBuffer);
 
-    glfwSwapBuffers(window);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      glUseProgram(renderer.shaderProgram);
+      glUniformMatrix4fv(
+          glGetUniformLocation(renderer.shaderProgram, "projection"), false, projBuffer);
+      glUniformMatrix4fv(glGetUniformLocation(renderer.shaderProgram, "view"), false, viewBuffer);
+      glBindVertexArray(renderer.vao);
+      glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, setup.positions.length);
+      glBindVertexArray(0);
 
-    glDeleteVertexArrays(renderer.vao);
-    glDeleteBuffers(renderer.vbo);
-    glDeleteBuffers(renderer.ebo);
-    glDeleteProgram(renderer.shaderProgram);
-    glfwDestroyWindow(window);
-    glfwTerminate();
-    glfwSetErrorCallback(null).free();
+      glFinish();
+
+      // resolve the multisampled color buffer into the single-sample FBO, then read from it
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, msaaFbo);
+      glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolveFbo);
+      glBlitFramebuffer(
+          0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+      Path parent = outputPath.getParent();
+      if (parent != null) Files.createDirectories(parent);
+
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, resolveFbo);
+      glReadBuffer(GL_COLOR_ATTACHMENT0);
+      renderer.saveScreenshot(outputPath);
+
+      glDeleteRenderbuffers(colorRb);
+      glDeleteRenderbuffers(depthRb);
+      glDeleteRenderbuffers(resolveColorRb);
+      glDeleteFramebuffers(msaaFbo);
+      glDeleteFramebuffers(resolveFbo);
+      glDeleteVertexArrays(renderer.vao);
+      glDeleteBuffers(renderer.vbo);
+      glDeleteBuffers(renderer.ebo);
+      glDeleteProgram(renderer.shaderProgram);
+      glfwDestroyWindow(window);
+      glfwTerminate();
+      glfwSetErrorCallback(null).free();
+    }
   }
 
   private void setupShaders() {
