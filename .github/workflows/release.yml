@@ -33,7 +33,7 @@ jobs:
       - name: Build app image (exe)
         shell: cmd
         run: |
-          jpackage --input staging\ --name CubeArray --main-jar CubeArray.jar --main-class org.ironsight.CubeArray.CubeArrayMain --type app-image --dest dist\
+          jpackage --input staging\ --name CubeArray --main-jar CubeArray.jar --main-class org.ironsight.cubearray.CubeArrayMain --type app-image --dest dist\
 
       - name: Copy JAR and README into app-image
         shell: cmd

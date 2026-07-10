@@ -181,7 +181,7 @@
                         <configuration>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>org.ironsight.CubeArray.CubeArrayMain</mainClass>
+                                    <mainClass>org.ironsight.cubearray.CubeArrayMain</mainClass>
                                 </transformer>
                             </transformers>
                         </configuration>
