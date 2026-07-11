@@ -6,7 +6,6 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -17,10 +16,6 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -38,6 +33,7 @@ import org.ironsight.cubearray.platform.ResourceUtils;
 import org.ironsight.cubearray.schematic.SchemReader;
 import org.ironsight.cubearray.edit.BatchConverter;
 import org.ironsight.cubearray.edit.BlockReplacer;
+import org.ironsight.cubearray.preview.SchematicPreviewHelper;
 import org.pepsoft.worldpainter.objects.WPObject;
 
 public class FileRenderApp {
@@ -55,13 +51,6 @@ public class FileRenderApp {
   // is context dirty and needs to be saved?
   private boolean contextDirtyFlag;
   private final HashMap<CaColumn, TableColumn> columToTableColumn = new HashMap<>();
-  private final ExecutorService renderExecutor =
-      Executors.newSingleThreadExecutor(
-          r -> {
-            Thread t = new Thread(r, "render-worker");
-            t.setDaemon(true);
-            return t;
-          });
 
   private void flagContextDirty(AppContext context) {
     this.context = context;
@@ -146,7 +135,7 @@ public class FileRenderApp {
     PeriodicChecker.INSTANCE.addCallback(this::checkContextSaving);
     PeriodicChecker.INSTANCE.addCallback(this::checkLoadingThreads);
 
-    this.tableModel = new FileTableModel(PeriodicChecker.INSTANCE);
+    this.tableModel = new FileTableModel(PeriodicChecker.INSTANCE, SchematicPreviewHelper.getInstance());
     tableModel.setFileQueueSizeChangedCallback(
         count -> {
           if (count == 0) this.setTextRemainingFiles("");
@@ -1239,51 +1228,21 @@ public class FileRenderApp {
 
   private void showRenderPreview(int modelRow) {
     File file = tableModel.getFileAt(modelRow);
-    Path renderPath = ResourceUtils.getRenderPathForFile(file);
-    if (!Files.exists(renderPath)) {
-      JOptionPane.showMessageDialog(frame, "No render available yet.", file.getName(), JOptionPane.PLAIN_MESSAGE);
-      return;
-    }
-    ImageIcon icon =
-        new ImageIcon(
-            new ImageIcon(renderPath.toString())
-                .getImage()
-                .getScaledInstance(640, 640, Image.SCALE_SMOOTH));
-    JOptionPane.showMessageDialog(frame, icon, file.getName(), JOptionPane.PLAIN_MESSAGE);
+    SchematicPreviewHelper.getInstance().showPreviewDialog(file, frame);
   }
 
   private void renderSchematicIcon(File file) {
     if (file == null) return;
-    if (!ResourceUtils.needsNewRender(file)) return;
-    Future<?> future =
-        renderExecutor.submit(
-            () -> {
-              try {
-                WPObject obj = tableModel.getSchematicFor(file);
-                if (obj == null) return;
-                ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
-                CubeSetup setup = SchemReader.prepareData(List.of(obj));
-                if (setup == null) return;
-                Path renderPath = ResourceUtils.getRenderPathForFile(file);
-                Files.createDirectories(renderPath.getParent());
-                InstancedCubes.renderToFile(setup, renderPath, 640, 640);
-                SwingUtilities.invokeLater(
-                    () -> {
-                      tableModel.invalidateIconCache(file);
-                      int idx = tableModel.indexOfFile(file);
-                      if (idx >= 0) tableModel.fireTableRowsUpdated(idx, idx);
-                    });
-              } catch (Exception e) {
-                logger.log(Level.WARNING, "Failed to render icon for " + file.getName(), e);
-              }
-            });
-    try {
-      future.get();
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    } catch (ExecutionException e) {
-      logger.log(Level.WARNING, "Render failed for " + file.getName(), e);
-    }
+    WPObject obj = tableModel.getSchematicFor(file);
+    if (obj == null) return;
+    SchematicPreviewHelper.getInstance().render(
+        file,
+        obj,
+        () -> {
+          tableModel.invalidateIconCache(file);
+          int idx = tableModel.indexOfFile(file);
+          if (idx >= 0) tableModel.fireTableRowsUpdated(idx, idx);
+        });
   }
 
   private JFileChooser getFileChooser(boolean folder) {
