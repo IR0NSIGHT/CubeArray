@@ -116,12 +116,22 @@ public class SchematicPreviewHelper {
           parent, "No render available yet.", file.getName(), JOptionPane.PLAIN_MESSAGE);
       return;
     }
-    ImageIcon icon =
+    ImageIcon image =
         new ImageIcon(
             new ImageIcon(renderPath.toString())
                 .getImage()
                 .getScaledInstance(640, 640, Image.SCALE_SMOOTH));
-    JOptionPane.showMessageDialog(parent, icon, file.getName(), JOptionPane.PLAIN_MESSAGE);
+
+    JPanel panel = new JPanel(new BorderLayout(0, 8));
+    panel.add(new JLabel(image), BorderLayout.CENTER);
+
+    JButton openBtn = new JButton("Open render in folder");
+    openBtn.addActionListener(e -> ResourceUtils.revealFileInFolder(renderPath));
+    JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+    btnPanel.add(openBtn);
+    panel.add(btnPanel, BorderLayout.SOUTH);
+
+    JOptionPane.showMessageDialog(parent, panel, file.getName(), JOptionPane.PLAIN_MESSAGE);
   }
 
   public void render(File file, WPObject obj, Runnable onComplete) {

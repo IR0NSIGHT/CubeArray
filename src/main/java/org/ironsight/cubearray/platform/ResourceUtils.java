@@ -1,5 +1,6 @@
 package org.ironsight.cubearray.platform;
 
+import java.awt.Desktop;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -13,6 +14,7 @@ import java.util.*;
 import java.util.function.Predicate;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -92,6 +94,44 @@ public class ResourceUtils {
     Path renderPath = getRenderPathForFile(schematicFile);
     if (!Files.exists(renderPath)) return true;
     return schematicFile.lastModified() > renderPath.toFile().lastModified();
+  }
+
+  public static void revealFileInFolder(Path file) {
+    String os = System.getProperty("os.name").toLowerCase();
+    String path = file.toAbsolutePath().toString();
+    try {
+      if (os.contains("win")) {
+        Runtime.getRuntime().exec(new String[] {"explorer", "/select,", path});
+        return;
+      }
+      if (os.contains("mac")) {
+        Runtime.getRuntime().exec(new String[] {"open", "-R", path});
+        return;
+      }
+    } catch (IOException e) {
+      // fall through to fallback
+    }
+    // Linux: try known file managers that support file selection
+    String[][] candidates = {
+      {"nautilus", path},
+      {"dolphin", "--select", path},
+      {"nemo", path},
+    };
+    for (String[] cmd : candidates) {
+      try {
+        Runtime.getRuntime().exec(cmd);
+        return;
+      } catch (IOException ignored) {
+      }
+    }
+    // Ultimate fallback: open containing folder in default file manager
+    if (Desktop.isDesktopSupported()) {
+      try {
+        Desktop.getDesktop().open(file.getParent().toFile());
+      } catch (IOException e) {
+        logger.log(Level.WARNING, "Could not open file location: " + file, e);
+      }
+    }
   }
 
   public static Path getInstallPath() {
