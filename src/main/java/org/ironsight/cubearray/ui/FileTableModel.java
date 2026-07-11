@@ -405,6 +405,23 @@ class FileTableModel extends AbstractTableModel {
     }
   }
 
+  public void addFiles(Collection<File> newFiles) {
+    int oldSize;
+    synchronized (files) {
+      oldSize = files.size();
+      var existing = new HashSet<>(files);
+      for (File f : newFiles) {
+        if (f != null && existing.add(f)) {
+          files.add(f);
+        }
+      }
+    }
+    int added = files.size() - oldSize;
+    if (added > 0) {
+      fireTableRowsInserted(oldSize, oldSize + added - 1);
+    }
+  }
+
   public void removeFile(File... files) {
     for (File file : files) {
       int i = this.files.indexOf(file);

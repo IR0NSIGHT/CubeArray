@@ -393,36 +393,52 @@ public class FileRenderApp {
 
   private void importFolder() {
     JFileChooser chooser = getFileChooser(true);
-    var newFilesAndTimeStamps = new HashMap<>(context.filesAndTimestamps());
-    if (chooser.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) {
-      for (File folder : chooser.getSelectedFiles()) {
-        try {
-          var filesInFolderRecursive = getAllFiles(folder);
-          filesInFolderRecursive.forEach(
-              f -> {
+    if (chooser.showOpenDialog(frame) != JFileChooser.APPROVE_OPTION) return;
+
+    File[] selectedFolders = chooser.getSelectedFiles();
+    File currentDirectory = chooser.getCurrentDirectory();
+
+    new Thread(
+            () -> {
+              var newFilesAndTimeStamps = new HashMap<>(context.filesAndTimestamps());
+              List<File> allDiscoveredFiles = new ArrayList<>();
+              String errorMessage = null;
+
+              for (File folder : selectedFolders) {
+                try {
+                  allDiscoveredFiles.addAll(getAllFiles(folder));
+                } catch (IOException e) {
+                  errorMessage =
+                      "Importing of folder '"
+                          + folder.getAbsolutePath()
+                          + "' has failed: "
+                          + e.getMessage();
+                }
+              }
+
+              for (File f : allDiscoveredFiles) {
                 newFilesAndTimeStamps.put(f, System.currentTimeMillis());
-                tableModel.addFile(f);
-              });
-        } catch (IOException e) {
-          JOptionPane.showMessageDialog(
-              frame,
-              "Importing of folder '"
-                  + folder.getAbsolutePath()
-                  + "' has failed: "
-                  + e.getMessage(),
-              "Error",
-              JOptionPane.ERROR_MESSAGE);
-        }
-      }
-    }
-    var newContext =
-        new AppContext(
-            newFilesAndTimeStamps,
-            chooser.getCurrentDirectory(),
-            context.guiBounds(),
-            context.neverBeforeUsed(),
-            context.columnContext());
-    flagContextDirty(newContext);
+              }
+
+              final String finalError = errorMessage;
+              SwingUtilities.invokeLater(
+                  () -> {
+                    tableModel.addFiles(allDiscoveredFiles);
+                    flagContextDirty(
+                        new AppContext(
+                            newFilesAndTimeStamps,
+                            currentDirectory,
+                            context.guiBounds(),
+                            context.neverBeforeUsed(),
+                            context.columnContext()));
+                    if (finalError != null) {
+                      JOptionPane.showMessageDialog(
+                          frame, finalError, "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                  });
+            },
+            "folder-importer")
+        .start();
   }
 
   /**
