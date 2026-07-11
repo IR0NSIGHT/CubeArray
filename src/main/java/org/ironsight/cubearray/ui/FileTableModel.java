@@ -1,5 +1,7 @@
 package org.ironsight.cubearray.ui;
 
+import org.ironsight.cubearray.preview.SchematicPreviewHelper;
+
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
@@ -26,6 +28,7 @@ import org.pepsoft.worldpainter.layers.bo2.Schem;
 import org.pepsoft.worldpainter.objects.WPObject;
 
 class FileTableModel extends AbstractTableModel {
+  private final SchematicPreviewHelper previewHelper;
 
   private static final Logger logger = AppLogger.get(FileTableModel.class);
   public static final StringConverter dateRenderer =
@@ -123,12 +126,12 @@ class FileTableModel extends AbstractTableModel {
   private final HashMap<File, WPObject> schematicObjects = new HashMap<>();
   private final HashSet<File> loadingFiles = new HashSet<>();
 
-  public FileTableModel(PeriodicChecker checker) {
+  public FileTableModel(PeriodicChecker checker, SchematicPreviewHelper previewHelper) {
+    this.previewHelper = previewHelper;
     if (checker != null) checker.addCallback(this::tryLoadSchematics);
   }
 
   private final HashSet<File> errorFiles = new HashSet<>();
-  private static final Map<String, Icon> iconCache = new HashMap<>();
 
   private void flagAsError(File file) {
     errorFiles.add(file);
@@ -164,18 +167,17 @@ class FileTableModel extends AbstractTableModel {
               try {
                 var schems = SchemReader.loadSchematics(List.of(f.toPath()), this::flagAsError);
                 loadingFiles.remove(f);
-                for (WPObject schem : schems) {
-                  schematicObjects.put(f, schem);
-                  if (onSchematicLoadedCallback != null) onSchematicLoadedCallback.accept(f);
-                }
-                final int ii = i;
                 SwingUtilities.invokeLater(
                     () -> {
-                      if (ii >= files.size()) return;
-                      fireTableRowsUpdated(
-                          ii, ii); // FIXME the index might have changed, get current index of file
+                      int currentIdx = indexOfFile(f);
+                      if (currentIdx < 0) return;
+                      for (WPObject schem : schems) {
+                        schematicObjects.put(f, schem);
+                        if (onSchematicLoadedCallback != null) onSchematicLoadedCallback.accept(f);
+                      }
+                      fireTableRowsUpdated(currentIdx, currentIdx);
                       if (remainingFileCountChangedCallback != null) {
-                        int remainingCount = files.size() - schematicObjects.size();
+                        int remainingCount = Math.max(0, files.size() - schematicObjects.size());
                         remainingFileCountChangedCallback.accept(remainingCount);
                       }
                     });
@@ -210,7 +212,7 @@ class FileTableModel extends AbstractTableModel {
     loadingFiles.remove(file);
     fireTableRowsUpdated(modelRow, modelRow);
     if (remainingFileCountChangedCallback != null) {
-      int remainingCount = files.size() - schematicObjects.size();
+      int remainingCount = Math.max(0, files.size() - schematicObjects.size());
       remainingFileCountChangedCallback.accept(remainingCount);
     }
   }
@@ -259,7 +261,7 @@ class FileTableModel extends AbstractTableModel {
     File f = files.get(row);
     WPObject obj = getSchematicFor(f);
     return switch (CaColumn.values()[col]) {
-      case ICON -> getIconFromFile(f);
+      case ICON -> previewHelper.getIcon(f);
       case FILE -> f.getName();
       case PATH -> f.getAbsolutePath();
       case FILE_SIZE -> getSizeBytes(f);
@@ -350,37 +352,6 @@ class FileTableModel extends AbstractTableModel {
     return schematicObjects.get(f);
   }
 
-  private Icon generatePlaceholderIcon(File f) {
-    var image = new java.awt.image.BufferedImage(64, 64, java.awt.image.BufferedImage.TYPE_INT_ARGB);
-    var g = image.createGraphics();
-    g.setColor(new Color(0x33, 0x33, 0x33));
-    g.fillRect(0, 0, 64, 64);
-    g.setColor(new Color(0x88, 0x88, 0x88));
-    g.setFont(g.getFont().deriveFont(24f));
-    var fm = g.getFontMetrics();
-    String letter = f.getName().substring(0, 1).toUpperCase();
-    int x = (64 - fm.stringWidth(letter)) / 2;
-    int y = (64 - fm.getHeight()) / 2 + fm.getAscent();
-    g.drawString(letter, x, y);
-    g.dispose();
-    return new ImageIcon(image);
-  }
-
-  private Icon getIconFromFile(File f) {
-    return iconCache.computeIfAbsent(
-        f.getAbsolutePath(),
-        k -> {
-          Path renderPath = ResourceUtils.getRenderPathForFile(f);
-          if (renderPath.toFile().exists()) {
-            return new ImageIcon(
-                new ImageIcon(renderPath.toString())
-                    .getImage()
-                    .getScaledInstance(64, 64, Image.SCALE_SMOOTH));
-          }
-          return generatePlaceholderIcon(f);
-        });
-  }
-
   public boolean isFileLoaded(int modelRow) {
     return schematicObjects.containsKey(getFile(modelRow));
   }
@@ -423,13 +394,30 @@ class FileTableModel extends AbstractTableModel {
   }
 
   public void invalidateIconCache(File f) {
-    iconCache.remove(f.getAbsolutePath());
+    previewHelper.invalidateIcon(f);
   }
 
   public void addFile(File f) {
     if (f != null && !files.contains(f)) {
       files.add(f);
       fireTableRowsInserted(files.size() - 1, files.size() - 1);
+    }
+  }
+
+  public void addFiles(Collection<File> newFiles) {
+    int oldSize;
+    synchronized (files) {
+      oldSize = files.size();
+      var existing = new HashSet<>(files);
+      for (File f : newFiles) {
+        if (f != null && existing.add(f)) {
+          files.add(f);
+        }
+      }
+    }
+    int added = files.size() - oldSize;
+    if (added > 0) {
+      fireTableRowsInserted(oldSize, oldSize + added - 1);
     }
   }
 

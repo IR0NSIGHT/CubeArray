@@ -80,6 +80,14 @@ public class ResourceUtils {
     return getInstallPath().resolve("renders").resolve(baseName + "__" + hash + ".png");
   }
 
+  public static Path getThumbPathForFile(File file) {
+    Path renderPath = getRenderPathForFile(file);
+    String name = renderPath.getFileName().toString();
+    int dot = name.lastIndexOf('.');
+    String thumb = (dot > 0 ? name.substring(0, dot) : name) + "_thumb.png";
+    return renderPath.resolveSibling(thumb);
+  }
+
   public static boolean needsNewRender(File schematicFile) {
     Path renderPath = getRenderPathForFile(schematicFile);
     if (!Files.exists(renderPath)) return true;

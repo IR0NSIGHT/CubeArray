@@ -6,7 +6,6 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -17,10 +16,6 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -38,6 +33,7 @@ import org.ironsight.cubearray.platform.ResourceUtils;
 import org.ironsight.cubearray.schematic.SchemReader;
 import org.ironsight.cubearray.edit.BatchConverter;
 import org.ironsight.cubearray.edit.BlockReplacer;
+import org.ironsight.cubearray.preview.SchematicPreviewHelper;
 import org.pepsoft.worldpainter.objects.WPObject;
 
 public class FileRenderApp {
@@ -55,13 +51,6 @@ public class FileRenderApp {
   // is context dirty and needs to be saved?
   private boolean contextDirtyFlag;
   private final HashMap<CaColumn, TableColumn> columToTableColumn = new HashMap<>();
-  private final ExecutorService renderExecutor =
-      Executors.newSingleThreadExecutor(
-          r -> {
-            Thread t = new Thread(r, "render-worker");
-            t.setDaemon(true);
-            return t;
-          });
 
   private void flagContextDirty(AppContext context) {
     this.context = context;
@@ -125,6 +114,7 @@ public class FileRenderApp {
   }
 
   private final JLabel topInfoLabel;
+  private final JLabel renderInfoLabel;
 
   public FileRenderApp(final AppContext initialContext) {
     this.context = initialContext;
@@ -146,13 +136,18 @@ public class FileRenderApp {
     PeriodicChecker.INSTANCE.addCallback(this::checkContextSaving);
     PeriodicChecker.INSTANCE.addCallback(this::checkLoadingThreads);
 
-    this.tableModel = new FileTableModel(PeriodicChecker.INSTANCE);
+    this.tableModel = new FileTableModel(PeriodicChecker.INSTANCE, SchematicPreviewHelper.getInstance());
     tableModel.setFileQueueSizeChangedCallback(
         count -> {
           if (count == 0) this.setTextRemainingFiles("");
           else this.setTextRemainingFiles("Loading " + count + " file(s)");
         });
     tableModel.setOnSchematicLoadedCallback(this::renderSchematicIcon);
+    SchematicPreviewHelper.getInstance().setPendingRenderCountChangedCallback(
+        count -> {
+          if (count == 0) this.setTextRenderingSchematics("");
+          else this.setTextRenderingSchematics("Rendering " + count + " schematic(s)");
+        });
 
     this.fileTable = new JTable(tableModel);
     this.rowSorter = new TableRowSorter<>(tableModel);
@@ -319,6 +314,11 @@ public class FileRenderApp {
         JLabel topInfoLabel = new JLabel();
         topInfo.add(topInfoLabel);
         this.topInfoLabel = topInfoLabel;
+
+        JLabel renderInfoLabel = new JLabel();
+        topInfo.add(Box.createHorizontalStrut(16));
+        topInfo.add(renderInfoLabel);
+        this.renderInfoLabel = renderInfoLabel;
       }
       topPanel.add(topInfo);
     }
@@ -404,36 +404,52 @@ public class FileRenderApp {
 
   private void importFolder() {
     JFileChooser chooser = getFileChooser(true);
-    var newFilesAndTimeStamps = new HashMap<>(context.filesAndTimestamps());
-    if (chooser.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) {
-      for (File folder : chooser.getSelectedFiles()) {
-        try {
-          var filesInFolderRecursive = getAllFiles(folder);
-          filesInFolderRecursive.forEach(
-              f -> {
+    if (chooser.showOpenDialog(frame) != JFileChooser.APPROVE_OPTION) return;
+
+    File[] selectedFolders = chooser.getSelectedFiles();
+    File currentDirectory = chooser.getCurrentDirectory();
+
+    new Thread(
+            () -> {
+              var newFilesAndTimeStamps = new HashMap<>(context.filesAndTimestamps());
+              List<File> allDiscoveredFiles = new ArrayList<>();
+              String errorMessage = null;
+
+              for (File folder : selectedFolders) {
+                try {
+                  allDiscoveredFiles.addAll(getAllFiles(folder));
+                } catch (IOException e) {
+                  errorMessage =
+                      "Importing of folder '"
+                          + folder.getAbsolutePath()
+                          + "' has failed: "
+                          + e.getMessage();
+                }
+              }
+
+              for (File f : allDiscoveredFiles) {
                 newFilesAndTimeStamps.put(f, System.currentTimeMillis());
-                tableModel.addFile(f);
-              });
-        } catch (IOException e) {
-          JOptionPane.showMessageDialog(
-              frame,
-              "Importing of folder '"
-                  + folder.getAbsolutePath()
-                  + "' has failed: "
-                  + e.getMessage(),
-              "Error",
-              JOptionPane.ERROR_MESSAGE);
-        }
-      }
-    }
-    var newContext =
-        new AppContext(
-            newFilesAndTimeStamps,
-            chooser.getCurrentDirectory(),
-            context.guiBounds(),
-            context.neverBeforeUsed(),
-            context.columnContext());
-    flagContextDirty(newContext);
+              }
+
+              final String finalError = errorMessage;
+              SwingUtilities.invokeLater(
+                  () -> {
+                    tableModel.addFiles(allDiscoveredFiles);
+                    flagContextDirty(
+                        new AppContext(
+                            newFilesAndTimeStamps,
+                            currentDirectory,
+                            context.guiBounds(),
+                            context.neverBeforeUsed(),
+                            context.columnContext()));
+                    if (finalError != null) {
+                      JOptionPane.showMessageDialog(
+                          frame, finalError, "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                  });
+            },
+            "folder-importer")
+        .start();
   }
 
   /**
@@ -473,6 +489,7 @@ public class FileRenderApp {
               tableModel.invalidateIconCache(file);
               try {
                 Files.deleteIfExists(ResourceUtils.getRenderPathForFile(file));
+                Files.deleteIfExists(ResourceUtils.getThumbPathForFile(file));
               } catch (IOException e) {
                 // ignore
               }
@@ -733,6 +750,10 @@ public class FileRenderApp {
     topInfoLabel.setText(text);
   }
 
+  private void setTextRenderingSchematics(String text) {
+    renderInfoLabel.setText(text);
+  }
+
   private void reloadSelectedFiles() {
     var rows = getSelectedModelRows();
     for (int row : rows) {
@@ -741,6 +762,7 @@ public class FileRenderApp {
       tableModel.invalidateIconCache(file);
       try {
         Files.deleteIfExists(ResourceUtils.getRenderPathForFile(file));
+        Files.deleteIfExists(ResourceUtils.getThumbPathForFile(file));
       } catch (IOException e) {
         // ignore
       }
@@ -1239,51 +1261,21 @@ public class FileRenderApp {
 
   private void showRenderPreview(int modelRow) {
     File file = tableModel.getFileAt(modelRow);
-    Path renderPath = ResourceUtils.getRenderPathForFile(file);
-    if (!Files.exists(renderPath)) {
-      JOptionPane.showMessageDialog(frame, "No render available yet.", file.getName(), JOptionPane.PLAIN_MESSAGE);
-      return;
-    }
-    ImageIcon icon =
-        new ImageIcon(
-            new ImageIcon(renderPath.toString())
-                .getImage()
-                .getScaledInstance(640, 640, Image.SCALE_SMOOTH));
-    JOptionPane.showMessageDialog(frame, icon, file.getName(), JOptionPane.PLAIN_MESSAGE);
+    SchematicPreviewHelper.getInstance().showPreviewDialog(file, frame);
   }
 
   private void renderSchematicIcon(File file) {
     if (file == null) return;
-    if (!ResourceUtils.needsNewRender(file)) return;
-    Future<?> future =
-        renderExecutor.submit(
-            () -> {
-              try {
-                WPObject obj = tableModel.getSchematicFor(file);
-                if (obj == null) return;
-                ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
-                CubeSetup setup = SchemReader.prepareData(List.of(obj));
-                if (setup == null) return;
-                Path renderPath = ResourceUtils.getRenderPathForFile(file);
-                Files.createDirectories(renderPath.getParent());
-                InstancedCubes.renderToFile(setup, renderPath, 640, 640);
-                SwingUtilities.invokeLater(
-                    () -> {
-                      tableModel.invalidateIconCache(file);
-                      int idx = tableModel.indexOfFile(file);
-                      if (idx >= 0) tableModel.fireTableRowsUpdated(idx, idx);
-                    });
-              } catch (Exception e) {
-                logger.log(Level.WARNING, "Failed to render icon for " + file.getName(), e);
-              }
-            });
-    try {
-      future.get();
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    } catch (ExecutionException e) {
-      logger.log(Level.WARNING, "Render failed for " + file.getName(), e);
-    }
+    WPObject obj = tableModel.getSchematicFor(file);
+    if (obj == null) return;
+    SchematicPreviewHelper.getInstance().render(
+        file,
+        obj,
+        () -> {
+          tableModel.invalidateIconCache(file);
+          int idx = tableModel.indexOfFile(file);
+          if (idx >= 0) tableModel.fireTableRowsUpdated(idx, idx);
+        });
   }
 
   private JFileChooser getFileChooser(boolean folder) {
