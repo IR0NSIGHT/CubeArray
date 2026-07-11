@@ -16,7 +16,7 @@ jpackage \
   --input staging/ \
   --name CubeArray \
   --main-jar CubeArray.jar \
-  --main-class org.ironsight.CubeArray.CubeArrayMain \
+  --main-class org.ironsight.cubearray.CubeArrayMain \
   --type app-image \
   --dest dist/
 
