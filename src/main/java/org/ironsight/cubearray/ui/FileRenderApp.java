@@ -2,6 +2,8 @@ package org.ironsight.cubearray.ui;
 
 import static org.ironsight.cubearray.platform.ResourceUtils.isSupportedSchematicType;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
@@ -66,38 +68,59 @@ public class FileRenderApp {
     contextDirtyFlag = true;
   }
 
-  private record TextSearch(
-      String searchString, List<CaColumn> searchCaColumns, boolean excludeMatches) {
-    // provide default values via a compact constructor
-    public TextSearch() {
-      this("", List.of(), false);
+  private ChipSearchManager chipSearchManager;
+
+  private JTextField searchField;
+  private JPanel chipRow;
+
+  private static final long DEBUG_SEARCH_DELAY_MS = 0;
+
+  private void updateFilter() {
+    if (DEBUG_SEARCH_DELAY_MS > 0) {
+      try {
+        MILLISECONDS.sleep(DEBUG_SEARCH_DELAY_MS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
     }
-  }
+    String plainText = searchField.getText().trim().toLowerCase();
+    boolean hasPlainText = !plainText.isEmpty();
+    boolean hasChips = chipSearchManager.hasConditions();
 
-  private TextSearch currentSearch = new TextSearch();
-
-  private void updateTextSearch(TextSearch newSearch) {
-    this.currentSearch = newSearch;
-    if (currentSearch.searchString.isEmpty()) {
+    if (!hasPlainText && !hasChips) {
       rowSorter.setRowFilter(null);
     } else {
-
       rowSorter.setRowFilter(
           new RowFilter<>() {
             @Override
             public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
-              for (CaColumn c : context.columnContext().displayedColumns()) {
-                if (c.renderer
-                    .convertToString(entry.getValue(c.ordinal()))
-                    .toLowerCase()
-                    .contains(currentSearch.searchString)) return true;
+              if (hasPlainText) {
+                boolean found = false;
+                for (CaColumn c : context.columnContext().displayedColumns()) {
+                  if (c.renderer
+                      .convertToString(entry.getValue(c.ordinal()))
+                      .toLowerCase()
+                      .contains(plainText)) {
+                    found = true;
+                    break;
+                  }
+                }
+                if (!found) return false;
               }
-              return false;
+              for (ChipSearchManager.SearchCondition cond : chipSearchManager.getConditions()) {
+                String cellValue =
+                    cond.column()
+                        .renderer
+                        .convertToString(entry.getValue(cond.column().ordinal()))
+                        .toLowerCase();
+                if (!cellValue.contains(cond.searchTerm().toLowerCase())) return false;
+              }
+              return true;
             }
           });
     }
     for (CaColumn c : CaColumn.values()) {
-      c.renderer.setSearchText(currentSearch.searchString);
+      c.renderer.setSearchText(plainText);
     }
   }
 
@@ -216,41 +239,29 @@ public class FileRenderApp {
     }
     fileTable.setRowHeight(64);
 
-    JTextField searchField = new JTextField(20);
+    searchField = new JTextField(40);
     searchField.setText("Search");
     searchField.putClientProperty("JTextField.placeholderText", "Search...");
-    searchField
-        .getDocument()
-        .addDocumentListener(
-            new javax.swing.event.DocumentListener() {
-              public void insertUpdate(javax.swing.event.DocumentEvent e) {
-                update();
-              }
+    DebouncedDocumentListener debouncer =
+        DebouncedDocumentListener.create(200, this::updateFilter);
+    searchField.getDocument().addDocumentListener(debouncer);
 
-              private void update() {
-                String text = searchField.getText().trim().toLowerCase();
-                updateTextSearch(
-                    new TextSearch(
-                        text, currentSearch.searchCaColumns, currentSearch.excludeMatches));
-              }
+    chipRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
+    chipRow.setVisible(false);
 
-              public void removeUpdate(javax.swing.event.DocumentEvent e) {
-                update();
-              }
-
-              public void changedUpdate(javax.swing.event.DocumentEvent e) {
-                update();
-              }
-            });
+    chipSearchManager =
+        new ChipSearchManager(searchField, chipRow, this::updateFilter, frame);
+    JButton addConditionBtn = chipSearchManager.createAddConditionButton();
 
     fileTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF); // allows wide table + horizontal scrolling
     JScrollPane scrollPane = new JScrollPane(fileTable);
 
-    JPanel topPanel = new JPanel(new GridLayout(2, 0));
+    JPanel topPanel = new JPanel();
+    topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));
     {
-      JPanel topButtons = new JPanel(new FlowLayout(FlowLayout.LEFT));
+      JPanel searchRow = new JPanel(new FlowLayout(FlowLayout.LEFT));
       {
-        JButton addBtn = new JButton("Files");
+        JButton addBtn = new JButton(Icons.get("menu"));
         final JPopupMenu filesMenu =
             new JPopupMenu() {
               @Override
@@ -294,17 +305,21 @@ public class FileRenderApp {
                     filesMenu.show(addBtn, 0, addBtn.getHeight());
                   });
             });
-        topPanel.add(addBtn);
+        searchRow.add(addBtn);
 
-        topPanel.add(searchField);
+        searchRow.add(searchField);
+        searchRow.add(addConditionBtn);
       }
+      topPanel.add(searchRow);
+
+      topPanel.add(chipRow);
+
       JPanel topInfo = new JPanel(new FlowLayout(FlowLayout.LEFT));
       {
         JLabel topInfoLabel = new JLabel();
         topInfo.add(topInfoLabel);
         this.topInfoLabel = topInfoLabel;
       }
-      topPanel.add(topButtons);
       topPanel.add(topInfo);
     }
 
@@ -318,9 +333,9 @@ public class FileRenderApp {
     }
 
     JTabbedPane tabbedPane = new JTabbedPane(SwingConstants.LEFT);
-    tabbedPane.add("File List", fileListPanel);
-    tabbedPane.add(
-        "⚙\uFE0F", getSettingsComponent(context.columnContext().displayedColumns())); // SETTINGS
+    tabbedPane.addTab(null, Icons.get("folder"), fileListPanel);
+    tabbedPane.addTab(null, Icons.get("settings"),
+        getSettingsComponent(context.columnContext().displayedColumns()));
     frame.add(tabbedPane);
     context.filesAndTimestamps().keySet().forEach(tableModel::addFile);
 
@@ -800,7 +815,7 @@ public class FileRenderApp {
       convertToSponge3Btn.addActionListener(a -> this.convertSelectedToSponge3());
       rightMenu.add(convertToSponge3Btn);
 
-      JButton replaceSandstoneBtn = new JButton("Replace sandstone with cobblestone");
+      JButton replaceSandstoneBtn = new JButton("Replace blocks");
       replaceSandstoneBtn.addActionListener(a -> this.replaceSandstoneWithCobblestone());
       rightMenu.add(replaceSandstoneBtn);
     }
