@@ -131,7 +131,7 @@ public class SpriteSheet {
       for (String sprite : matEntry.getValue()) {
         File file = spriteFile(sprite, nameToFile);
         if (file == null) {
-          logger.warning("CAN NOT LOCATE TEXTURE FOR: " + sprite + " (" + mat.simpleName + ")");
+        //  logger.warning("CAN NOT LOCATE TEXTURE FOR: " + sprite + " (" + mat.simpleName + ")");
           matRects.put(sprite, NO_TEXTURE);
           continue;
         }

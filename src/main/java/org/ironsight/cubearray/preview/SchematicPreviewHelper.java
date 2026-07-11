@@ -11,6 +11,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.imageio.ImageIO;
@@ -27,16 +32,55 @@ public class SchematicPreviewHelper {
   private static final SchematicPreviewHelper INSTANCE = new SchematicPreviewHelper();
 
   private final ExecutorService renderExecutor =
-      Executors.newSingleThreadExecutor(
+      new ThreadPoolExecutor(
+          1,
+          1,
+          0L,
+          TimeUnit.MILLISECONDS,
+          new PriorityBlockingQueue<>(),
           r -> {
             Thread t = new Thread(r, "render-worker");
             t.setDaemon(true);
             return t;
           });
 
+  private static class PriorityTask implements Runnable, Comparable<PriorityTask> {
+    private final Runnable task;
+    private final long priority;
+
+    PriorityTask(Runnable task, long priority) {
+      this.task = task;
+      this.priority = priority;
+    }
+
+    @Override
+    public void run() {
+      task.run();
+    }
+
+    @Override
+    public int compareTo(PriorityTask other) {
+      return Long.compare(this.priority, other.priority);
+    }
+  }
+
   private final Map<String, Icon> iconCache = new HashMap<>();
 
+  private Consumer<Integer> pendingRenderCountChangedCallback;
+
   private SchematicPreviewHelper() {}
+
+  public void setPendingRenderCountChangedCallback(Consumer<Integer> callback) {
+    this.pendingRenderCountChangedCallback = callback;
+  }
+
+  private void firePendingRenderCountChanged() {
+    if (pendingRenderCountChangedCallback != null) {
+      ThreadPoolExecutor tpe = (ThreadPoolExecutor) renderExecutor;
+      int count = tpe.getQueue().size() + (tpe.getActiveCount() > 0 ? 1 : 0);
+      pendingRenderCountChangedCallback.accept(count);
+    }
+  }
 
   public static SchematicPreviewHelper getInstance() {
     return INSTANCE;
@@ -86,33 +130,40 @@ public class SchematicPreviewHelper {
       if (onComplete != null) onComplete.run();
       return;
     }
-    renderExecutor.submit(
-        () -> {
-          try {
-            ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
-            CubeSetup setup = SchemReader.prepareData(List.of(obj));
-            if (setup == null) return;
-            Path renderPath = ResourceUtils.getRenderPathForFile(file);
-            Files.createDirectories(renderPath.getParent());
-            InstancedCubes.renderToFile(setup, renderPath, 640, 640);
-            try {
-              BufferedImage full = ImageIO.read(renderPath.toFile());
-              BufferedImage thumb = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
-              Graphics2D g = thumb.createGraphics();
-              g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-              g.drawImage(full, 0, 0, 64, 64, null);
-              g.dispose();
-              ImageIO.write(thumb, "PNG", ResourceUtils.getThumbPathForFile(file).toFile());
-            } catch (Exception e) {
-              logger.log(Level.FINE, "Failed to generate thumbnail for " + file.getName(), e);
-            }
-            if (onComplete != null) {
-              SwingUtilities.invokeLater(onComplete);
-            }
-          } catch (Exception e) {
-            logger.log(Level.WARNING, "Failed to render icon for " + file.getName(), e);
-          }
-        });
+    firePendingRenderCountChanged();
+    renderExecutor.execute(
+        new PriorityTask(
+            () -> {
+              try {
+                ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
+                CubeSetup setup = SchemReader.prepareData(List.of(obj));
+                if (setup == null) return;
+                Path renderPath = ResourceUtils.getRenderPathForFile(file);
+                Files.createDirectories(renderPath.getParent());
+                InstancedCubes.renderToFile(setup, renderPath, 640, 640);
+                try {
+                  BufferedImage full = ImageIO.read(renderPath.toFile());
+                  BufferedImage thumb = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
+                  Graphics2D g = thumb.createGraphics();
+                  g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                  g.drawImage(full, 0, 0, 64, 64, null);
+                  g.dispose();
+                  ImageIO.write(thumb, "PNG", ResourceUtils.getThumbPathForFile(file).toFile());
+                } catch (Exception e) {
+                  logger.log(Level.FINE, "Failed to generate thumbnail for " + file.getName(), e);
+                }
+                SwingUtilities.invokeLater(
+                    () -> {
+                      if (onComplete != null) onComplete.run();
+                    });
+              } catch (Exception e) {
+                logger.log(Level.WARNING, "Failed to render icon for " + file.getName(), e);
+              } finally {
+                SwingUtilities.invokeLater(
+                    () -> firePendingRenderCountChanged());
+              }
+            },
+            file.length()));
   }
 
   public void dispose() {

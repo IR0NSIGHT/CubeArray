@@ -167,18 +167,17 @@ class FileTableModel extends AbstractTableModel {
               try {
                 var schems = SchemReader.loadSchematics(List.of(f.toPath()), this::flagAsError);
                 loadingFiles.remove(f);
-                for (WPObject schem : schems) {
-                  schematicObjects.put(f, schem);
-                  if (onSchematicLoadedCallback != null) onSchematicLoadedCallback.accept(f);
-                }
-                final int ii = i;
                 SwingUtilities.invokeLater(
                     () -> {
-                      if (ii >= files.size()) return;
-                      fireTableRowsUpdated(
-                          ii, ii); // FIXME the index might have changed, get current index of file
+                      int currentIdx = indexOfFile(f);
+                      if (currentIdx < 0) return;
+                      for (WPObject schem : schems) {
+                        schematicObjects.put(f, schem);
+                        if (onSchematicLoadedCallback != null) onSchematicLoadedCallback.accept(f);
+                      }
+                      fireTableRowsUpdated(currentIdx, currentIdx);
                       if (remainingFileCountChangedCallback != null) {
-                        int remainingCount = files.size() - schematicObjects.size();
+                        int remainingCount = Math.max(0, files.size() - schematicObjects.size());
                         remainingFileCountChangedCallback.accept(remainingCount);
                       }
                     });
@@ -213,7 +212,7 @@ class FileTableModel extends AbstractTableModel {
     loadingFiles.remove(file);
     fireTableRowsUpdated(modelRow, modelRow);
     if (remainingFileCountChangedCallback != null) {
-      int remainingCount = files.size() - schematicObjects.size();
+      int remainingCount = Math.max(0, files.size() - schematicObjects.size());
       remainingFileCountChangedCallback.accept(remainingCount);
     }
   }

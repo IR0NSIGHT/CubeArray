@@ -114,6 +114,7 @@ public class FileRenderApp {
   }
 
   private final JLabel topInfoLabel;
+  private final JLabel renderInfoLabel;
 
   public FileRenderApp(final AppContext initialContext) {
     this.context = initialContext;
@@ -142,6 +143,11 @@ public class FileRenderApp {
           else this.setTextRemainingFiles("Loading " + count + " file(s)");
         });
     tableModel.setOnSchematicLoadedCallback(this::renderSchematicIcon);
+    SchematicPreviewHelper.getInstance().setPendingRenderCountChangedCallback(
+        count -> {
+          if (count == 0) this.setTextRenderingSchematics("");
+          else this.setTextRenderingSchematics("Rendering " + count + " schematic(s)");
+        });
 
     this.fileTable = new JTable(tableModel);
     this.rowSorter = new TableRowSorter<>(tableModel);
@@ -308,6 +314,11 @@ public class FileRenderApp {
         JLabel topInfoLabel = new JLabel();
         topInfo.add(topInfoLabel);
         this.topInfoLabel = topInfoLabel;
+
+        JLabel renderInfoLabel = new JLabel();
+        topInfo.add(Box.createHorizontalStrut(16));
+        topInfo.add(renderInfoLabel);
+        this.renderInfoLabel = renderInfoLabel;
       }
       topPanel.add(topInfo);
     }
@@ -478,6 +489,7 @@ public class FileRenderApp {
               tableModel.invalidateIconCache(file);
               try {
                 Files.deleteIfExists(ResourceUtils.getRenderPathForFile(file));
+                Files.deleteIfExists(ResourceUtils.getThumbPathForFile(file));
               } catch (IOException e) {
                 // ignore
               }
@@ -738,6 +750,10 @@ public class FileRenderApp {
     topInfoLabel.setText(text);
   }
 
+  private void setTextRenderingSchematics(String text) {
+    renderInfoLabel.setText(text);
+  }
+
   private void reloadSelectedFiles() {
     var rows = getSelectedModelRows();
     for (int row : rows) {
@@ -746,6 +762,7 @@ public class FileRenderApp {
       tableModel.invalidateIconCache(file);
       try {
         Files.deleteIfExists(ResourceUtils.getRenderPathForFile(file));
+        Files.deleteIfExists(ResourceUtils.getThumbPathForFile(file));
       } catch (IOException e) {
         // ignore
       }
