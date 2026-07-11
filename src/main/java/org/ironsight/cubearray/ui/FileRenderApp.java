@@ -815,7 +815,7 @@ public class FileRenderApp {
       convertToSponge3Btn.addActionListener(a -> this.convertSelectedToSponge3());
       rightMenu.add(convertToSponge3Btn);
 
-      JButton replaceSandstoneBtn = new JButton("Replace sandstone with cobblestone");
+      JButton replaceSandstoneBtn = new JButton("Replace blocks");
       replaceSandstoneBtn.addActionListener(a -> this.replaceSandstoneWithCobblestone());
       rightMenu.add(replaceSandstoneBtn);
     }
