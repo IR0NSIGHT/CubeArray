@@ -2,6 +2,8 @@ package org.ironsight.cubearray.ui;
 
 import static org.ironsight.cubearray.platform.ResourceUtils.isSupportedSchematicType;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
@@ -76,7 +78,16 @@ public class FileRenderApp {
 
   private TextSearch currentSearch = new TextSearch();
 
+  private static final long DEBUG_SEARCH_DELAY_MS = 0;
+
   private void updateTextSearch(TextSearch newSearch) {
+    if (DEBUG_SEARCH_DELAY_MS > 0) {
+      try {
+        MILLISECONDS.sleep(DEBUG_SEARCH_DELAY_MS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }
     this.currentSearch = newSearch;
     if (currentSearch.searchString.isEmpty()) {
       rowSorter.setRowFilter(null);
@@ -219,29 +230,16 @@ public class FileRenderApp {
     JTextField searchField = new JTextField(20);
     searchField.setText("Search");
     searchField.putClientProperty("JTextField.placeholderText", "Search...");
-    searchField
-        .getDocument()
-        .addDocumentListener(
-            new javax.swing.event.DocumentListener() {
-              public void insertUpdate(javax.swing.event.DocumentEvent e) {
-                update();
-              }
-
-              private void update() {
-                String text = searchField.getText().trim().toLowerCase();
-                updateTextSearch(
-                    new TextSearch(
-                        text, currentSearch.searchCaColumns, currentSearch.excludeMatches));
-              }
-
-              public void removeUpdate(javax.swing.event.DocumentEvent e) {
-                update();
-              }
-
-              public void changedUpdate(javax.swing.event.DocumentEvent e) {
-                update();
-              }
+    DebouncedDocumentListener debouncer =
+        DebouncedDocumentListener.create(
+            200,
+            () -> {
+              String text = searchField.getText().trim().toLowerCase();
+              updateTextSearch(
+                  new TextSearch(
+                      text, currentSearch.searchCaColumns, currentSearch.excludeMatches));
             });
+    searchField.getDocument().addDocumentListener(debouncer);
 
     fileTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF); // allows wide table + horizontal scrolling
     JScrollPane scrollPane = new JScrollPane(fileTable);
