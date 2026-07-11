@@ -68,19 +68,22 @@ public class FileRenderApp {
     contextDirtyFlag = true;
   }
 
-  private record TextSearch(
-      String searchString, List<CaColumn> searchCaColumns, boolean excludeMatches) {
-    // provide default values via a compact constructor
-    public TextSearch() {
-      this("", List.of(), false);
-    }
-  }
+  private record SearchCondition(CaColumn column, String searchTerm) {}
 
-  private TextSearch currentSearch = new TextSearch();
+  private final List<SearchCondition> searchConditions = new ArrayList<>();
+
+  private static final List<CaColumn> SEARCHABLE_COLUMNS =
+      Arrays.stream(CaColumn.values())
+          .filter(c -> c != CaColumn.ICON)
+          .sorted(Comparator.comparing((CaColumn c) -> c.displayName.toLowerCase()))
+          .toList();
+
+  private JTextField searchField;
+  private JPanel chipRow;
 
   private static final long DEBUG_SEARCH_DELAY_MS = 0;
 
-  private void updateTextSearch(TextSearch newSearch) {
+  private void updateFilter() {
     if (DEBUG_SEARCH_DELAY_MS > 0) {
       try {
         MILLISECONDS.sleep(DEBUG_SEARCH_DELAY_MS);
@@ -88,28 +91,158 @@ public class FileRenderApp {
         Thread.currentThread().interrupt();
       }
     }
-    this.currentSearch = newSearch;
-    if (currentSearch.searchString.isEmpty()) {
+    String plainText = searchField.getText().trim().toLowerCase();
+    boolean hasPlainText = !plainText.isEmpty();
+    boolean hasChips = !searchConditions.isEmpty();
+
+    if (!hasPlainText && !hasChips) {
       rowSorter.setRowFilter(null);
     } else {
-
       rowSorter.setRowFilter(
           new RowFilter<>() {
             @Override
             public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
-              for (CaColumn c : context.columnContext().displayedColumns()) {
-                if (c.renderer
-                    .convertToString(entry.getValue(c.ordinal()))
-                    .toLowerCase()
-                    .contains(currentSearch.searchString)) return true;
+              if (hasPlainText) {
+                boolean found = false;
+                for (CaColumn c : context.columnContext().displayedColumns()) {
+                  if (c.renderer
+                      .convertToString(entry.getValue(c.ordinal()))
+                      .toLowerCase()
+                      .contains(plainText)) {
+                    found = true;
+                    break;
+                  }
+                }
+                if (!found) return false;
               }
-              return false;
+              for (SearchCondition cond : searchConditions) {
+                String cellValue =
+                    cond.column()
+                        .renderer
+                        .convertToString(entry.getValue(cond.column().ordinal()))
+                        .toLowerCase();
+                if (!cellValue.contains(cond.searchTerm().toLowerCase())) return false;
+              }
+              return true;
             }
           });
     }
     for (CaColumn c : CaColumn.values()) {
-      c.renderer.setSearchText(currentSearch.searchString);
+      c.renderer.setSearchText(plainText);
     }
+  }
+
+  private void showAddConditionDialog() {
+    String searchText = searchField.getText().trim();
+    if (searchText.isEmpty()) return;
+
+    Window window = SwingUtilities.getWindowAncestor(frame);
+    JDialog dialog =
+        new JDialog(window, "Add Search Condition", Dialog.ModalityType.APPLICATION_MODAL);
+
+    JPanel panel = new JPanel(new GridBagLayout());
+    GridBagConstraints gbc = new GridBagConstraints();
+    gbc.insets = new Insets(8, 8, 8, 8);
+    gbc.fill = GridBagConstraints.HORIZONTAL;
+
+    JLabel searchTextLabel = new JLabel("\u201C" + searchText + "\u201D");
+    searchTextLabel.setFont(searchTextLabel.getFont().deriveFont(Font.BOLD));
+
+    gbc.gridx = 0;
+    gbc.gridy = 0;
+    panel.add(new JLabel("Search for:"), gbc);
+    gbc.gridx = 1;
+    panel.add(searchTextLabel, gbc);
+
+    JComboBox<CaColumn> columnCombo = new JComboBox<>(SEARCHABLE_COLUMNS.toArray(new CaColumn[0]));
+    columnCombo.setRenderer(
+        new DefaultListCellRenderer() {
+          @Override
+          public Component getListCellRendererComponent(
+              JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
+            super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+            if (value instanceof CaColumn col) {
+              setText(col.displayName);
+            }
+            return this;
+          }
+        });
+    if (!SEARCHABLE_COLUMNS.isEmpty()) {
+      columnCombo.setSelectedIndex(0);
+    }
+
+    gbc.gridx = 0;
+    gbc.gridy = 1;
+    panel.add(new JLabel("In column:"), gbc);
+    gbc.gridx = 1;
+    panel.add(columnCombo, gbc);
+
+    JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+    JButton okButton = new JButton("OK");
+    JButton cancelButton = new JButton("Cancel");
+    buttonPanel.add(okButton);
+    buttonPanel.add(cancelButton);
+
+    gbc.gridx = 0;
+    gbc.gridy = 2;
+    gbc.gridwidth = 2;
+    gbc.anchor = GridBagConstraints.CENTER;
+    panel.add(buttonPanel, gbc);
+
+    okButton.addActionListener(
+        e -> {
+          CaColumn selectedCol = (CaColumn) columnCombo.getSelectedItem();
+          if (selectedCol != null) {
+            addCondition(new SearchCondition(selectedCol, searchText));
+            searchField.setText("");
+            dialog.dispose();
+          }
+        });
+    cancelButton.addActionListener(e -> dialog.dispose());
+    dialog.getContentPane().add(panel);
+    dialog.pack();
+    dialog.setLocationRelativeTo(window);
+    dialog.setVisible(true);
+  }
+
+  private void addCondition(SearchCondition cond) {
+    searchConditions.add(cond);
+
+    JPanel chip = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 2));
+    chip.setBackground(new Color(220, 230, 250));
+    chip.setBorder(
+        BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(180, 200, 240)),
+            BorderFactory.createEmptyBorder(2, 6, 2, 2)));
+
+    JLabel label = new JLabel(cond.column().displayName + ": " + cond.searchTerm());
+    JButton closeButton = new JButton("\u00D7");
+    closeButton.setFont(closeButton.getFont().deriveFont(Font.BOLD, 12f));
+    closeButton.setBorder(BorderFactory.createEmptyBorder(0, 4, 0, 2));
+    closeButton.setContentAreaFilled(false);
+    closeButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+    chip.add(label);
+    chip.add(closeButton);
+
+    closeButton.addActionListener(
+        e -> {
+          searchConditions.remove(cond);
+          chipRow.remove(chip);
+          if (searchConditions.isEmpty()) {
+            chipRow.setVisible(false);
+          }
+          chipRow.revalidate();
+          chipRow.repaint();
+          updateFilter();
+        });
+
+    chipRow.add(chip);
+    chipRow.setVisible(true);
+    chipRow.revalidate();
+    chipRow.repaint();
+
+    updateFilter();
   }
 
   private final JLabel topInfoLabel;
@@ -227,26 +360,75 @@ public class FileRenderApp {
     }
     fileTable.setRowHeight(64);
 
-    JTextField searchField = new JTextField(20);
+    searchField = new JTextField(40);
     searchField.setText("Search");
     searchField.putClientProperty("JTextField.placeholderText", "Search...");
     DebouncedDocumentListener debouncer =
-        DebouncedDocumentListener.create(
-            200,
-            () -> {
-              String text = searchField.getText().trim().toLowerCase();
-              updateTextSearch(
-                  new TextSearch(
-                      text, currentSearch.searchCaColumns, currentSearch.excludeMatches));
-            });
+        DebouncedDocumentListener.create(200, this::updateFilter);
     searchField.getDocument().addDocumentListener(debouncer);
+
+    JButton addConditionBtn = new JButton();
+    addConditionBtn.setToolTipText("Add search term as column-specific condition");
+    addConditionBtn.setIcon(
+        new Icon() {
+          @Override
+          public void paintIcon(Component c, Graphics g, int x, int y) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setStroke(new BasicStroke(2f));
+            g2.setColor(c.isEnabled() ? new Color(60, 60, 60) : new Color(180, 180, 180));
+            int cx = x + 9, cy = y + 8, r = 9;
+            g2.drawOval(cx - r, cy - r, r * 2, r * 2);
+            int hx = cx + (int) (r * 0.7), hy = cy + (int) (r * 0.7);
+            int hx2 = hx + 8, hy2 = hy + 8;
+            g2.drawLine(hx, hy, hx2, hy2);
+            g2.dispose();
+          }
+
+          @Override
+          public int getIconWidth() {
+            return 28;
+          }
+
+          @Override
+          public int getIconHeight() {
+            return 28;
+          }
+        });
+    addConditionBtn.setEnabled(false);
+    addConditionBtn.addActionListener(e -> showAddConditionDialog());
+
+    searchField
+        .getDocument()
+        .addDocumentListener(
+            new DocumentListener() {
+              @Override
+              public void insertUpdate(DocumentEvent e) {
+                toggleButton();
+              }
+
+              @Override
+              public void removeUpdate(DocumentEvent e) {
+                toggleButton();
+              }
+
+              @Override
+              public void changedUpdate(DocumentEvent e) {
+                toggleButton();
+              }
+
+              private void toggleButton() {
+                addConditionBtn.setEnabled(!searchField.getText().trim().isEmpty());
+              }
+            });
 
     fileTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF); // allows wide table + horizontal scrolling
     JScrollPane scrollPane = new JScrollPane(fileTable);
 
-    JPanel topPanel = new JPanel(new GridLayout(2, 0));
+    JPanel topPanel = new JPanel();
+    topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));
     {
-      JPanel topButtons = new JPanel(new FlowLayout(FlowLayout.LEFT));
+      JPanel searchRow = new JPanel(new FlowLayout(FlowLayout.LEFT));
       {
         JButton addBtn = new JButton("Files");
         final JPopupMenu filesMenu =
@@ -292,17 +474,23 @@ public class FileRenderApp {
                     filesMenu.show(addBtn, 0, addBtn.getHeight());
                   });
             });
-        topPanel.add(addBtn);
+        searchRow.add(addBtn);
 
-        topPanel.add(searchField);
+        searchRow.add(searchField);
+        searchRow.add(addConditionBtn);
       }
+      topPanel.add(searchRow);
+
+      chipRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
+      chipRow.setVisible(false);
+      topPanel.add(chipRow);
+
       JPanel topInfo = new JPanel(new FlowLayout(FlowLayout.LEFT));
       {
         JLabel topInfoLabel = new JLabel();
         topInfo.add(topInfoLabel);
         this.topInfoLabel = topInfoLabel;
       }
-      topPanel.add(topButtons);
       topPanel.add(topInfo);
     }
 
