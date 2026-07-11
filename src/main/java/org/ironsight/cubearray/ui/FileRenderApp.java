@@ -261,7 +261,7 @@ public class FileRenderApp {
     {
       JPanel searchRow = new JPanel(new FlowLayout(FlowLayout.LEFT));
       {
-        JButton addBtn = new JButton("Files");
+        JButton addBtn = new JButton(Icons.get("menu"));
         final JPopupMenu filesMenu =
             new JPopupMenu() {
               @Override
@@ -333,9 +333,9 @@ public class FileRenderApp {
     }
 
     JTabbedPane tabbedPane = new JTabbedPane(SwingConstants.LEFT);
-    tabbedPane.add("File List", fileListPanel);
-    tabbedPane.add(
-        "⚙\uFE0F", getSettingsComponent(context.columnContext().displayedColumns())); // SETTINGS
+    tabbedPane.addTab(null, Icons.get("folder"), fileListPanel);
+    tabbedPane.addTab(null, Icons.get("settings"),
+        getSettingsComponent(context.columnContext().displayedColumns()));
     frame.add(tabbedPane);
     context.filesAndTimestamps().keySet().forEach(tableModel::addFile);
 

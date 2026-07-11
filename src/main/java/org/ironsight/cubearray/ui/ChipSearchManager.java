@@ -42,33 +42,7 @@ public class ChipSearchManager {
   public JButton createAddConditionButton() {
     JButton btn = new JButton();
     btn.setToolTipText("Add search term as column-specific condition");
-    btn.setIcon(
-        new Icon() {
-          @Override
-          public void paintIcon(Component c, Graphics g, int x, int y) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(
-                RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setStroke(new BasicStroke(2f));
-            g2.setColor(c.isEnabled() ? new Color(60, 60, 60) : new Color(180, 180, 180));
-            int cx = x + 9, cy = y + 8, r = 9;
-            g2.drawOval(cx - r, cy - r, r * 2, r * 2);
-            int hx = cx + (int) (r * 0.7), hy = cy + (int) (r * 0.7);
-            int hx2 = hx + 8, hy2 = hy + 8;
-            g2.drawLine(hx, hy, hx2, hy2);
-            g2.dispose();
-          }
-
-          @Override
-          public int getIconWidth() {
-            return 28;
-          }
-
-          @Override
-          public int getIconHeight() {
-            return 28;
-          }
-        });
+    btn.setIcon(Icons.get("search"));
     btn.setEnabled(false);
     btn.addActionListener(e -> showAddConditionDialog());
 
