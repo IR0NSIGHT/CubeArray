@@ -28,7 +28,7 @@ jobs:
         shell: cmd
         run: |
           mkdir staging
-          copy "target\CubeArray.jar" "staging\CubeArray.jar"
+          copy "target\CubeArray-1.1-app.jar" "staging\CubeArray.jar"
 
       - name: Build app image (exe)
         shell: cmd
