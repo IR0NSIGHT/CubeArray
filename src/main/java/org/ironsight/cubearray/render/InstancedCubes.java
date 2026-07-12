@@ -50,12 +50,16 @@ public class InstancedCubes {
   private long window;
   private int width = 1920;
   private int height = 1080;
-  private int vao, vbo, ebo, instanceVBO;
+  private int vao, vbo, ebo, instanceVBO, colorIndexVBO;
   private int shaderProgram;
+  private int colorPaletteTexId, sizePaletteTexId, offsetPaletteTexId,
+              rotationPaletteTexId, uvPaletteTexId;
+  private int blockTexId;
   private double lastMouseX, lastMouseY;
   private boolean firstMouse = true;
   private CameraState cameraState;
-  private CubeSetup setup;
+  private volatile CubeSetup setup;
+  private volatile CubeSetup lastUploadedSetup;
   private float autoRotate = 5f;
   private CameraState orbitCamera;
   private CameraState initialPos;
@@ -74,48 +78,37 @@ public class InstancedCubes {
 
   public InstancedCubes(CubeSetup setup) {
     this.setup = setup;
-
-    var dim = new Vector3f(setup.max).sub(setup.min);
-    initialPos =
-        new CameraState(
-            new Vector3f(setup.min).add(setup.max).mul(0.5f), // center
-            (float) toRadians(210), // slightly from the side
-            (float) toRadians(30), // slightly from above
-            Math.max(dim.x, Math.max(dim.y, dim.z)) * 2 // longest side * 2 = radius
-            );
-
+    updateFixedPositions();
     cameraState = initialPos;
-    fixPos_0 = initialPos;
-    fixPos_1 =
-        new CameraState(
-            initialPos.target, (float) toRadians(-45), initialPos.pitch, initialPos.radius);
-    fixPos_2 =
-        new CameraState(initialPos.target, (float) toRadians(0), initialPos.pitch, initialPos.radius);
-    fixPos_3 =
-        new CameraState(
-            initialPos.target, (float) toRadians(45), initialPos.pitch, initialPos.radius);
-    fixPos_4 =
-        new CameraState(
-            initialPos.target, (float) toRadians(-90), initialPos.pitch, initialPos.radius);
-    fixPos_5 =
-        new CameraState(
-            initialPos.target, (float) toRadians(0), (float) toRadians(89), initialPos.radius);
-    fixPos_6 =
-        new CameraState(
-            initialPos.target, (float) toRadians(90), initialPos.pitch, initialPos.radius);
-    fixPos_7 =
-        new CameraState(
-            initialPos.target, (float) toRadians(-135), initialPos.pitch, initialPos.radius);
-    fixPos_8 =
-        new CameraState(
-            initialPos.target, (float) toRadians(-180), initialPos.pitch, initialPos.radius);
-    fixPos_9 =
-        new CameraState(
-            initialPos.target, (float) toRadians(135), initialPos.pitch, initialPos.radius);
-
     transition =
         new CameraTransition(
             fixPos_2, fixPos_3, System.currentTimeMillis(), System.currentTimeMillis() + 1000);
+  }
+
+  private void updateFixedPositions() {
+    var dim = new Vector3f(setup.max).sub(setup.min);
+    var center = new Vector3f(setup.min).add(setup.max).mul(0.5f);
+    float radius = Math.max(dim.x, Math.max(dim.y, dim.z)) * 2;
+    maxRadius = Math.max(radius, Math.max(gridX, Math.max(gridY, gridZ)));
+
+    initialPos =
+        new CameraState(center, (float) toRadians(210), (float) toRadians(30), radius);
+    fixPos_0 = initialPos;
+    fixPos_1 = new CameraState(center, (float) toRadians(-45), initialPos.pitch, radius);
+    fixPos_2 = new CameraState(center, (float) toRadians(0), initialPos.pitch, radius);
+    fixPos_3 = new CameraState(center, (float) toRadians(45), initialPos.pitch, radius);
+    fixPos_4 = new CameraState(center, (float) toRadians(-90), initialPos.pitch, radius);
+    fixPos_5 = new CameraState(center, (float) toRadians(0), (float) toRadians(89), radius);
+    fixPos_6 = new CameraState(center, (float) toRadians(90), initialPos.pitch, radius);
+    fixPos_7 = new CameraState(center, (float) toRadians(-135), initialPos.pitch, radius);
+    fixPos_8 = new CameraState(center, (float) toRadians(-180), initialPos.pitch, radius);
+    fixPos_9 = new CameraState(center, (float) toRadians(135), initialPos.pitch, radius);
+  }
+
+  /** Thread-safe: replaces the rendered data on the next frame. Camera position is preserved. */
+  public void replaceData(CubeSetup newSetup) {
+    if (newSetup == null) return;
+    this.setup = newSetup;
   }
 
   public void run() throws Exception {
@@ -152,7 +145,10 @@ public class InstancedCubes {
     GL.createCapabilities();
 
     setupShaders();
-    setupBuffers();
+    setupVertexData();
+    uploadInstanceData();
+    uploadPaletteTextures();
+    lastUploadedSetup = setup;
   }
 
   private void loop() {
@@ -359,6 +355,13 @@ public class InstancedCubes {
 
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+      if (setup != lastUploadedSetup) {
+        uploadInstanceData();
+        uploadPaletteTextures();
+        updateFixedPositions();
+        lastUploadedSetup = setup;
+      }
+
       // Calculate camera direction vectors
       Vector3f forward =
           new Vector3f((float) Math.sin(cameraState.yaw), 0, (float) Math.cos(cameraState.yaw))
@@ -526,6 +529,13 @@ public class InstancedCubes {
     glDeleteBuffers(vbo);
     glDeleteBuffers(ebo);
     glDeleteBuffers(instanceVBO);
+    glDeleteBuffers(colorIndexVBO);
+    glDeleteTextures(colorPaletteTexId);
+    glDeleteTextures(sizePaletteTexId);
+    glDeleteTextures(offsetPaletteTexId);
+    glDeleteTextures(rotationPaletteTexId);
+    glDeleteTextures(uvPaletteTexId);
+    glDeleteTextures(blockTexId);
     glDeleteProgram(shaderProgram);
 
     glfwFreeCallbacks(window);
@@ -561,7 +571,9 @@ public class InstancedCubes {
       renderer.height = height;
       renderer.window = window;
       renderer.setupShaders();
-      renderer.setupBuffers();
+      renderer.setupVertexData();
+      renderer.uploadInstanceData();
+      renderer.uploadPaletteTextures();
 
       renderer.cameraState = renderer.initialPos;
 
@@ -675,13 +687,7 @@ public class InstancedCubes {
     glDeleteShader(fragmentShader);
   }
 
-  private void setupBuffers() throws IOException {
-    // --- Cube geometry ---
-    // 6 floats per vertex: x, y, z, u, v, faceId. Each face carries its own [0,1] UV rect and a
-    // faceId matching the Face enum ordinal (NORTH 0, SOUTH 1, EAST 2, WEST 3, UP 4, DOWN 5); the
-    // vertex shader uses faceId to look up that face's atlas rect in the per-face uv palette, so
-    // every face can sample a different sprite. Local axes follow Minecraft: -X west, +X east,
-    // -Y down, +Y up, -Z north, +Z south.
+  private void setupVertexData() {
     final int UP = Face.UP.ordinal();
     final int DOWN = Face.DOWN.ordinal();
     final int NORTH = Face.NORTH.ordinal();
@@ -689,7 +695,6 @@ public class InstancedCubes {
     final int EAST = Face.EAST.ordinal();
     final int WEST = Face.WEST.ordinal();
     float[] cubeVertices = {
-      // +Y (UP) and -Y (DOWN) horizontal faces
       0, 1, 0, 0, 0, UP,
       1, 1, 0, 0, 1, UP,
       1, 1, 1, 1, 1, UP,
@@ -698,145 +703,177 @@ public class InstancedCubes {
       1, 0, 0, 0, 1, DOWN,
       1, 0, 1, 1, 1, DOWN,
       0, 0, 1, 1, 0, DOWN,
-
       // -Z (NORTH) and +Z (SOUTH) faces
-      0, 1, 0, 1, 0, NORTH, //  8
-      1, 1, 0, 0, 0, NORTH, //  9
-      1, 1, 1, 1, 0, SOUTH, // 10
-      0, 1, 1, 0, 0, SOUTH, // 11
-      0, 0, 0, 1, 1, NORTH, // 12
-      1, 0, 0, 0, 1, NORTH, // 13
-      1, 0, 1, 1, 1, SOUTH, // 14
-      0, 0, 1, 0, 1, SOUTH, // 15
-
+      0, 1, 0, 1, 0, NORTH,
+      1, 1, 0, 0, 0, NORTH,
+      1, 1, 1, 1, 0, SOUTH,
+      0, 1, 1, 0, 0, SOUTH,
+      0, 0, 0, 1, 1, NORTH,
+      1, 0, 0, 0, 1, NORTH,
+      1, 0, 1, 1, 1, SOUTH,
+      0, 0, 1, 0, 1, SOUTH,
       // -X (WEST) and +X (EAST) faces
-      0, 1, 0, 0, 0, WEST, // 16
-      1, 1, 0, 1, 0, EAST, // 17
-      1, 1, 1, 0, 0, EAST, // 18
-      0, 1, 1, 1, 0, WEST, // 19
-      0, 0, 0, 0, 1, WEST, // 20
-      1, 0, 0, 1, 1, EAST, // 21
-      1, 0, 1, 0, 1, EAST, // 22
-      0, 0, 1, 1, 1, WEST, // 23
+      0, 1, 0, 0, 0, WEST,
+      1, 1, 0, 1, 0, EAST,
+      1, 1, 1, 0, 0, EAST,
+      0, 1, 1, 1, 0, WEST,
+      0, 0, 0, 0, 1, WEST,
+      1, 0, 0, 1, 1, EAST,
+      1, 0, 1, 0, 1, EAST,
+      0, 0, 1, 1, 1, WEST,
     };
     final int floatsPerVertex = 6;
-    // centre the cube on the origin - only shift the xyz position components, not uv/faceId
     for (int i = 0; i < cubeVertices.length; i++) {
       if (i % floatsPerVertex < 3) cubeVertices[i] -= 0.5f;
     }
-
     int[] cubeIndices = {
-      2, 1, 0, // bottom
-      0, 3, 2, 5, 6, 7, // top plane 1
-      7, 4, 5, 8 + 1, 8 + 5, 8 + 4, // front (in z dir)
-      8 + 4, 8 + 0, 8 + 1, 8 + 3, 8 + 7, 8 + 6, // back (-z dir)
-      8 + 6, 8 + 2, 8 + 3, 16 + 0, 16 + 4, 16 + 7, // left
-      16 + 7, 16 + 3, 16 + 0, 16 + 2, 16 + 6, 16 + 5, // right
+      2, 1, 0,
+      0, 3, 2, 5, 6, 7,
+      7, 4, 5, 8 + 1, 8 + 5, 8 + 4,
+      8 + 4, 8 + 0, 8 + 1, 8 + 3, 8 + 7, 8 + 6,
+      8 + 6, 8 + 2, 8 + 3, 16 + 0, 16 + 4, 16 + 7,
+      16 + 7, 16 + 3, 16 + 0, 16 + 2, 16 + 6, 16 + 5,
       16 + 5, 16 + 1, 16 + 2
     };
 
     vao = glGenVertexArrays();
     glBindVertexArray(vao);
 
-    // --- Element buffer ---
     ebo = glGenBuffers();
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, cubeIndices, GL_STATIC_DRAW);
 
-    // --- Vertex buffer ---
     vbo = glGenBuffers();
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBufferData(GL_ARRAY_BUFFER, cubeVertices, GL_STATIC_DRAW);
-    final int attribIndexVERTEXPOS = 0;
-    final int attribIndexUVPOS = 1;
-    final int attribIndexINSTANCEPOS = 2;
-    final int attribIndexCOLORINDEX = 3;
-    final int attribIndexFACEID = 4;
-    final int stride = floatsPerVertex * Float.BYTES;
-    glVertexAttribPointer(attribIndexVERTEXPOS, 3, GL_FLOAT, false, stride, 0);
-    glEnableVertexAttribArray(attribIndexVERTEXPOS);
+    int stride = floatsPerVertex * Float.BYTES;
+    glVertexAttribPointer(0, 3, GL_FLOAT, false, stride, 0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, false, stride, 3 * Float.BYTES);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(4, 1, GL_FLOAT, false, stride, 5 * Float.BYTES);
+    glEnableVertexAttribArray(4);
+  }
 
-    glVertexAttribPointer(attribIndexUVPOS, 2, GL_FLOAT, false, stride, 3 * Float.BYTES);
-    glEnableVertexAttribArray(attribIndexUVPOS);
-
-    glVertexAttribPointer(attribIndexFACEID, 1, GL_FLOAT, false, stride, 5 * Float.BYTES);
-    glEnableVertexAttribArray(attribIndexFACEID);
-
-    // --- Instance positions ---
+  private void uploadInstanceData() {
     FloatBuffer instancePositionsFlat = BufferUtils.createFloatBuffer(setup.positions.length * 3);
     for (Vector3f pos : setup.positions) instancePositionsFlat.put(pos.x).put(pos.y).put(pos.z);
     instancePositionsFlat.flip();
 
-    instanceVBO = glGenBuffers();
+    if (instanceVBO == 0) instanceVBO = glGenBuffers();
     glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-    glBufferData(GL_ARRAY_BUFFER, instancePositionsFlat, GL_STATIC_DRAW);
-    glVertexAttribPointer(attribIndexINSTANCEPOS, 3, GL_FLOAT, false, 3 * Float.BYTES, 0);
-    glEnableVertexAttribArray(attribIndexINSTANCEPOS);
-    glVertexAttribDivisor(attribIndexINSTANCEPOS, 1);
+    glBufferData(GL_ARRAY_BUFFER, instancePositionsFlat, GL_DYNAMIC_DRAW);
+    glVertexAttribPointer(2, 3, GL_FLOAT, false, 3 * Float.BYTES, 0);
+    glEnableVertexAttribArray(2);
+    glVertexAttribDivisor(2, 1);
 
-    // --- Instance color indices ---
     IntBuffer colorIndexData = BufferUtils.createIntBuffer(setup.colorIndices.length);
     colorIndexData.put(setup.colorIndices).flip();
 
-    int colorIndexVBO = glGenBuffers();
+    if (colorIndexVBO == 0) colorIndexVBO = glGenBuffers();
     glBindBuffer(GL_ARRAY_BUFFER, colorIndexVBO);
-    glBufferData(GL_ARRAY_BUFFER, colorIndexData, GL_STATIC_DRAW);
-    glVertexAttribIPointer(attribIndexCOLORINDEX, 1, GL_INT, Integer.BYTES, 0);
-    glEnableVertexAttribArray(attribIndexCOLORINDEX);
-    glVertexAttribDivisor(attribIndexCOLORINDEX, 1);
+    glBufferData(GL_ARRAY_BUFFER, colorIndexData, GL_DYNAMIC_DRAW);
+    glVertexAttribIPointer(3, 1, GL_INT, Integer.BYTES, 0);
+    glEnableVertexAttribArray(3);
+    glVertexAttribDivisor(3, 1);
 
     glBindVertexArray(0);
+  }
 
+  private void uploadPaletteTextures() {
     glUseProgram(shaderProgram);
 
-    // --- Lights ---
     int lightDirLoc = glGetUniformLocation(shaderProgram, "lightDir");
     int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
     Vector3f lightDir = new Vector3f(-1, 5, -3).normalize();
     glUniform3f(lightDirLoc, lightDir.x, lightDir.y, lightDir.z);
     glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
 
-    int colorPaletteTexID =
-        GlUtils.bind1DTexturePalette(
-            setup.colorPalette, "colorPaletteTex", GL_TEXTURE0, shaderProgram);
-    int sizePaletteTexID =
-        GlUtils.bind1DTexturePalette(
-            setup.sizePalette, "sizePaletteTex", GL_TEXTURE1, shaderProgram);
-    int offsetPaletteTexID =
-        GlUtils.bind1DTexturePalette(
-            setup.offsetPalette, "offsetPaletteTex", GL_TEXTURE2, shaderProgram);
-    int rotationPaletteTexID =
-        GlUtils.bind1DTexturePalette(
-            setup.rotationPalette, "rotationPaletteTex", GL_TEXTURE3, shaderProgram);
-    // uv palette is 2D: one column per block type, one row per face (see CubeSetup.uvCoordsPalette)
-    int uvPaletteTexId =
-        GlUtils.bind2DTexturePalette(
-            setup.uvCoordsPalette,
-            setup.offsetPalette.length,
-            Face.values().length,
-            "uvPaletteTex",
-            GL_TEXTURE4,
-            shaderProgram);
-
+    // Color palette
+    if (colorPaletteTexId == 0) colorPaletteTexId = glGenTextures();
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, colorPaletteTexID);
+    glBindTexture(GL_TEXTURE_2D, colorPaletteTexId);
+    {
+      FloatBuffer buf = BufferUtils.createFloatBuffer(setup.colorPalette.length * 3);
+      for (Vector3f c : setup.colorPalette) buf.put(c.x).put(c.y).put(c.z);
+      buf.flip();
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, setup.colorPalette.length, 1, 0, GL_RGB, GL_FLOAT, buf);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glUniform1i(glGetUniformLocation(shaderProgram, "colorPaletteTex"), 0);
+    }
 
+    // Size palette
+    if (sizePaletteTexId == 0) sizePaletteTexId = glGenTextures();
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, sizePaletteTexID);
+    glBindTexture(GL_TEXTURE_2D, sizePaletteTexId);
+    {
+      FloatBuffer buf = BufferUtils.createFloatBuffer(setup.sizePalette.length * 3);
+      for (Vector3f c : setup.sizePalette) buf.put(c.x).put(c.y).put(c.z);
+      buf.flip();
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, setup.sizePalette.length, 1, 0, GL_RGB, GL_FLOAT, buf);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glUniform1i(glGetUniformLocation(shaderProgram, "sizePaletteTex"), 1);
+    }
 
+    // Offset palette
+    if (offsetPaletteTexId == 0) offsetPaletteTexId = glGenTextures();
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, offsetPaletteTexID);
+    glBindTexture(GL_TEXTURE_2D, offsetPaletteTexId);
+    {
+      FloatBuffer buf = BufferUtils.createFloatBuffer(setup.offsetPalette.length * 3);
+      for (Vector3f c : setup.offsetPalette) buf.put(c.x).put(c.y).put(c.z);
+      buf.flip();
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, setup.offsetPalette.length, 1, 0, GL_RGB, GL_FLOAT, buf);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glUniform1i(glGetUniformLocation(shaderProgram, "offsetPaletteTex"), 2);
+    }
 
+    // Rotation palette
+    if (rotationPaletteTexId == 0) rotationPaletteTexId = glGenTextures();
     glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, rotationPaletteTexID);
+    glBindTexture(GL_TEXTURE_2D, rotationPaletteTexId);
+    {
+      FloatBuffer buf = BufferUtils.createFloatBuffer(setup.rotationPalette.length * 3);
+      for (Vector3f c : setup.rotationPalette) buf.put(c.x).put(c.y).put(c.z);
+      buf.flip();
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, setup.rotationPalette.length, 1, 0, GL_RGB, GL_FLOAT, buf);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glUniform1i(glGetUniformLocation(shaderProgram, "rotationPaletteTex"), 3);
+    }
 
+    // UV palette (2D: width = num types, height = num faces)
+    if (uvPaletteTexId == 0) uvPaletteTexId = glGenTextures();
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, uvPaletteTexId);
+    {
+      FloatBuffer buf = BufferUtils.createFloatBuffer(setup.uvCoordsPalette.length * 4);
+      for (Vector4f c : setup.uvCoordsPalette) buf.put(c.x).put(c.y).put(c.z).put(c.w);
+      buf.flip();
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, setup.offsetPalette.length, Face.values().length, 0, GL_RGBA, GL_FLOAT, buf);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glUniform1i(glGetUniformLocation(shaderProgram, "uvPaletteTex"), 4);
+    }
 
+    // Texture atlas
     BufferedImage image = setup.textureAtlas;
-    int width = image.getWidth();
-    int height = image.getHeight();
-    BufferedImage abgr = new BufferedImage(width, height, BufferedImage.TYPE_4BYTE_ABGR);
+    int atlasW = image.getWidth();
+    int atlasH = image.getHeight();
+    BufferedImage abgr = new BufferedImage(atlasW, atlasH, BufferedImage.TYPE_4BYTE_ABGR);
     var graphics = abgr.getGraphics();
     graphics.drawImage(image, 0, 0, null);
     graphics.dispose();
@@ -848,30 +885,26 @@ public class InstancedCubes {
       pixels[i + 2] = b;
       pixels[i + 3] = a;
     }
+    if (blockTexId == 0) blockTexId = glGenTextures();
     glActiveTexture(GL_TEXTURE5);
-    int texId = GlUtils.createSimple2DTexture(abgr.getWidth(), abgr.getHeight(), pixels);
+    glBindTexture(GL_TEXTURE_2D, blockTexId);
+    {
+      ByteBuffer buf = BufferUtils.createByteBuffer(pixels.length);
+      buf.put(pixels).flip();
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, atlasW, atlasH, 0, GL_RGBA, GL_UNSIGNED_BYTE, buf);
+    }
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glUniform1i(glGetUniformLocation(shaderProgram, "blockTexture"), 5);
 
-    int texUniform = glGetUniformLocation(shaderProgram, "blockTexture");
-    glUniform1i(texUniform, 5);
-
-    glActiveTexture(GL_TEXTURE5);
-    glBindTexture(GL_TEXTURE_2D, texId);
-
-    // -------------
-    int paletteSizeLoc = glGetUniformLocation(shaderProgram, "paletteSize");
-    glUniform1i(paletteSizeLoc, setup.offsetPalette.length);
-
-    int atlasSizeLoc = glGetUniformLocation(shaderProgram, "atlasSize");
-    glUniform1f(atlasSizeLoc, setup.textureAtlas.getWidth());
+    glUniform1i(glGetUniformLocation(shaderProgram, "paletteSize"), setup.offsetPalette.length);
+    glUniform1f(glGetUniformLocation(shaderProgram, "atlasSize"), setup.textureAtlas.getWidth());
 
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
-
-    // Enable blending
     glEnable(GL_DEPTH_TEST);
-    //    glEnable(GL_BLEND);
-    //    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
   }
 
   public void renderText(String text, float x, float y) {
