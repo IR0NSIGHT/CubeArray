@@ -354,11 +354,17 @@ public class InstancedCubes {
                         cameraState, target, System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == ZOOM_IN.key) {
-                // zoom in
-                cameraState = zoom(cameraState, 2);
+                CameraState target = zoom(cameraState, 2);
+                transition =
+                    new CameraTransition(
+                        cameraState, target, System.currentTimeMillis(),
+                        System.currentTimeMillis() + 500);
               } else if (key == ZOOM_OUT.key) {
-                // zoom out
-                cameraState = zoom(cameraState, -2);
+                CameraState target = zoom(cameraState, -2);
+                transition =
+                    new CameraTransition(
+                        cameraState, target, System.currentTimeMillis(),
+                        System.currentTimeMillis() + 500);
               } else if (key == SCREENSHOT.key) {
                 saveScreenshot();
               }
