@@ -31,6 +31,7 @@ public class CubeSetup {
   public final BufferedImage textureAtlas;
   public final Vector3f min;
   public final Vector3f max;
+  public final boolean useGrid;
 
   public CubeSetup(
       Vector3f[] positions,
@@ -43,7 +44,8 @@ public class CubeSetup {
       BufferedImage textureAtlas,
       Vector3f min,
       Vector3f max,
-      String name) {
+      String name,
+      boolean useGrid) {
     this.positions = positions;
     this.colorIndices = colorIndices;
     this.colorPalette = colorPalette;
@@ -55,5 +57,6 @@ public class CubeSetup {
     this.min = min;
     this.max = max;
     this.name = name;
+    this.useGrid = useGrid;
   }
 }

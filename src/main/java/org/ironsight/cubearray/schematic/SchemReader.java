@@ -239,6 +239,10 @@ public class SchemReader {
   }
 
   public static CubeSetup prepareData(List<WPObject> schematics) throws Exception {
+    return prepareData(schematics, false);
+  }
+
+  public static CubeSetup prepareData(List<WPObject> schematics, boolean useGrid) throws Exception {
     ensureAssetsLoaded();
     if (schematics.isEmpty()) return null;
     final String name = schematics.size() == 1 ? schematics.get(0).getName() : "schematics";
@@ -315,15 +319,18 @@ public class SchemReader {
       index++;
     }
 
-    Material markerX = WOOL_WHITE.withProperty("cubearray_axis", "x");
-    Material markerY = WOOL_WHITE.withProperty("cubearray_axis", "y");
-    Material markerZ = WOOL_WHITE.withProperty("cubearray_axis", "z");
-    for (Material m : new Material[]{markerX, markerY, markerZ}) {
-      maxColorIdx = addInstance(m, new Vector3f(0, 0, 0), positions, blockTypeIndicesList, mat_to_palette_idx, maxColorIdx);
+    int xIdx = -1, yIdx = -1, zIdx = -1;
+    if (useGrid) {
+      Material markerX = WOOL_WHITE.withProperty("cubearray_axis", "x");
+      Material markerY = WOOL_WHITE.withProperty("cubearray_axis", "y");
+      Material markerZ = WOOL_WHITE.withProperty("cubearray_axis", "z");
+      for (Material m : new Material[]{markerX, markerY, markerZ}) {
+        maxColorIdx = addInstance(m, new Vector3f(0, 0, 0), positions, blockTypeIndicesList, mat_to_palette_idx, maxColorIdx);
+      }
+      xIdx = mat_to_palette_idx.get(markerX);
+      yIdx = mat_to_palette_idx.get(markerY);
+      zIdx = mat_to_palette_idx.get(markerZ);
     }
-    int xIdx = mat_to_palette_idx.get(markerX);
-    int yIdx = mat_to_palette_idx.get(markerY);
-    int zIdx = mat_to_palette_idx.get(markerZ);
 
     Vector3f[] colorPalette = new Vector3f[mat_to_palette_idx.size()];
     Arrays.fill(colorPalette, new Vector3f(1, 1, 1));
@@ -369,21 +376,23 @@ public class SchemReader {
       materialSprites.put(keyed, sprites);
     }
 
-    float rodLen = maxDim * 2;
-    colorPalette[xIdx] = new Vector3f(1, 0, 0);
-    sizePalette[xIdx] = new Vector3f(rodLen, 0.1f, 0.1f);
-    offsetPalette[xIdx] = new Vector3f(0, 0, 0);
-    rotationPalette[xIdx] = new Vector3f(0, 0, 0);
+    if (useGrid) {
+      float rodLen = maxDim * 2;
+      colorPalette[xIdx] = new Vector3f(1, 0, 0);
+      sizePalette[xIdx] = new Vector3f(rodLen, 0.1f, 0.1f);
+      offsetPalette[xIdx] = new Vector3f(0, 0, 0);
+      rotationPalette[xIdx] = new Vector3f(0, 0, 0);
 
-    colorPalette[yIdx] = new Vector3f(0, 1, 0);
-    sizePalette[yIdx] = new Vector3f(0.1f, rodLen, 0.1f);
-    offsetPalette[yIdx] = new Vector3f(0, 0, 0);
-    rotationPalette[yIdx] = new Vector3f(0, 0, 0);
+      colorPalette[yIdx] = new Vector3f(0, 1, 0);
+      sizePalette[yIdx] = new Vector3f(0.1f, rodLen, 0.1f);
+      offsetPalette[yIdx] = new Vector3f(0, 0, 0);
+      rotationPalette[yIdx] = new Vector3f(0, 0, 0);
 
-    colorPalette[zIdx] = new Vector3f(0, 0, 1);
-    sizePalette[zIdx] = new Vector3f(0.1f, 0.1f, rodLen);
-    offsetPalette[zIdx] = new Vector3f(0, 0, 0);
-    rotationPalette[zIdx] = new Vector3f(0, 0, 0);
+      colorPalette[zIdx] = new Vector3f(0, 0, 1);
+      sizePalette[zIdx] = new Vector3f(0.1f, 0.1f, rodLen);
+      offsetPalette[zIdx] = new Vector3f(0, 0, 0);
+      rotationPalette[zIdx] = new Vector3f(0, 0, 0);
+    }
 
     SpriteSheet spriteSheet =
         new SpriteSheet(
@@ -408,10 +417,12 @@ public class SchemReader {
       }
     }
 
-    for (int f = 0; f < Face.values().length; f++) {
-      uvCoordsPalette[f * numTypes + xIdx] = new Vector4f(0, 0, 0, 0);
-      uvCoordsPalette[f * numTypes + yIdx] = new Vector4f(0, 0, 0, 0);
-      uvCoordsPalette[f * numTypes + zIdx] = new Vector4f(0, 0, 0, 0);
+    if (useGrid) {
+      for (int f = 0; f < Face.values().length; f++) {
+        uvCoordsPalette[f * numTypes + xIdx] = new Vector4f(0, 0, 0, 0);
+        uvCoordsPalette[f * numTypes + yIdx] = new Vector4f(0, 0, 0, 0);
+        uvCoordsPalette[f * numTypes + zIdx] = new Vector4f(0, 0, 0, 0);
+      }
     }
 
     int[] blockTypeIndices = blockTypeIndicesList.stream().mapToInt(i -> i).toArray();
@@ -440,7 +451,8 @@ public class SchemReader {
         spriteSheet.getTextureAtlas(),
         min,
         max,
-        name);
+        name,
+        useGrid);
   }
 
   /**

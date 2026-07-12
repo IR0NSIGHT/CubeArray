@@ -22,6 +22,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.LinkedBlockingQueue;
 import javax.imageio.ImageIO;
 import org.ironsight.cubearray.mcmodel.Face;
 import org.ironsight.cubearray.platform.ResourceUtils;
@@ -78,11 +81,15 @@ public class InstancedCubes {
   private CameraState prevCameraState;
   private double lastChangeTime;
   private CameraTransition transition;
+  private final BlockingQueue<Runnable> pendingTasks = new LinkedBlockingQueue<>();
+  private boolean showGrid = true;
+  private volatile CameraState publishedCameraState;
 
   public InstancedCubes(CubeSetup setup) {
     this.setup = setup;
     updateFixedPositions();
     cameraState = initialPos;
+    publishedCameraState = cameraState;
     transition =
         new CameraTransition(
             new CameraState(schematicCenter, fixPos_2.yaw(), initialPos.pitch(), 0f, initialPos.radius()),
@@ -493,7 +500,7 @@ public class InstancedCubes {
         lastChangeTime = glfwGetTime();
       }
 
-      boolean needsRedraw = (glfwGetTime() - lastChangeTime) < 0.5;
+      boolean needsRedraw = (glfwGetTime() - lastChangeTime) < 0.5 || !pendingTasks.isEmpty();
 
       if (needsRedraw) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -514,6 +521,11 @@ public class InstancedCubes {
         glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, setup.positions.length);
         glBindVertexArray(0);
 
+        Runnable task;
+        while ((task = pendingTasks.poll()) != null) {
+          task.run();
+        }
+
         glfwSwapBuffers(window);
       } else {
         try {
@@ -524,14 +536,39 @@ public class InstancedCubes {
       }
 
       prevCameraState = cameraState;
+      publishedCameraState = cameraState;
       glfwPollEvents();
+
+      Runnable task;
+      while ((task = pendingTasks.poll()) != null) {
+        task.run();
+      }
     }
   }
 
   private void saveScreenshot(Path out) throws IOException {
-    // Reads from whatever framebuffer is currently bound as GL_READ_FRAMEBUFFER. The caller
-    // is responsible for binding the correct source (the visible window's default framebuffer
-    // for the interactive path, or the offscreen resolve FBO for renderToFile).
+    ImageIO.write(captureScreenshot(), "png", out.toFile());
+  }
+
+  private void saveScreenshot() {
+    try {
+      Path out =
+          ResourceUtils.getScreenshotPath()
+              .resolve(
+                  "screenshot_CubeArray_" + setup.name + "_" + System.currentTimeMillis() + ".png");
+      if (out.toFile().exists()) return;
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+      glReadBuffer(GL_BACK);
+      saveScreenshot(out);
+    } catch (IOException ex) {
+      System.out.println(ex);
+    }
+  }
+
+  /**
+   * Captures the current GL read framebuffer and returns it as a BufferedImage.
+   */
+  public BufferedImage captureScreenshot() {
     ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * 4);
     glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
 
@@ -547,23 +584,55 @@ public class InstancedCubes {
         image.setRGB(x, height - y - 1, (a << 24) | (r << 16) | (g << 8) | b);
       }
     }
-    ImageIO.write(image, "png", out.toFile());
+    return image;
   }
 
-  private void saveScreenshot() {
-    try {
-      Path out =
-          ResourceUtils.getScreenshotPath()
-              .resolve(
-                  "screenshot_CubeArray_" + setup.name + "_" + System.currentTimeMillis() + ".png");
-      if (out.toFile().exists()) return;
-      // interactive viewer: read from the visible window's default framebuffer
-      glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
-      glReadBuffer(GL_BACK);
-      saveScreenshot(out);
-    } catch (IOException ex) {
-      System.out.println(ex);
-    }
+  /**
+   * Safely captures a screenshot from any thread by queuing the readback onto
+   * the render loop.
+   */
+  public CompletableFuture<BufferedImage> requestScreenshot() {
+    CompletableFuture<BufferedImage> future = new CompletableFuture<>();
+    pendingTasks.add(() -> {
+      try {
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+        glReadBuffer(GL_BACK);
+        future.complete(captureScreenshot());
+      } catch (Throwable t) {
+        future.completeExceptionally(t);
+      }
+    });
+    return future;
+  }
+
+  /**
+   * Returns the most recent camera state, published at the end of every render-loop iteration.
+   * Safe to call from any thread.
+   */
+  public CameraState getCameraState() {
+    return publishedCameraState;
+  }
+
+  /**
+   * Queues a camera position update onto the render thread. Safe to call from any thread.
+   */
+  public void setCamera(float yawDeg, float pitchDeg, float radius) {
+    pendingTasks.add(() -> {
+      cameraState =
+          new CameraState(
+              cameraState.target(),
+              (float) toRadians(yawDeg),
+              (float) toRadians(pitchDeg),
+              0f,
+              radius);
+    });
+  }
+
+  /**
+   * Queues a grid-visibility toggle onto the render thread. Safe to call from any thread.
+   */
+  public void toggleGrid() {
+    pendingTasks.add(() -> showGrid = !showGrid);
   }
 
   private CameraState zoom(CameraState cameraState, float factor) {
