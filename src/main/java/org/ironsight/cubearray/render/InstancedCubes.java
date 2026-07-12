@@ -88,30 +88,30 @@ public class InstancedCubes {
     fixPos_0 = initialPos;
     fixPos_1 =
         new CameraState(
-            initialPos.target, (float) toRadians(-45), initialPos.yaw, initialPos.radius);
+            initialPos.target, (float) toRadians(-45), initialPos.pitch, initialPos.radius);
     fixPos_2 =
-        new CameraState(initialPos.target, (float) toRadians(0), initialPos.yaw, initialPos.radius);
+        new CameraState(initialPos.target, (float) toRadians(0), initialPos.pitch, initialPos.radius);
     fixPos_3 =
         new CameraState(
-            initialPos.target, (float) toRadians(45), initialPos.yaw, initialPos.radius);
+            initialPos.target, (float) toRadians(45), initialPos.pitch, initialPos.radius);
     fixPos_4 =
         new CameraState(
-            initialPos.target, (float) toRadians(-90), initialPos.yaw, initialPos.radius);
+            initialPos.target, (float) toRadians(-90), initialPos.pitch, initialPos.radius);
     fixPos_5 =
         new CameraState(
             initialPos.target, (float) toRadians(0), (float) toRadians(89), initialPos.radius);
     fixPos_6 =
         new CameraState(
-            initialPos.target, (float) toRadians(90), initialPos.yaw, initialPos.radius);
+            initialPos.target, (float) toRadians(90), initialPos.pitch, initialPos.radius);
     fixPos_7 =
         new CameraState(
-            initialPos.target, (float) toRadians(-135), initialPos.yaw, initialPos.radius);
+            initialPos.target, (float) toRadians(-135), initialPos.pitch, initialPos.radius);
     fixPos_8 =
         new CameraState(
-            initialPos.target, (float) toRadians(-180), initialPos.yaw, initialPos.radius);
+            initialPos.target, (float) toRadians(-180), initialPos.pitch, initialPos.radius);
     fixPos_9 =
         new CameraState(
-            initialPos.target, (float) toRadians(135), initialPos.yaw, initialPos.radius);
+            initialPos.target, (float) toRadians(135), initialPos.pitch, initialPos.radius);
 
     transition =
         new CameraTransition(
