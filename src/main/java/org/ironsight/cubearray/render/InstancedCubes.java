@@ -345,17 +345,14 @@ public class InstancedCubes {
     double lastTime = glfwGetTime();
 
     while (!glfwWindowShouldClose(window)) {
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear screen
-
       double currentTime = glfwGetTime();
       float deltaTime = (float) (currentTime - lastTime);
       lastTime = currentTime;
 
       renderText("FPS: " + Math.round(1f / deltaTime), 10, 30);
 
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-      if (setup != lastUploadedSetup) {
+      boolean dataChanged = setup != lastUploadedSetup;
+      if (dataChanged) {
         uploadInstanceData();
         uploadPaletteTextures();
         updateFixedPositions();
@@ -451,26 +448,45 @@ public class InstancedCubes {
         if (System.currentTimeMillis() > transition.timeEnd()) transition = null;
       }
 
-      // CALCULATE POSITIONS - DO NOT CHANGE CAMERA STATE AFTER THIS
-      cameraPos.add(cameraState.target);
-      Matrix4f view = new Matrix4f().lookAt(cameraPos, cameraState.target(), new Vector3f(0, 1, 0));
-
       // reset mouse offsets
       xoffset = 0;
       yoffset = 0;
 
-      projection.get(projBuffer);
-      view.get(viewBuffer);
+      boolean needsRedraw = dataChanged
+          || movement.length() != 0
+          || rotateCameraByMouse
+          || moveCameraByMouse
+          || autoRotate != 0
+          || transition != null;
 
-      glUseProgram(shaderProgram);
-      glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), false, projBuffer);
-      glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), false, viewBuffer);
+      if (needsRedraw) {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-      glBindVertexArray(vao);
-      glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, setup.positions.length);
-      glBindVertexArray(0);
+        // CALCULATE POSITIONS - DO NOT CHANGE CAMERA STATE AFTER THIS
+        cameraPos.add(cameraState.target);
+        Matrix4f view =
+            new Matrix4f().lookAt(cameraPos, cameraState.target(), new Vector3f(0, 1, 0));
 
-      glfwSwapBuffers(window);
+        projection.get(projBuffer);
+        view.get(viewBuffer);
+
+        glUseProgram(shaderProgram);
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), false, projBuffer);
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), false, viewBuffer);
+
+        glBindVertexArray(vao);
+        glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, setup.positions.length);
+        glBindVertexArray(0);
+
+        glfwSwapBuffers(window);
+      } else {
+        try {
+          Thread.sleep(10);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+      }
+
       glfwPollEvents();
     }
   }

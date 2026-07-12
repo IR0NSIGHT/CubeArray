@@ -251,6 +251,7 @@ public class SchemReader {
     int spacer = 10;
     int maxDepth = 0;
     int index = 0;
+    float maxDim = 0;
     for (WPObject object : schematics) {
 
       if (index % 20 == 0) {
@@ -259,6 +260,7 @@ public class SchemReader {
         maxDepth = 0;
       }
       var dimensions = object.getDimensions();
+      maxDim = Math.max(maxDim, Math.max(dimensions.x, Math.max(dimensions.y, dimensions.z)));
       var offset = object.getOffset();
       for (int x = 0; x < object.getDimensions().x; x++) {
         for (int y = 0; y < object.getDimensions().y; y++) {
@@ -313,6 +315,16 @@ public class SchemReader {
       index++;
     }
 
+    Material markerX = WOOL_WHITE.withProperty("cubearray_axis", "x");
+    Material markerY = WOOL_WHITE.withProperty("cubearray_axis", "y");
+    Material markerZ = WOOL_WHITE.withProperty("cubearray_axis", "z");
+    for (Material m : new Material[]{markerX, markerY, markerZ}) {
+      maxColorIdx = addInstance(m, new Vector3f(0, 0, 0), positions, blockTypeIndicesList, mat_to_palette_idx, maxColorIdx);
+    }
+    int xIdx = mat_to_palette_idx.get(markerX);
+    int yIdx = mat_to_palette_idx.get(markerY);
+    int zIdx = mat_to_palette_idx.get(markerZ);
+
     Vector3f[] colorPalette = new Vector3f[mat_to_palette_idx.size()];
     Arrays.fill(colorPalette, new Vector3f(1, 1, 1));
 
@@ -357,6 +369,22 @@ public class SchemReader {
       materialSprites.put(keyed, sprites);
     }
 
+    float rodLen = maxDim * 2;
+    colorPalette[xIdx] = new Vector3f(1, 0, 0);
+    sizePalette[xIdx] = new Vector3f(rodLen, 0.1f, 0.1f);
+    offsetPalette[xIdx] = new Vector3f(0, 0, 0);
+    rotationPalette[xIdx] = new Vector3f(0, 0, 0);
+
+    colorPalette[yIdx] = new Vector3f(0, 1, 0);
+    sizePalette[yIdx] = new Vector3f(0.1f, rodLen, 0.1f);
+    offsetPalette[yIdx] = new Vector3f(0, 0, 0);
+    rotationPalette[yIdx] = new Vector3f(0, 0, 0);
+
+    colorPalette[zIdx] = new Vector3f(0, 0, 1);
+    sizePalette[zIdx] = new Vector3f(0.1f, 0.1f, rodLen);
+    offsetPalette[zIdx] = new Vector3f(0, 0, 0);
+    rotationPalette[zIdx] = new Vector3f(0, 0, 0);
+
     SpriteSheet spriteSheet =
         new SpriteSheet(
             ResourceUtils.getInstallPath().resolve(ResourceUtils.TEXTURE_PACK_ROOT).toFile(),
@@ -378,6 +406,12 @@ public class SchemReader {
         uvCoordsPalette[faceEntry.getKey().ordinal() * numTypes + matIdx] =
             cropToFaceUv(cell, face.uv());
       }
+    }
+
+    for (int f = 0; f < Face.values().length; f++) {
+      uvCoordsPalette[f * numTypes + xIdx] = new Vector4f(0, 0, 0, 0);
+      uvCoordsPalette[f * numTypes + yIdx] = new Vector4f(0, 0, 0, 0);
+      uvCoordsPalette[f * numTypes + zIdx] = new Vector4f(0, 0, 0, 0);
     }
 
     int[] blockTypeIndices = blockTypeIndicesList.stream().mapToInt(i -> i).toArray();
