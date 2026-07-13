@@ -167,6 +167,29 @@ public class SchematicRenderIntegrationTest {
   }
 
   @Test
+  public void requestScreenshotProducesNonBlankImage() throws Exception {
+    ensureTextures();
+    File dir = new File("src/main/resources/schematics/Dannypan");
+    File[] schemFiles = dir.listFiles((d, n) -> n.endsWith(".schem"));
+    assertTrue(schemFiles.length > 0);
+    File schemFile = schemFiles[0];
+
+    CubeSetup setup =
+        SchemReader.prepareData(
+            SchemReader.loadSchematics(List.of(schemFile.toPath()), f -> {}));
+    assertNotNull(setup);
+
+    Path outputPath =
+        OUTPUT_DIR.resolve("requestScreenshot/" + schemFile.getName().replace(".schem", ".png"));
+    Files.createDirectories(outputPath.getParent());
+
+    InstancedCubes.renderToFile(setup, outputPath, 640, 640);
+
+    assertTrue("Output file missing", outputPath.toFile().exists());
+    assertNonBlank(outputPath, "requestScreenshot");
+  }
+
+  @Test
   public void renderPaleozoeySchematics() throws Exception {
     ensureTextures();
     File dir = new File("src/main/resources/schematics/Paleozoey");
