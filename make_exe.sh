@@ -9,7 +9,7 @@ mvn clean package
 # stage only the fat jar — jpackage copies everything in --input
 rm -rf staging
 mkdir staging
-cp target/CubeArray-1.1-app.jar staging/CubeArray.jar
+cp target/CubeArray.jar staging/CubeArray.jar
 
 # make new exe
 jpackage \
