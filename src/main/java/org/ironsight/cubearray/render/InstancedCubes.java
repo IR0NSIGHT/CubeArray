@@ -82,7 +82,6 @@ public class InstancedCubes {
   private double lastChangeTime;
   private CameraTransition transition;
   private final BlockingQueue<Runnable> pendingTasks = new LinkedBlockingQueue<>();
-  private boolean showGrid = true;
   private volatile CameraState publishedCameraState;
 
   public InstancedCubes(CubeSetup setup) {
@@ -626,13 +625,6 @@ public class InstancedCubes {
               0f,
               radius);
     });
-  }
-
-  /**
-   * Queues a grid-visibility toggle onto the render thread. Safe to call from any thread.
-   */
-  public void toggleGrid() {
-    pendingTasks.add(() -> showGrid = !showGrid);
   }
 
   private CameraState zoom(CameraState cameraState, float factor) {

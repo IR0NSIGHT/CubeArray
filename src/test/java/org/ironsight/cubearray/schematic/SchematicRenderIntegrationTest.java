@@ -141,6 +141,32 @@ public class SchematicRenderIntegrationTest {
   }
 
   @Test
+  public void renderWithGridEnabled() throws Exception {
+    ensureTextures();
+    File dir = new File("src/main/resources/schematics/Dannypan");
+    File[] schemFiles = dir.listFiles((d, name) -> name.endsWith(".schem"));
+    assertNotNull("No .schem files in Dannypan", schemFiles);
+    assertTrue("No .schem files in Dannypan", schemFiles.length > 0);
+    File schemFile = schemFiles[0];
+
+    Path outputPath =
+        OUTPUT_DIR.resolve("withgrid/" + schemFile.getName().replace(".schem", ".png"));
+    Files.createDirectories(outputPath.getParent());
+
+    CubeSetup setup =
+        SchemReader.prepareData(
+            SchemReader.loadSchematics(List.of(schemFile.toPath()), f -> {}),
+            true);
+
+    assertNotNull("Failed to prepare data with grid", setup);
+    assertTrue("useGrid should be true", setup.useGrid);
+    InstancedCubes.renderToFile(setup, outputPath, 640, 640);
+
+    assertTrue("Output file missing", outputPath.toFile().exists());
+    assertNonBlank(outputPath, schemFile.getName() + " (grid)");
+  }
+
+  @Test
   public void renderPaleozoeySchematics() throws Exception {
     ensureTextures();
     File dir = new File("src/main/resources/schematics/Paleozoey");
