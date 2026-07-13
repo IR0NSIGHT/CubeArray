@@ -94,7 +94,7 @@ public class InstancedCubes {
     cameraState = initialPos;
     publishedCameraState = cameraState;
     transition =
-        new CameraTransition(
+        CameraTransition.create(
             new CameraState(schematicCenter, fixPos_2.yaw(), initialPos.pitch(), 0f, initialPos.radius()),
             new CameraState(schematicCenter, fixPos_3.yaw(), initialPos.pitch(), 0f, initialPos.radius()),
             System.currentTimeMillis(), System.currentTimeMillis() + 1000);
@@ -277,7 +277,7 @@ public class InstancedCubes {
                 }
                 isFPV = !isFPV;
                 transition =
-                    new CameraTransition(
+                    CameraTransition.create(
                         cameraState,
                         newState,
                         System.currentTimeMillis(),
@@ -288,7 +288,7 @@ public class InstancedCubes {
                         cameraState.target(), fixPos_0.yaw(),
                         (float) toRadians(30), 0f, cameraState.radius());
                 transition =
-                    new CameraTransition(
+                    CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == CAM_FIX_POS_1.key) {
@@ -297,7 +297,7 @@ public class InstancedCubes {
                         cameraState.target(), fixPos_1.yaw(),
                         cameraState.pitch(), 0f, cameraState.radius());
                 transition =
-                    new CameraTransition(
+                    CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == CAM_FIX_POS_2.key) {
@@ -306,7 +306,7 @@ public class InstancedCubes {
                         cameraState.target(), fixPos_2.yaw(),
                         cameraState.pitch(), 0f, cameraState.radius());
                 transition =
-                    new CameraTransition(
+                    CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == CAM_FIX_POS_3.key) {
@@ -315,7 +315,7 @@ public class InstancedCubes {
                         cameraState.target(), fixPos_3.yaw(),
                         cameraState.pitch(), 0f, cameraState.radius());
                 transition =
-                    new CameraTransition(
+                    CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == CAM_FIX_POS_4.key) {
@@ -324,7 +324,7 @@ public class InstancedCubes {
                         cameraState.target(), fixPos_4.yaw(),
                         cameraState.pitch(), 0f, cameraState.radius());
                 transition =
-                    new CameraTransition(
+                    CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == CAM_FIX_POS_5.key) {
@@ -333,7 +333,7 @@ public class InstancedCubes {
                         schematicCenter, fixPos_5.yaw(),
                         (float) toRadians(89), 0f, cameraState.radius());
                 transition =
-                    new CameraTransition(
+                    CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == CAM_FIX_POS_6.key) {
@@ -342,7 +342,7 @@ public class InstancedCubes {
                         cameraState.target(), fixPos_6.yaw(),
                         cameraState.pitch(), 0f, cameraState.radius());
                 transition =
-                    new CameraTransition(
+                    CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == CAM_FIX_POS_7.key) {
@@ -351,7 +351,7 @@ public class InstancedCubes {
                         cameraState.target(), fixPos_7.yaw(),
                         cameraState.pitch(), 0f, cameraState.radius());
                 transition =
-                    new CameraTransition(
+                    CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == CAM_FIX_POS_8.key) {
@@ -360,7 +360,7 @@ public class InstancedCubes {
                         cameraState.target(), fixPos_8.yaw(),
                         cameraState.pitch(), 0f, cameraState.radius());
                 transition =
-                    new CameraTransition(
+                    CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == CAM_FIX_POS_9.key) {
@@ -369,19 +369,19 @@ public class InstancedCubes {
                         cameraState.target(), fixPos_9.yaw(),
                         cameraState.pitch(), 0f, cameraState.radius());
                 transition =
-                    new CameraTransition(
+                    CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == ZOOM_IN.key) {
                 CameraState target = zoom(cameraState, 2);
                 transition =
-                    new CameraTransition(
+                    CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == ZOOM_OUT.key) {
                 CameraState target = zoom(cameraState, -2);
                 transition =
-                    new CameraTransition(
+                    CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == SCREENSHOT.key) {
@@ -981,6 +981,15 @@ public class InstancedCubes {
       float delta = (float) (time - timeStart) / (timeEnd - timeStart);
       delta = Math.min(1, Math.max(0, delta));
       return start.multiply(1 - delta).add(end.multiply(delta));
+    }
+
+    static CameraTransition create(CameraState start, CameraState end, long timeStart, long timeEnd) {
+      float twoPi = (float) (2 * Math.PI);
+      float diff = (end.yaw - start.yaw) % twoPi;
+      if (diff > (float) Math.PI) diff -= twoPi;
+      if (diff < (float) -Math.PI) diff += twoPi;
+      CameraState adjustedEnd = new CameraState(end.target, start.yaw + diff, end.pitch, end.roll, end.radius);
+      return new CameraTransition(start, adjustedEnd, timeStart, timeEnd);
     }
   }
 
