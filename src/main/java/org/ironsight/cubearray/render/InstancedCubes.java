@@ -537,11 +537,6 @@ public class InstancedCubes {
       prevCameraState = cameraState;
       publishedCameraState = cameraState;
       glfwPollEvents();
-
-      Runnable task;
-      while ((task = pendingTasks.poll()) != null) {
-        task.run();
-      }
     }
   }
 
@@ -610,6 +605,15 @@ public class InstancedCubes {
    */
   public CameraState getCameraState() {
     return publishedCameraState;
+  }
+
+  /** Drains and executes all queued render-thread tasks. Package-private for testing. */
+  void executePendingTasks() {
+    Runnable task;
+    while ((task = pendingTasks.poll()) != null) {
+      task.run();
+    }
+    publishedCameraState = cameraState;
   }
 
   /**
