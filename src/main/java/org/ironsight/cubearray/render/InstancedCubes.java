@@ -83,6 +83,8 @@ public class InstancedCubes {
   private CameraTransition transition;
   private final BlockingQueue<Runnable> pendingTasks = new LinkedBlockingQueue<>();
   private volatile CameraState publishedCameraState;
+  private int resolveFbo;
+  private int resolveColorRb;
 
   public InstancedCubes(CubeSetup setup) {
     this.setup = setup;
@@ -155,6 +157,14 @@ public class InstancedCubes {
     glfwShowWindow(window);
 
     GL.createCapabilities();
+
+    resolveFbo = glGenFramebuffers();
+    glBindFramebuffer(GL_FRAMEBUFFER, resolveFbo);
+    resolveColorRb = glGenRenderbuffers();
+    glBindRenderbuffer(GL_RENDERBUFFER, resolveColorRb);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, width, height);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, resolveColorRb);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     setupShaders();
     setupVertexData();
@@ -520,6 +530,12 @@ public class InstancedCubes {
         glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, setup.positions.length);
         glBindVertexArray(0);
 
+        // TODO: only blit when pendingTasks contains a screenshot request to avoid the per-frame cost
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolveFbo);
+        glBlitFramebuffer(0, 0, width, height, 0, 0, width, height,
+                          GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
         Runnable task;
         while ((task = pendingTasks.poll()) != null) {
           task.run();
@@ -551,8 +567,8 @@ public class InstancedCubes {
               .resolve(
                   "screenshot_CubeArray_" + setup.name + "_" + System.currentTimeMillis() + ".png");
       if (out.toFile().exists()) return;
-      glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
-      glReadBuffer(GL_BACK);
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, resolveFbo);
+      glReadBuffer(GL_COLOR_ATTACHMENT0);
       saveScreenshot(out);
     } catch (IOException ex) {
       System.out.println(ex);
@@ -589,8 +605,8 @@ public class InstancedCubes {
     CompletableFuture<BufferedImage> future = new CompletableFuture<>();
     pendingTasks.add(() -> {
       try {
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
-        glReadBuffer(GL_BACK);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, resolveFbo);
+        glReadBuffer(GL_COLOR_ATTACHMENT0);
         future.complete(captureScreenshot());
       } catch (Throwable t) {
         future.completeExceptionally(t);
@@ -655,6 +671,8 @@ public class InstancedCubes {
     glDeleteTextures(uvPaletteTexId);
     glDeleteTextures(blockTexId);
     glDeleteProgram(shaderProgram);
+    glDeleteRenderbuffers(resolveColorRb);
+    glDeleteFramebuffers(resolveFbo);
 
     glfwFreeCallbacks(window);
     glfwDestroyWindow(window);
