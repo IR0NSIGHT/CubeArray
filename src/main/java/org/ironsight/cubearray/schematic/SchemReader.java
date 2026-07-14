@@ -346,8 +346,8 @@ public class SchemReader {
 
     // the render piece each palette entry resolves to; reused below to build the per-face uv palette
     Piece[] pieceByIdx = new Piece[mat_to_palette_idx.size()];
-    // per material, the sprite names its faces reference - the atlas allocates one cell per sprite
-    Map<Material, Set<String>> materialSprites = new HashMap<>();
+    // per material, the sprite names its faces reference -> tintindex (-1 = no tint)
+    Map<Material, Map<String, Integer>> materialSprites = new HashMap<>();
 
     for (var entry : mat_to_palette_idx.entrySet()) {
       Material keyed = entry.getKey();
@@ -369,9 +369,10 @@ public class SchemReader {
       offsetPalette[matIdx] = piece.offset();
       rotationPalette[matIdx] = piece.rotation();
 
-      Set<String> sprites = new HashSet<>();
-      for (FaceTexture face : piece.faces().values()) {
-        if (face.texture() != null) sprites.add(face.texture());
+      Map<String, Integer> sprites = new LinkedHashMap<>();
+      for (var faceEntry : piece.faces().entrySet()) {
+        FaceTexture face = faceEntry.getValue();
+        if (face.texture() != null) sprites.putIfAbsent(face.texture(), face.tintindex());
       }
       materialSprites.put(keyed, sprites);
     }

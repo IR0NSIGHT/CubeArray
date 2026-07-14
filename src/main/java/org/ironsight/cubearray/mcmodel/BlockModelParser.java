@@ -302,7 +302,8 @@ public class BlockModelParser {
               ? new Vector4f(faceJson.uv[0], faceJson.uv[1], faceJson.uv[2], faceJson.uv[3])
               : null; // omitted uv means "auto-generate from element position", not modeled yet
       Face cullface = faceJson.cullface != null ? parseFace(faceJson.cullface) : null;
-      return new FaceTexture(resolvedTexture, uv, cullface);
+      int tint = faceJson.tintindex != null ? faceJson.tintindex : -1;
+      return new FaceTexture(resolvedTexture, uv, cullface, tint);
     }
   }
 
@@ -334,5 +335,6 @@ public class BlockModelParser {
     public float[] uv;
     public String texture;
     public String cullface;
+    public Integer tintindex;
   }
 }

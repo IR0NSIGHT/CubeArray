@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.logging.Logger;
 import javax.imageio.ImageIO;
 import org.ironsight.cubearray.mcmodel.FaceTexture;
@@ -25,11 +24,22 @@ import org.pepsoft.minecraft.Material;
  * maps that back to the atlas rect the shader samples.
  *
  * <p>Cells are keyed per material (not globally) so biome-tinted grayscale sprites (grass, leaves)
- * can be colourised with that material's colour; see {@link #colorizeLeaf}.
+ * can be colourised per-tintindex with a hardcoded colour; see {@link #colorizeLeaf}.
  */
 public class SpriteSheet {
   private static final Logger logger = AppLogger.get(SpriteSheet.class);
   private static final Vector4f NO_TEXTURE = new Vector4f(0, 0, 0, 0);
+
+  // Hardcoded tint colors for each tintindex:
+  //   0 = grass (plains-style ~#91BD59)
+  //   1 = foliage (oak-leaf ~#77AB2F)
+  //   2 = dry foliage (brown ~#8B6B4D)
+  private static final int[] HARDCODED_TINTS = {
+    0xFF91BD59,
+    0xFF77AB2F,
+    0xFF8B6B4D,
+  };
+
   private static final String[] EXTENSIONS = {
     "",
     "s",
@@ -49,11 +59,11 @@ public class SpriteSheet {
   private final Map<Material, Map<String, Vector4f>> rects;
 
   /**
-   * @param materialSprites for each render material, the set of resolved sprite names its faces
-   *     reference (from {@link FaceTexture#texture()}); a material with no textured faces maps to an
-   *     empty set and simply gets no atlas cells.
+   * @param materialSprites for each render material, the map of resolved sprite names to tintindex
+   *     (-1 = no tint, 0 = grass, 1 = foliage, 2 = dry foliage); a material with no textured faces
+   *     maps to an empty map and simply gets no atlas cells.
    */
-  public SpriteSheet(File texturePackDir, Map<Material, Set<String>> materialSprites)
+  public SpriteSheet(File texturePackDir, Map<Material, Map<String, Integer>> materialSprites)
       throws IOException {
     assert texturePackDir != null && texturePackDir.exists() && texturePackDir.isDirectory();
     var nameToFile = nameToFile(texturePackDir);
@@ -107,11 +117,13 @@ public class SpriteSheet {
   }
 
   private BufferedImage buildAtlas(
-      Map<Material, Set<String>> materialSprites, int textureSize, HashMap<String, File> nameToFile)
+      Map<Material, Map<String, Integer>> materialSprites,
+      int textureSize,
+      HashMap<String, File> nameToFile)
       throws IOException {
     // one atlas cell per (material, sprite) pair
     int numTextures = 0;
-    for (Set<String> sprites : materialSprites.values()) numTextures += sprites.size();
+    for (var sprites : materialSprites.values()) numTextures += sprites.size();
     int gridSize = Math.max(1, (int) Math.ceil(Math.sqrt(numTextures)));
 
     int atlasSize = 1;
@@ -122,16 +134,16 @@ public class SpriteSheet {
     Graphics2D g = atlas.createGraphics();
 
     int i = 0;
-    for (Map.Entry<Material, Set<String>> matEntry : materialSprites.entrySet()) {
-      Material mat = matEntry.getKey();
-      boolean tinted = mat.leafBlock || mat.vegetation || mat.name.contains("grass");
+    for (var matEntry : materialSprites.entrySet()) {
       Map<String, Vector4f> matRects = new LinkedHashMap<>();
-      rects.put(mat, matRects);
+      rects.put(matEntry.getKey(), matRects);
 
-      for (String sprite : matEntry.getValue()) {
+      for (var spriteEntry : matEntry.getValue().entrySet()) {
+        String sprite = spriteEntry.getKey();
+        int tintIndex = spriteEntry.getValue();
+
         File file = spriteFile(sprite, nameToFile);
         if (file == null) {
-        //  logger.warning("CAN NOT LOCATE TEXTURE FOR: " + sprite + " (" + mat.simpleName + ")");
           matRects.put(sprite, NO_TEXTURE);
           continue;
         }
@@ -139,7 +151,9 @@ public class SpriteSheet {
         int x = (i % gridSize) * textureSize;
         int y = (i / gridSize) * textureSize;
         BufferedImage tex = ImageIO.read(file);
-        if (tinted) tex = colorizeLeaf(tex, mat.colour);
+        if (tintIndex >= 0 && tintIndex < HARDCODED_TINTS.length) {
+          tex = colorizeLeaf(tex, HARDCODED_TINTS[tintIndex]);
+        }
         g.drawImage(tex, x, y, textureSize, textureSize, null);
 
         float u1 = x / (float) atlasSize;

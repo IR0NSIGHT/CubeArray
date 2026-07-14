@@ -16,10 +16,12 @@ import org.joml.Vector4f;
  *
  * <p>{@code texture} is the sprite name already resolved through the model's "textures" table
  * (e.g. "block/acacia_fence_side"), not the raw "#side" reference used in the JSON.
+ *
+ * @param tintindex the block model's tint index (-1 for no tint, 0=grass, 1=foliage, 2=dry foliage)
  */
-public record FaceTexture(String texture, Vector4f uv, Face cullface) {
+public record FaceTexture(String texture, Vector4f uv, Face cullface, int tintindex) {
 
-  public FaceTexture(String texture, float u1, float v1, float u2, float v2) {
-    this(texture, new Vector4f(u1, v1, u2, v2), null);
+  public FaceTexture(String texture, Vector4f uv, Face cullface) {
+    this(texture, uv, cullface, -1);
   }
 }

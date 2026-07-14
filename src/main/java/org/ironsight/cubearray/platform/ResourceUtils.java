@@ -29,7 +29,7 @@ public class ResourceUtils {
   private static final Set<String> SUPPORTED_FILE_EXTENSIONS =
       SUPPORTED_FILE_TYPES.stream().map(s -> s.replace(".", "")).collect(Collectors.toSet());
   public static String TEXTURE_RESOURCES = "textures/";
-  public static String TEXTURE_PACK_ROOT = "textures/Faithful_32x_1_21_7/";
+  public static String TEXTURE_PACK_ROOT = "vanilla_assets/";
   // bundled complete vanilla asset layer (models + blockstates); see
   // src/main/resources/vanilla_assets/README.md
   public static String VANILLA_ASSETS_RESOURCES = "vanilla_assets/";
