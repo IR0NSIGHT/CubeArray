@@ -19,14 +19,17 @@ import org.junit.Test;
 public class BlockModelParserTest {
 
   private static Path packRoot;
+  private static Path vanillaPackRoot;
 
   @BeforeClass
   public static void extractResourcePack() throws Exception {
     ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
+    ResourceUtils.copyResourcesToFile(ResourceUtils.VANILLA_ASSETS_RESOURCES);
     // Pixel Perfection Legacy's current-version content ships at the zip's top-level "assets/",
     // which lands directly under the extracted "textures/" folder (unlike Faithful, which wraps
     // itself in its own "Faithful_32x_1_21_7/" subfolder - see ResourceUtils.TEXTURE_PACK_ROOT).
     packRoot = ResourceUtils.getInstallPath().resolve(ResourceUtils.TEXTURE_RESOURCES);
+    vanillaPackRoot = ResourceUtils.getInstallPath().resolve(ResourceUtils.VANILLA_ASSETS_RESOURCES);
   }
 
   @Test
@@ -70,6 +73,26 @@ public class BlockModelParserTest {
           faceTexture.texture());
       assertEquals(face, faceTexture.cullface());
     }
+  }
+
+  @Test
+  public void parsesTextureObjectFormat() throws Exception {
+    // gray_stained_glass_pane_noside uses the new MC 26.1 texture object format where "pane" is
+    // an object with "sprite" and "force_translucent" fields instead of a plain string.
+    BlockModel model =
+        BlockModelParser.parseModel(vanillaPackRoot, "block/gray_stained_glass_pane_noside");
+
+    assertNotNull(model);
+    // The model inherits from template_glass_pane_noside which defines a "particle" ref "#pane"
+    // and one element with a north face using texture "#pane".  Our parser extracts the sprite
+    // from the {"force_translucent": true, "sprite": "..."} object so it resolves correctly.
+    assertFalse("expected at least one sub-block", model.subBlocks().isEmpty());
+    SubBlock block = model.subBlocks().get(0);
+    FaceTexture northFace = block.faces().get(Face.NORTH);
+    assertNotNull("expected north face", northFace);
+    assertEquals(
+        "minecraft:block/gray_stained_glass",
+        northFace.texture());
   }
 
   @Test

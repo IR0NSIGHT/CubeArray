@@ -122,6 +122,19 @@ public class BlockModelParser {
         : new Vector3f();
   }
 
+  /**
+   * Extracts a texture sprite path from a raw JSON value. May be a plain string or an object with
+   * a {@code "sprite"} field (the new format introduced in MC 26.1 Snapshot 7 / RP version 81).
+   */
+  private static String extractTextureRef(Object value) {
+    if (value instanceof String s) return s;
+    if (value instanceof Map<?, ?> m) {
+      Object sprite = m.get("sprite");
+      return sprite instanceof String s ? s : null;
+    }
+    return null;
+  }
+
   /** Resolves a face's "#key" (or already-literal) texture reference against a textures map. */
   private static String resolveTextureRef(String ref, Map<String, String> textures) {
     Set<String> seen = new HashSet<>();
@@ -178,7 +191,12 @@ public class BlockModelParser {
                 : RawModel.EMPTY;
 
         Map<String, String> textures = new LinkedHashMap<>(parent.textures());
-        if (json.textures != null) textures.putAll(json.textures);
+        if (json.textures != null) {
+          for (var entry : json.textures.entrySet()) {
+            String ref = extractTextureRef(entry.getValue());
+            if (ref != null) textures.put(entry.getKey(), ref);
+          }
+        }
 
         // elements are inherited wholesale from the parent unless this model defines its own
         List<ElementJson> elements = json.elements != null ? json.elements : parent.elements();
@@ -291,7 +309,7 @@ public class BlockModelParser {
   @JsonIgnoreProperties(ignoreUnknown = true)
   private static final class ModelJson {
     public String parent;
-    public Map<String, String> textures;
+    public Map<String, Object> textures;
     public List<ElementJson> elements;
   }
 
