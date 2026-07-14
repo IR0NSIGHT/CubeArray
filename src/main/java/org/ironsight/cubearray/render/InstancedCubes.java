@@ -87,6 +87,7 @@ public class InstancedCubes {
   private volatile CameraState publishedCameraState;
   private int resolveFbo;
   private int resolveColorRb;
+  private Matrix4f projection;
 
   public InstancedCubes(CubeSetup setup) {
     this.setup = setup;
@@ -161,6 +162,19 @@ public class InstancedCubes {
 
     GL.createCapabilities();
 
+    glViewport(0, 0, width, height);
+    projection = new Matrix4f().perspective((float) toRadians(45.0f), (float) width / height, .1f, 10000.0f);
+
+    glfwSetFramebufferSizeCallback(window, (win, fbWidth, fbHeight) -> {
+        width = fbWidth;
+        height = fbHeight;
+        glViewport(0, 0, fbWidth, fbHeight);
+        projection = new Matrix4f().perspective((float) toRadians(45.0f), (float) fbWidth / fbHeight, .1f, 10000.0f);
+        glBindRenderbuffer(GL_RENDERBUFFER, resolveColorRb);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, fbWidth, fbHeight);
+        lastChangeTime = glfwGetTime();
+    });
+
     resolveFbo = glGenFramebuffers();
     glBindFramebuffer(GL_FRAMEBUFFER, resolveFbo);
     resolveColorRb = glGenRenderbuffers();
@@ -183,8 +197,6 @@ public class InstancedCubes {
     FloatBuffer viewBuffer = BufferUtils.createFloatBuffer(16);
     autoRotate = 0f;
 
-    Matrix4f projection =
-        new Matrix4f().perspective((float) toRadians(45.0f), (float) width / height, .1f, 10000.0f);
     /* TODO add orthographic perspective?
     float aspect = (float) width / height;
     float size = 20.0f; // world units visible vertically
