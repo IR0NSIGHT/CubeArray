@@ -643,6 +643,22 @@ public class InstancedCubes {
   }
 
   /**
+   * Queues a camera target position update onto the render thread. Safe to call from any thread.
+   */
+  public void setCameraTarget(Vector3f target) {
+    pendingTasks.add(() -> {
+      cameraState =
+          new CameraState(
+              target,
+              cameraState.yaw(),
+              cameraState.pitch(),
+              cameraState.roll(),
+              cameraState.radius());
+      lastChangeTime = glfwGetTime();
+    });
+  }
+
+  /**
    * Queues a camera position update onto the render thread. Safe to call from any thread.
    */
   public void setCamera(float yawDeg, float pitchDeg, float radius) {
@@ -654,6 +670,7 @@ public class InstancedCubes {
               (float) toRadians(pitchDeg),
               0f,
               radius);
+      lastChangeTime = glfwGetTime();
     });
   }
 

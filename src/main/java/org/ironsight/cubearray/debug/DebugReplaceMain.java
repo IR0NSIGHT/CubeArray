@@ -5,6 +5,7 @@ import java.util.List;
 import org.ironsight.cubearray.platform.ResourceUtils;
 import org.ironsight.cubearray.render.CubeSetup;
 import org.ironsight.cubearray.render.InstancedCubes;
+import org.joml.Vector3f;
 import org.ironsight.cubearray.schematic.SchemReader;
 
 public class DebugReplaceMain {
@@ -37,11 +38,20 @@ public class DebugReplaceMain {
 
     Thread.sleep(500);
 
+    var baseTarget = renderer.getCameraState().target();
     boolean onFirst = false;
+    boolean up = true;
+    int tick = 0;
     while (true) {
       Thread.sleep(2000);
       renderer.replaceData(onFirst ? setupA : setupB);
       onFirst = !onFirst;
+      tick++;
+      if (tick % 2 == 0) {
+        float y = up ? baseTarget.y + 10 : baseTarget.y - 10;
+        renderer.setCameraTarget(new Vector3f(baseTarget.x, y, baseTarget.z));
+        up = !up;
+      }
     }
   }
 }
