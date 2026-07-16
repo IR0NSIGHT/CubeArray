@@ -54,6 +54,10 @@ public class SchemReader {
   // cache of the render pieces a material expands into (deterministic per material)
   private static final Map<Material, List<Piece>> pieceCache = new ConcurrentHashMap<>();
 
+  // legacy block name → modern name, for schematics that use pre-1.13 IDs
+  private static final Map<String, String> BLOCK_REMAPPINGS =
+      Map.of("minecraft:grass", "minecraft:short_grass");
+
   /**
    * One renderable cuboid: a model element positioned by a blockstate placement's rotation, plus
    * the per-face textures ({@link SubBlock#faces()}) so each cube face can sample its own sprite.
@@ -95,14 +99,17 @@ public class SchemReader {
    * when the block has no blockstate, or none of its variants matched.
    */
   private static List<BlockStateParser.ModelPlacement> selectPlacements(Material mat) {
-    BlockStateParser.BlockState state = blockStates.get(mat.namespace + ":" + mat.simpleName);
+    String blockId =
+        BLOCK_REMAPPINGS.getOrDefault(
+            mat.namespace + ":" + mat.simpleName, mat.namespace + ":" + mat.simpleName);
+    BlockStateParser.BlockState state = blockStates.get(blockId);
     if (state != null) {
       List<BlockStateParser.ModelPlacement> placements = state.select(key -> mat.getProperty(key));
       if (!placements.isEmpty()) return placements;
     }
     return List.of(
         new BlockStateParser.ModelPlacement(
-            mat.namespace + ":block/" + mat.simpleName, 0, 0, false));
+            blockId.replaceFirst(":", ":block/"), 0, 0, false));
   }
 
   /** Render pieces a material expands into: one per element of each selected model placement. */
