@@ -71,7 +71,7 @@ public enum CaColumn {
   BLOCKS(
       "Blocks",
       List.class,
-      FileTableModel.stringListRenderer,
+      FileTableModel.blockListRenderer,
       "Blocktypes that are used in the schematic",
       500),
   ENTITIES(

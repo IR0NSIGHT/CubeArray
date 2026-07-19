@@ -93,6 +93,65 @@ class FileTableModel extends AbstractTableModel {
           }
         }
       };
+  public static BlockIconProvider blockIconProvider;
+  public static final StringConverter blockListRenderer =
+      new StringConverter() {
+        private List<String> blocks = List.of();
+
+        @Override
+        protected void setValue(Object value) {
+          if (value instanceof List<?> list) {
+            blocks = list.stream().filter(Objects::nonNull).map(Object::toString).toList();
+          } else {
+            blocks = List.of();
+          }
+        }
+
+        @Override
+        public String convertToString(Object o) {
+          return String.join(", ", blocks);
+        }
+
+        @Override
+          protected void paintComponent(Graphics g) {
+          super.paintComponent(g);
+          if (blockIconProvider == null || blocks.isEmpty()) return;
+          Graphics2D g2 = (Graphics2D) g.create();
+          g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+          Insets insets = getInsets();
+          FontMetrics fm = g2.getFontMetrics();
+          int x = insets.left + 2;
+          int y = (getHeight() + fm.getAscent()) / 2 - 1;
+          int remaining = blocks.size();
+          for (int i = 0; i < blocks.size(); i++) {
+            remaining--;
+            String block = blocks.get(i);
+            Icon icon = blockIconProvider.getIconSmall(block);
+            int iconWidth = (icon != null) ? icon.getIconWidth() + 3 : 0;
+            String text = (remaining > 0) ? block + ", " : block;
+            int textWidth = fm.stringWidth(text);
+            String moreText = remaining > 0 ? "+" + remaining + " more" : null;
+            int moreWidth = moreText != null ? fm.stringWidth(moreText) : 0;
+            boolean fits =
+                i == 0
+                    || x + iconWidth + textWidth + moreWidth + 6
+                        <= getWidth() - insets.right - 2;
+            if (fits) {
+              if (icon != null) {
+                int iconY = (getHeight() - icon.getIconHeight()) / 2;
+                icon.paintIcon(this, g2, x, iconY);
+                x += iconWidth;
+              }
+              g2.drawString(text, x, y);
+              x += textWidth;
+            } else {
+              if (moreText != null) g2.drawString(moreText, x, y);
+              break;
+            }
+          }
+          g2.dispose();
+        }
+      };
   public static int NO_VALUE = -1;
   public static final StringConverter iconRenderer =
       new StringConverter() {

@@ -139,6 +139,7 @@ public class FileRenderApp {
     PeriodicChecker.INSTANCE.addCallback(this::checkLoadingThreads);
 
     this.tableModel = new FileTableModel(PeriodicChecker.INSTANCE, SchematicPreviewHelper.getInstance());
+    FileTableModel.blockIconProvider = blockIconProvider;
     tableModel.setFileQueueSizeChangedCallback(
         count -> {
           if (count == 0) this.setTextRemainingFiles("");
