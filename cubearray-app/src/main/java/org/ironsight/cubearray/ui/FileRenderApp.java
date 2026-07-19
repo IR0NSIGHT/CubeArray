@@ -48,6 +48,7 @@ public class FileRenderApp {
   private final TableRowSorter<FileTableModel> rowSorter;
 
   private final Set<Thread> loadingThreads = new HashSet<>();
+  private final BlockIconProvider blockIconProvider = new BlockIconProvider(20, 16);
   // is context dirty and needs to be saved?
   private boolean contextDirtyFlag;
   private final HashMap<CaColumn, TableColumn> columToTableColumn = new HashMap<>();
@@ -885,6 +886,10 @@ public class FileRenderApp {
                 showRenderPreview(modelRow);
                 return;
               }
+              if (modelCol == CaColumn.BLOCKS.ordinal() && object instanceof List<?> list) {
+                showBlocksPopup(e, list.stream().map(Object::toString).toList());
+                return;
+              }
 
               logger.fine("Model row=" + modelRow + ", model col=" + modelCol);
 
@@ -1056,6 +1061,24 @@ public class FileRenderApp {
           "Delete from disk",
           JOptionPane.ERROR_MESSAGE);
     }
+  }
+
+  private void showBlocksPopup(MouseEvent e, List<String> blocks) {
+    JPopupMenu menu = new JPopupMenu();
+    menu.setLightWeightPopupEnabled(false);
+    JPanel panel = new JPanel();
+    panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+    for (String block : blocks) {
+      JLabel label = new JLabel(block, blockIconProvider.getIcon(block), JLabel.LEADING);
+      label.setIconTextGap(6);
+      label.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
+      panel.add(label);
+    }
+    JScrollPane scroll = new JScrollPane(panel);
+    scroll.setPreferredSize(new Dimension(300, Math.min(400, blocks.size() * 28 + 10)));
+    menu.add(new JLabel("Blocks"));
+    menu.add(scroll);
+    SwingUtilities.invokeLater(() -> menu.show(e.getComponent(), e.getX(), e.getY()));
   }
 
   private void replaceSandstoneWithCobblestone() {
