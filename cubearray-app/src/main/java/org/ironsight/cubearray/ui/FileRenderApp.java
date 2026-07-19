@@ -61,6 +61,7 @@ public class FileRenderApp {
 
   private JTextField searchField;
   private JPanel chipRow;
+  private JProgressBar searchSpinner;
 
   private static final long DEBUG_SEARCH_DELAY_MS = 0;
 
@@ -70,47 +71,47 @@ public class FileRenderApp {
         MILLISECONDS.sleep(DEBUG_SEARCH_DELAY_MS);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
+        return;
       }
     }
+
     String plainText = searchField.getText().trim().toLowerCase();
     boolean hasPlainText = !plainText.isEmpty();
-    boolean hasChips = chipSearchManager.hasConditions();
+    List<ChipSearchManager.SearchCondition> conditions =
+        List.copyOf(chipSearchManager.getConditions());
 
-    if (!hasPlainText && !hasChips) {
-      rowSorter.setRowFilter(null);
-    } else {
+    if (!hasPlainText && conditions.isEmpty()) {
+      String pt = plainText;
+      SwingUtilities.invokeLater(() -> {
+        rowSorter.setRowFilter(null);
+        for (CaColumn c : CaColumn.values()) {
+          c.renderer.setSearchText(pt);
+        }
+      });
+      return;
+    }
+
+    Set<Integer> matchingRows;
+    try {
+      matchingRows = TableSearchRunner.computeMatchingRows(tableModel, context, conditions, plainText);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return;
+    }
+
+    String pt = plainText;
+    SwingUtilities.invokeLater(() -> {
       rowSorter.setRowFilter(
           new RowFilter<>() {
             @Override
             public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
-              if (hasPlainText) {
-                boolean found = false;
-                for (CaColumn c : context.columnContext().displayedColumns()) {
-                  if (c.renderer
-                      .convertToString(entry.getValue(c.ordinal()))
-                      .toLowerCase()
-                      .contains(plainText)) {
-                    found = true;
-                    break;
-                  }
-                }
-                if (!found) return false;
-              }
-              for (ChipSearchManager.SearchCondition cond : chipSearchManager.getConditions()) {
-                String cellValue =
-                    cond.column()
-                        .renderer
-                        .convertToString(entry.getValue(cond.column().ordinal()))
-                        .toLowerCase();
-                if (!cellValue.contains(cond.searchTerm().toLowerCase())) return false;
-              }
-              return true;
+              return matchingRows.contains((int) entry.getIdentifier());
             }
           });
-    }
-    for (CaColumn c : CaColumn.values()) {
-      c.renderer.setSearchText(plainText);
-    }
+      for (CaColumn c : CaColumn.values()) {
+        c.renderer.setSearchText(pt);
+      }
+    });
   }
 
   private final JLabel topInfoLabel;
@@ -241,6 +242,15 @@ public class FileRenderApp {
         DebouncedDocumentListener.create(200, this::updateFilter);
     searchField.getDocument().addDocumentListener(debouncer);
 
+    searchSpinner = new JProgressBar();
+    searchSpinner.setIndeterminate(true);
+    searchSpinner.setPreferredSize(new Dimension(16, 16));
+    searchSpinner.setMaximumSize(new Dimension(16, 16));
+    searchSpinner.setVisible(false);
+    debouncer.addPropertyChangeListener(
+        DebouncedDocumentListener.PROP_SEARCHING,
+        e -> searchSpinner.setVisible((boolean) e.getNewValue()));
+
     chipRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
     chipRow.setVisible(false);
 
@@ -303,6 +313,7 @@ public class FileRenderApp {
         searchRow.add(addBtn);
 
         searchRow.add(searchField);
+        searchRow.add(searchSpinner);
         searchRow.add(addConditionBtn);
       }
       topPanel.add(searchRow);

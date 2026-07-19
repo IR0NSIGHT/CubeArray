@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -123,15 +124,15 @@ class FileTableModel extends AbstractTableModel {
         }
       };
   private final List<File> files = new java.util.ArrayList<>();
-  private final HashMap<File, WPObject> schematicObjects = new HashMap<>();
-  private final HashSet<File> loadingFiles = new HashSet<>();
+  private final ConcurrentHashMap<File, WPObject> schematicObjects = new ConcurrentHashMap<>();
+  private final Set<File> loadingFiles = ConcurrentHashMap.newKeySet();
 
   public FileTableModel(PeriodicChecker checker, SchematicPreviewHelper previewHelper) {
     this.previewHelper = previewHelper;
     if (checker != null) checker.addCallback(this::tryLoadSchematics);
   }
 
-  private final HashSet<File> errorFiles = new HashSet<>();
+  private final Set<File> errorFiles = ConcurrentHashMap.newKeySet();
 
   private void flagAsError(File file) {
     errorFiles.add(file);
@@ -218,8 +219,10 @@ class FileTableModel extends AbstractTableModel {
   }
 
   public File getFile(int modelRow) {
-    if (modelRow < 0 || modelRow >= files.size()) return null;
-    return files.get(modelRow);
+    synchronized (files) {
+      if (modelRow < 0 || modelRow >= files.size()) return null;
+      return files.get(modelRow);
+    }
   }
 
   private static String formatPos(int x, int y, int z) {
@@ -239,7 +242,9 @@ class FileTableModel extends AbstractTableModel {
 
   @Override
   public int getRowCount() {
-    return files.size();
+    synchronized (files) {
+      return files.size();
+    }
   }
 
   @Override
@@ -258,7 +263,10 @@ class FileTableModel extends AbstractTableModel {
 
     if (col >= CaColumn.values().length) return null;
 
-    File f = files.get(row);
+    File f;
+    synchronized (files) {
+      f = files.get(row);
+    }
     WPObject obj = getSchematicFor(f);
     return switch (CaColumn.values()[col]) {
       case ICON -> previewHelper.getIcon(f);
@@ -386,11 +394,15 @@ class FileTableModel extends AbstractTableModel {
   }
 
   public File getFileAt(int row) {
-    return files.get(row);
+    synchronized (files) {
+      return files.get(row);
+    }
   }
 
   public int indexOfFile(File f) {
-    return files.indexOf(f);
+    synchronized (files) {
+      return files.indexOf(f);
+    }
   }
 
   public void invalidateIconCache(File f) {
@@ -398,14 +410,19 @@ class FileTableModel extends AbstractTableModel {
   }
 
   public void addFile(File f) {
-    if (f != null && !files.contains(f)) {
+    if (f == null) return;
+    int idx;
+    synchronized (files) {
+      if (files.contains(f)) return;
       files.add(f);
-      fireTableRowsInserted(files.size() - 1, files.size() - 1);
+      idx = files.size() - 1;
     }
+    fireTableRowsInserted(idx, idx);
   }
 
   public void addFiles(Collection<File> newFiles) {
     int oldSize;
+    int added;
     synchronized (files) {
       oldSize = files.size();
       var existing = new HashSet<>(files);
@@ -414,8 +431,8 @@ class FileTableModel extends AbstractTableModel {
           files.add(f);
         }
       }
+      added = files.size() - oldSize;
     }
-    int added = files.size() - oldSize;
     if (added > 0) {
       fireTableRowsInserted(oldSize, oldSize + added - 1);
     }
@@ -423,14 +440,16 @@ class FileTableModel extends AbstractTableModel {
 
   public void removeFile(File... files) {
     for (File file : files) {
-      int i = this.files.indexOf(file);
-      this.files.remove(file);
+      int i;
+      synchronized (this.files) {
+        i = this.files.indexOf(file);
+        this.files.remove(file);
+      }
       this.schematicObjects.remove(file);
       this.errorFiles.remove(file);
       this.loadingFiles.remove(file);
 
       if (i >= 0) fireTableRowsDeleted(i, i);
-      assert !this.files.contains(file);
     }
   }
 
