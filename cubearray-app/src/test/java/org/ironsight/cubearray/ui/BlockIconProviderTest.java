@@ -71,8 +71,11 @@ public class BlockIconProviderTest {
   }
 
   @Test
-  public void getIconSmallReturnsNullForMissing() {
-    assertNull(provider.getIconSmall("this_does_not_exist"));
+  public void getIconSmallReturnsUnknownIconForMissing() {
+    Icon icon = provider.getIconSmall("this_does_not_exist");
+    assertNotNull(icon);
+    assertEquals(20, icon.getIconWidth());
+    assertEquals(20, icon.getIconHeight());
   }
 
   @Test

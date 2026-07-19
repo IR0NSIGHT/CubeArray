@@ -126,7 +126,7 @@ class FileTableModel extends AbstractTableModel {
           for (int i = 0; i < blocks.size(); i++) {
             remaining--;
             String block = blocks.get(i);
-            Icon icon = blockIconProvider.getIconSmall(block);
+            Icon icon = blockIconProvider.getIcon(block);
             int iconWidth = (icon != null) ? icon.getIconWidth() + 3 : 0;
             String text = (remaining > 0) ? block + ", " : block;
             int textWidth = fm.stringWidth(text);

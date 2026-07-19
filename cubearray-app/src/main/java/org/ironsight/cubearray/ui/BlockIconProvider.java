@@ -42,7 +42,9 @@ public class BlockIconProvider {
       cache.put(cacheKey, icon);
       return icon;
     }
-    return null;
+    Icon unknown = unknownIconSmall();
+    if (unknown != null) cache.put(cacheKey, unknown);
+    return unknown;
   }
 
   private static String normalizeKey(String block) {
@@ -70,6 +72,19 @@ public class BlockIconProvider {
             new ImageIcon(url).getImage()
                 .getScaledInstance(defaultSize, defaultSize, Image.SCALE_SMOOTH));
     cache.put("__unknown__", icon);
+    return icon;
+  }
+
+  private Icon unknownIconSmall() {
+    Icon cached = cache.get("__unknown_small__");
+    if (cached != null) return cached;
+    URL url = classLoader.getResource("icons/unknown.png");
+    if (url == null) return null;
+    Icon icon =
+        new ImageIcon(
+            new ImageIcon(url).getImage()
+                .getScaledInstance(smallSize, smallSize, Image.SCALE_SMOOTH));
+    cache.put("__unknown_small__", icon);
     return icon;
   }
 }

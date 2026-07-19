@@ -48,7 +48,7 @@ public class FileRenderApp {
   private final TableRowSorter<FileTableModel> rowSorter;
 
   private final Set<Thread> loadingThreads = new HashSet<>();
-  private final BlockIconProvider blockIconProvider = new BlockIconProvider(20, 16);
+  private final BlockIconProvider blockIconProvider = new BlockIconProvider(32, 16);
   // is context dirty and needs to be saved?
   private boolean contextDirtyFlag;
   private final HashMap<CaColumn, TableColumn> columToTableColumn = new HashMap<>();
