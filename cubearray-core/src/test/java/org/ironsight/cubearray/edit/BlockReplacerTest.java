@@ -11,7 +11,7 @@ import pitheguy.schemconvert.converter.Schematic;
 public class BlockReplacerTest {
 
   private static final File JERUSALEM_WALLS =
-      new File("src/main/resources/schematics/Ir0nsight/jerusalem_walls_t.schem");
+      new File("src/test/resources/schematics/Ir0nsight/jerusalem_walls_t.schem");
 
   @Test
   public void replaceRedSandstoneWithCobblestone() throws Exception {

@@ -32,7 +32,7 @@ public class SchematicRenderIntegrationTest {
   @Test
   public void renderDannypanSchematics() throws Exception {
     ensureTextures();
-    File dir = new File("src/main/resources/schematics/Dannypan");
+    File dir = new File("src/test/resources/schematics/Dannypan");
     assertTrue("Dannypan directory not found: " + dir.getAbsolutePath(), dir.isDirectory());
 
     File[] schemFiles = dir.listFiles((d, name) -> name.endsWith(".schem"));
@@ -104,7 +104,7 @@ public class SchematicRenderIntegrationTest {
   @Test
   public void renderOffMainThreadIsNotBlank() throws Exception {
     ensureTextures();
-    File dir = new File("src/main/resources/schematics/Dannypan");
+    File dir = new File("src/test/resources/schematics/Dannypan");
     File[] schemFiles = dir.listFiles((d, name) -> name.endsWith(".schem"));
     assertNotNull("No .schem files in Dannypan", schemFiles);
     assertTrue("No .schem files in Dannypan", schemFiles.length > 0);
@@ -143,7 +143,7 @@ public class SchematicRenderIntegrationTest {
   @Test
   public void renderWithGridEnabled() throws Exception {
     ensureTextures();
-    File dir = new File("src/main/resources/schematics/Dannypan");
+    File dir = new File("src/test/resources/schematics/Dannypan");
     File[] schemFiles = dir.listFiles((d, name) -> name.endsWith(".schem"));
     assertNotNull("No .schem files in Dannypan", schemFiles);
     assertTrue("No .schem files in Dannypan", schemFiles.length > 0);
@@ -169,7 +169,7 @@ public class SchematicRenderIntegrationTest {
   @Test
   public void requestScreenshotProducesNonBlankImage() throws Exception {
     ensureTextures();
-    File dir = new File("src/main/resources/schematics/Dannypan");
+    File dir = new File("src/test/resources/schematics/Dannypan");
     File[] schemFiles = dir.listFiles((d, n) -> n.endsWith(".schem"));
     assertTrue(schemFiles.length > 0);
     File schemFile = schemFiles[0];
@@ -192,7 +192,7 @@ public class SchematicRenderIntegrationTest {
   @Test
   public void renderPaleozoeySchematics() throws Exception {
     ensureTextures();
-    File dir = new File("src/main/resources/schematics/Paleozoey");
+    File dir = new File("src/test/resources/schematics/Paleozoey");
     assertTrue("Paleozoey directory not found: " + dir.getAbsolutePath(), dir.isDirectory());
 
     File[] schemFiles = dir.listFiles((d, name) -> name.endsWith(".schem"));

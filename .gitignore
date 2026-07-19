@@ -1,4 +1,4 @@
-/target/
+target/
 /staging/
 hs_err_*.log
 /.idea/

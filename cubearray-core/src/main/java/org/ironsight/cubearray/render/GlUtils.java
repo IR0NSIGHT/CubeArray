@@ -42,7 +42,7 @@ public class GlUtils {
 
   /**
    * Uploads a {@code width x height} RGBA32F palette. Used for the per-face uv palette, laid out
-   * with one column per block type (material index) and one row per {@link Face} (height 6), so the
+   * with one column per block type (material index) and one row per {@link org.ironsight.cubearray.mcmodel.Face} (height 6), so the
    * vertex shader can look a face's atlas rect up at {@code (typeTexCoord, (faceId+0.5)/6)}.
    * {@code inputData} is row-major: {@code inputData[faceId * width + typeIndex]}.
    */

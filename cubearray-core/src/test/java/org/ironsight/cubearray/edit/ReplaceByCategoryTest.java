@@ -23,7 +23,7 @@ import pitheguy.schemconvert.converter.Schematic;
 public class ReplaceByCategoryTest {
 
   private static final File TOWER =
-      new File("src/main/resources/schematics/Ir0nsight/jerusalem_tower_pretty_I.schem");
+      new File("src/test/resources/schematics/Ir0nsight/jerusalem_tower_pretty_I.schem");
 
   // -------------------------------------------------------------------------
   // Core behaviour
