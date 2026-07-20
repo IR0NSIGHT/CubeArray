@@ -303,8 +303,8 @@ public class FileRenderApp {
         searchRow.add(addBtn);
 
         searchRow.add(searchField);
-        searchRow.add(searchSpinner);
         searchRow.add(addConditionBtn);
+        searchRow.add(searchSpinner);
       }
       topPanel.add(searchRow);
 
