@@ -31,6 +31,11 @@ class FreeTextSearchFilter extends AbstractSearchFilter {
     }
 
     @Override
+    public String getHighlightString(CaColumn column) {
+        return searchText.isEmpty() ? null : searchText;
+    }
+
+    @Override
     protected String filterThreadName() {
         return "free-text-search";
     }

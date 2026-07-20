@@ -14,6 +14,7 @@ import java.util.*;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -206,6 +207,21 @@ public class FileRenderApp {
 
     for (CaColumn c : CaColumn.values()) {
       fileTable.getColumnModel().getColumn(c.ordinal()).setCellRenderer(c.renderer);
+    }
+    {
+      Function<CaColumn, List<String>> highlightFn = col -> {
+        synchronized (searchFilters) {
+          List<String> result = new ArrayList<>();
+          for (SearchFilter f : searchFilters) {
+            String s = f.getHighlightString(col);
+            if (s != null && !s.isEmpty()) result.add(s.toLowerCase());
+          }
+          return result;
+        }
+      };
+      for (CaColumn c : CaColumn.values()) {
+        c.renderer.setHighlightLookup(highlightFn);
+      }
     }
     fileTable.setRowHeight(64);
 

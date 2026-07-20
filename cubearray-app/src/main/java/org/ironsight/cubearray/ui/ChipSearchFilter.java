@@ -25,6 +25,11 @@ class ChipSearchFilter extends AbstractSearchFilter {
     }
 
     @Override
+    public String getHighlightString(CaColumn column) {
+        return this.column == column ? searchTerm : null;
+    }
+
+    @Override
     protected String filterThreadName() {
         return "chip-search-" + column.name();
     }

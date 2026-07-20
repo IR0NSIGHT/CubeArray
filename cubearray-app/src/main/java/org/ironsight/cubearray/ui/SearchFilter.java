@@ -13,6 +13,7 @@ interface SearchFilter {
     void markAllDirty();
     void markDirty(int row);
     void setOnProgressCallback(IntConsumer callback);
+    String getHighlightString(CaColumn column);
 }
 
 abstract class AbstractSearchFilter implements SearchFilter {
@@ -71,6 +72,11 @@ abstract class AbstractSearchFilter implements SearchFilter {
     @Override
     public void setOnProgressCallback(IntConsumer callback) {
         this.onProgress = callback;
+    }
+
+    @Override
+    public String getHighlightString(CaColumn column) {
+        return null;
     }
 
     private void loop() {

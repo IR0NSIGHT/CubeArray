@@ -13,6 +13,7 @@ import java.util.*;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -511,70 +512,70 @@ class FileTableModel extends AbstractTableModel {
   }
 
   abstract static class StringConverter extends DefaultTableCellRenderer {
+    private Function<CaColumn, List<String>> highlightLookup;
+    private int currentColumn;
+
+    public void setHighlightLookup(Function<CaColumn, List<String>> fn) {
+      this.highlightLookup = fn;
+    }
+
+    @Override
+    public Component getTableCellRendererComponent(
+        JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+      currentColumn = column;
+      return super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+    }
+
     @Override
     protected void setValue(Object value) {
       setText(convertToString(value));
     }
-    ;
 
     public String convertToString(Object o) {
       return "?";
     }
 
-    private String searchText = "";
-
-    public void setSearchText(String searchText) {
-      this.searchText = searchText != null ? searchText : "";
-    }
-
     @Override
     protected void paintComponent(Graphics g) {
-      if (searchText == null || searchText.isEmpty()) {
+      String text = getText();
+      if (text == null || text.isEmpty()) {
+        super.paintComponent(g);
+        return;
+      }
+
+      List<String> highlights = null;
+      if (highlightLookup != null) {
+        highlights = highlightLookup.apply(CaColumn.values()[currentColumn]);
+      }
+
+      if (highlights == null || highlights.isEmpty()) {
         setForeground(Color.BLACK);
         super.paintComponent(g);
         return;
       }
 
-      String text = getText();
-      if (text == null) {
-        super.paintComponent(g);
-        return;
-      }
-
       String lowerText = text.toLowerCase();
-      int index = lowerText.indexOf(searchText);
-
-      if (index < 0) {
-        setForeground(Color.GRAY);
-        super.paintComponent(g);
-        return;
-      }
-      setForeground(Color.BLACK);
-
-      // draw a yellow filled rect into the background where the matchign string will be
+      boolean anyMatch = false;
       FontMetrics fm = g.getFontMetrics();
       Insets insets = getInsets();
-
       int textX = insets.left;
-
-      // Measure prefix width
-      String prefix = text.substring(0, index);
-      int prefixWidth = fm.stringWidth(prefix);
-
-      // Measure match width
-      String match = text.substring(index, index + searchText.length());
-      int matchWidth = fm.stringWidth(match);
-
-      int highlightX = textX + prefixWidth;
       int highlightY = insets.top + (getHeight() - insets.top - insets.bottom - fm.getHeight()) / 2;
       int highlightHeight = fm.getHeight();
 
-      // Draw highlight background
       g.setColor(Color.YELLOW);
-      g.fillRect(highlightX, highlightY, matchWidth, highlightHeight);
 
-      // Draw the default text on top of the highlighted background
-      g.setColor(getForeground());
+      for (String hl : highlights) {
+        int index = 0;
+        while ((index = lowerText.indexOf(hl, index)) >= 0) {
+          anyMatch = true;
+          int prefixWidth = fm.stringWidth(text.substring(0, index));
+          int matchWidth = fm.stringWidth(text.substring(index, index + hl.length()));
+          g.fillRect(textX + prefixWidth, highlightY, matchWidth, highlightHeight);
+          index += hl.length();
+        }
+      }
+
+      setForeground(anyMatch ? Color.BLACK : Color.GRAY);
       super.paintComponent(g);
     }
   }
