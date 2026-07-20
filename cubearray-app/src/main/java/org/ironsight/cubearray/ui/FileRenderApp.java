@@ -59,61 +59,17 @@ public class FileRenderApp {
   }
 
   private ChipSearchManager chipSearchManager;
+  private DebouncedDocumentListener debouncer;
+  private FreeTextSearchFilter freeTextFilter;
 
   private JTextField searchField;
   private JPanel chipRow;
   private JProgressBar searchSpinner;
 
+  private final List<SearchFilter> searchFilters = new ArrayList<>();
+  private final Map<String, ChipSearchFilter> chipFilters = new HashMap<>();
+
   private static final long DEBUG_SEARCH_DELAY_MS = 0;
-
-  private void updateFilter() {
-    if (DEBUG_SEARCH_DELAY_MS > 0) {
-      try {
-        MILLISECONDS.sleep(DEBUG_SEARCH_DELAY_MS);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        return;
-      }
-    }
-
-    String plainText = searchField.getText().trim().toLowerCase();
-    boolean hasPlainText = !plainText.isEmpty();
-    List<ChipSearchManager.SearchCondition> conditions =
-        List.copyOf(chipSearchManager.getConditions());
-
-    if (!hasPlainText && conditions.isEmpty()) {
-      String pt = plainText;
-      SwingUtilities.invokeLater(() -> {
-        rowSorter.setRowFilter(null);
-        for (CaColumn c : CaColumn.values()) {
-          c.renderer.setSearchText(pt);
-        }
-      });
-      return;
-    }
-
-    Set<Integer> matchingRows;
-    try {
-      matchingRows = TableSearchRunner.computeMatchingRows(tableModel, context, conditions, plainText);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      return;
-    }
-
-    String pt = plainText;
-    SwingUtilities.invokeLater(() -> {
-      rowSorter.setRowFilter(
-          new RowFilter<>() {
-            @Override
-            public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
-              return matchingRows.contains((int) entry.getIdentifier());
-            }
-          });
-      for (CaColumn c : CaColumn.values()) {
-        c.renderer.setSearchText(pt);
-      }
-    });
-  }
 
   private final JLabel topInfoLabel;
   private final JLabel renderInfoLabel;
@@ -145,7 +101,7 @@ public class FileRenderApp {
           if (count == 0) this.setTextRemainingFiles("");
           else this.setTextRemainingFiles("Loading " + count + " file(s)");
         });
-    tableModel.setOnSchematicLoadedCallback(this::renderSchematicIcon);
+    tableModel.setOnSchematicLoadedCallback(this::onSchematicLoaded);
     SchematicPreviewHelper.getInstance().setPendingRenderCountChangedCallback(
         count -> {
           if (count == 0) this.setTextRenderingSchematics("");
@@ -155,6 +111,22 @@ public class FileRenderApp {
     this.fileTable = new JTable(tableModel);
     this.rowSorter = new TableRowSorter<>(tableModel);
     rowSorter.setComparator(CaColumn.ICON.ordinal(), (a, b) -> 0);
+
+    freeTextFilter = new FreeTextSearchFilter(tableModel, context);
+    addFilter(freeTextFilter);
+    rowSorter.setRowFilter(
+        new RowFilter<>() {
+          @Override
+          public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
+            int row = (int) entry.getIdentifier();
+            synchronized (searchFilters) {
+              for (SearchFilter f : searchFilters) {
+                if (!f.contains(row)) return false;
+              }
+            }
+            return true;
+          }
+        });
 
     tableAddMouseClickListener(fileTable);
 
@@ -240,8 +212,8 @@ public class FileRenderApp {
     searchField = new JTextField(40);
     searchField.setText("Search");
     searchField.putClientProperty("JTextField.placeholderText", "Search...");
-    DebouncedDocumentListener debouncer =
-        DebouncedDocumentListener.create(200, this::updateFilter);
+    debouncer = DebouncedDocumentListener.create(
+        200, () -> freeTextFilter.setSearchText(searchField.getText()));
     searchField.getDocument().addDocumentListener(debouncer);
 
     searchSpinner = new JProgressBar();
@@ -257,7 +229,7 @@ public class FileRenderApp {
     chipRow.setVisible(false);
 
     chipSearchManager =
-        new ChipSearchManager(searchField, chipRow, this::updateFilter, frame);
+        new ChipSearchManager(searchField, chipRow, this::syncChipFilters, frame);
     JButton addConditionBtn = chipSearchManager.createAddConditionButton();
 
     fileTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF); // allows wide table + horizontal scrolling
@@ -1311,6 +1283,75 @@ public class FileRenderApp {
           int idx = tableModel.indexOfFile(file);
           if (idx >= 0) tableModel.fireTableRowsUpdated(idx, idx);
         });
+  }
+
+  private void onSchematicLoaded(File file) {
+    int row = tableModel.indexOfFile(file);
+    System.out.println("[FileRenderApp] onSchematicLoaded file=" + file.getName() + " row=" + row);
+    if (row >= 0) {
+      synchronized (searchFilters) {
+        for (SearchFilter f : searchFilters) {
+          f.markDirty(row);
+        }
+      }
+    }
+    renderSchematicIcon(file);
+  }
+
+  void addFilter(SearchFilter filter) {
+    System.out.println("[FileRenderApp] addFilter " + filter.getClass().getSimpleName());
+    synchronized (searchFilters) {
+      searchFilters.add(filter);
+    }
+    filter.setOnProgressCallback(
+        progress -> SwingUtilities.invokeLater(() -> {
+          int n = tableModel.getRowCount();
+          if (n > 0) {
+            System.out.println("[FileRenderApp] fireTableDataChanged (progress tick)");
+            tableModel.fireTableDataChanged();
+          }
+        }));
+    filter.startThread();
+  }
+
+  void removeFilter(SearchFilter filter) {
+    System.out.println("[FileRenderApp] removeFilter " + filter.getClass().getSimpleName());
+    filter.stop();
+    filter.setOnProgressCallback(null);
+    synchronized (searchFilters) {
+      searchFilters.remove(filter);
+    }
+    int n = tableModel.getRowCount();
+    if (n > 0) {
+      System.out.println("[FileRenderApp] fireTableDataChanged (removeFilter)");
+      tableModel.fireTableDataChanged();
+    }
+  }
+
+  private void syncChipFilters() {
+    Set<String> activeKeys = chipSearchManager.getConditions().stream()
+        .map(c -> c.column().name() + ":" + c.searchTerm().toLowerCase())
+        .collect(Collectors.toSet());
+
+    var it = chipFilters.entrySet().iterator();
+    while (it.hasNext()) {
+      var e = it.next();
+      if (!activeKeys.contains(e.getKey())) {
+        System.out.println("[FileRenderApp] syncChipFilters remove " + e.getKey());
+        removeFilter(e.getValue());
+        it.remove();
+      }
+    }
+
+    for (ChipSearchManager.SearchCondition cond : chipSearchManager.getConditions()) {
+      String key = cond.column().name() + ":" + cond.searchTerm().toLowerCase();
+      if (!chipFilters.containsKey(key)) {
+        System.out.println("[FileRenderApp] syncChipFilters add " + key);
+        ChipSearchFilter f = new ChipSearchFilter(tableModel, cond.column(), cond.searchTerm());
+        chipFilters.put(key, f);
+        addFilter(f);
+      }
+    }
   }
 
   private JFileChooser getFileChooser(boolean folder) {

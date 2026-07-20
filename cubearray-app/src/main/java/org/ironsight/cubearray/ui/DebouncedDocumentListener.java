@@ -2,8 +2,6 @@ package org.ironsight.cubearray.ui;
 
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
@@ -15,19 +13,12 @@ public class DebouncedDocumentListener implements DocumentListener {
   private final Timer timer;
   private final Runnable action;
   private final PropertyChangeSupport pcs = new PropertyChangeSupport(this);
-  private final ExecutorService executor;
-  private final AtomicInteger generation = new AtomicInteger(0);
   private volatile boolean searching;
 
   public DebouncedDocumentListener(int delayMs, Runnable action) {
     this.action = action;
     timer = new Timer(delayMs, e -> fire());
     timer.setRepeats(false);
-    executor = Executors.newSingleThreadExecutor(r -> {
-      Thread t = new Thread(r, "search-worker");
-      t.setDaemon(true);
-      return t;
-    });
   }
 
   public static DebouncedDocumentListener create(int delayMs, Runnable action) {
@@ -47,7 +38,7 @@ public class DebouncedDocumentListener implements DocumentListener {
   }
 
   public void shutdown() {
-    executor.shutdownNow();
+    timer.stop();
   }
 
   private void setSearching(boolean v) {
@@ -57,24 +48,13 @@ public class DebouncedDocumentListener implements DocumentListener {
   }
 
   private void restart() {
-    generation.incrementAndGet();
     setSearching(true);
     timer.restart();
   }
 
   private void fire() {
-    int gen = generation.get();
-    executor.submit(() -> {
-      try {
-        action.run();
-      } finally {
-        SwingUtilities.invokeLater(() -> {
-          if (gen == generation.get()) {
-            setSearching(false);
-          }
-        });
-      }
-    });
+    setSearching(false);
+    action.run();
   }
 
   @Override

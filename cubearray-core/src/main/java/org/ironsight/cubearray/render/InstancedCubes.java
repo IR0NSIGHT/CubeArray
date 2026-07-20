@@ -141,8 +141,6 @@ public class InstancedCubes {
   }
 
   private void init() throws Exception {
-    System.out.println("generating " + setup.positions.length + " cubes");
-
     GLFWErrorCallback.createPrint(System.err).set();
 
     if (!glfwInit()) throw new IllegalStateException("Unable to initialize GLFW");

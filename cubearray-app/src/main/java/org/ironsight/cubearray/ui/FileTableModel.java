@@ -317,13 +317,11 @@ class FileTableModel extends AbstractTableModel {
 
   @Override
   public Object getValueAt(int row, int col) {
-    assert row >= 0 : "row to small: " + row;
-    assert row < files.size() : "row to big: " + row + ", " + files.size();
-
     if (col >= CaColumn.values().length) return null;
 
     File f;
     synchronized (files) {
+      if (row < 0 || row >= files.size()) return null;
       f = files.get(row);
     }
     WPObject obj = getSchematicFor(f);
