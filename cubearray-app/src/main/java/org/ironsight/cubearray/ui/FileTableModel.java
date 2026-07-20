@@ -110,19 +110,33 @@ class FileTableModel extends AbstractTableModel {
 
         @Override
         public String convertToString(Object o) {
-          return String.join(", ", blocks);
+          if (o instanceof List<?> list) {
+            return list.stream()
+                .filter(Objects::nonNull)
+                .map(Object::toString)
+                .collect(Collectors.joining(", "));
+          }
+          return super.convertToString(o);
         }
 
         @Override
-          protected void paintComponent(Graphics g) {
+        protected void paintComponent(Graphics g) {
           super.paintComponent(g);
           if (blockIconProvider == null || blocks.isEmpty()) return;
+
+          List<String> highlights = null;
+          if (highlightLookup != null) {
+            highlights = highlightLookup.apply(CaColumn.values()[currentColumn]);
+          }
+          boolean hasHighlights = highlights != null && !highlights.isEmpty();
+
           Graphics2D g2 = (Graphics2D) g.create();
           g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
           Insets insets = getInsets();
           FontMetrics fm = g2.getFontMetrics();
           int x = insets.left + 2;
           int y = (getHeight() + fm.getAscent()) / 2 - 1;
+          int highlightY = y - fm.getAscent() + 1;
           int remaining = blocks.size();
           for (int i = 0; i < blocks.size(); i++) {
             remaining--;
@@ -142,6 +156,20 @@ class FileTableModel extends AbstractTableModel {
                 int iconY = (getHeight() - icon.getIconHeight()) / 2;
                 icon.paintIcon(this, g2, x, iconY);
                 x += iconWidth;
+              }
+              if (hasHighlights) {
+                String lowerText = text.toLowerCase();
+                g2.setColor(Color.YELLOW);
+                for (String hl : highlights) {
+                  int idx = 0;
+                  while ((idx = lowerText.indexOf(hl, idx)) >= 0) {
+                    int prefixW = fm.stringWidth(text.substring(0, idx));
+                    int matchW = fm.stringWidth(text.substring(idx, idx + hl.length()));
+                    g2.fillRect(x + prefixW, highlightY, matchW, fm.getHeight());
+                    idx += hl.length();
+                  }
+                }
+                g2.setColor(Color.BLACK);
               }
               g2.drawString(text, x, y);
               x += textWidth;
@@ -512,8 +540,8 @@ class FileTableModel extends AbstractTableModel {
   }
 
   abstract static class StringConverter extends DefaultTableCellRenderer {
-    private Function<CaColumn, List<String>> highlightLookup;
-    private int currentColumn;
+    protected Function<CaColumn, List<String>> highlightLookup;
+    protected int currentColumn;
 
     public void setHighlightLookup(Function<CaColumn, List<String>> fn) {
       this.highlightLookup = fn;
