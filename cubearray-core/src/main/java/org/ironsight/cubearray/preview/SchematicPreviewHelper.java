@@ -176,6 +176,45 @@ public class SchematicPreviewHelper {
             file.length()));
   }
 
+  /**
+   * Queues loading the given schematics and opening the interactive 3D viewer on the background
+   * render thread. Blocks the render thread until the user closes the window.
+   */
+  public void queueInteractiveRender(List<Path> schematicPaths) {
+    if (schematicPaths.isEmpty()) return;
+    renderExecutor.execute(
+        new PriorityTask(
+            () -> {
+              try {
+                ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
+                CubeSetup setup =
+                    SchemReader.prepareData(
+                        SchemReader.loadSchematics(schematicPaths, f -> {}));
+                if (setup == null) {
+                  SwingUtilities.invokeLater(
+                      () ->
+                          JOptionPane.showMessageDialog(
+                              null,
+                              "Error: unable to load schematics from selected files.",
+                              "Render Error",
+                              JOptionPane.ERROR_MESSAGE));
+                  return;
+                }
+                InstancedCubes.runInteractive(setup);
+              } catch (Exception e) {
+                logger.log(Level.WARNING, "Interactive render failed", e);
+                SwingUtilities.invokeLater(
+                    () ->
+                        JOptionPane.showMessageDialog(
+                            null,
+                            "Render failed: " + e.getMessage(),
+                            "Render Error",
+                            JOptionPane.ERROR_MESSAGE));
+              }
+            },
+            0));
+  }
+
   public void dispose() {
     renderExecutor.shutdown();
   }

@@ -44,6 +44,11 @@ public class InstancedCubes {
   // renders on different threads cannot destroy each other's window/context.
   private static final Object GLFW_LOCK = new Object();
 
+  /** Singleton renderer shared between background preview rendering and interactive viewing. */
+  private static InstancedCubes sharedInstance;
+  /** Thread that owns the singleton's GL context. Cross-thread calls use a one-shot fallback. */
+  private static Thread singletonOwner;
+
   int gridX = 1000;
   int gridY = 10;
   int gridZ = 1000;
@@ -138,6 +143,71 @@ public class InstancedCubes {
       loop();
       cleanup();
     }
+  }
+
+  /**
+   * Renders a single frame into the current window/context without init or cleanup. Used by the
+   * shared singleton for background preview rendering. Camera is reset to {@code initialPos} so
+   * each render starts from the default angle regardless of any prior interactive session.
+   */
+  private void renderOneFrame() {
+    boolean dataChanged = setup != lastUploadedSetup;
+    if (dataChanged) {
+      uploadInstanceData();
+      uploadPaletteTextures();
+      updateFixedPositions();
+      lastUploadedSetup = setup;
+    }
+
+    cameraState = initialPos;
+
+    glViewport(0, 0, width, height);
+    projection =
+        new Matrix4f()
+            .perspective(
+                (float) toRadians(45.0f), (float) width / height, .1f, 10000.0f);
+
+    glClearColor(0.53f, 0.81f, 0.92f, 1f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    FloatBuffer projBuffer = BufferUtils.createFloatBuffer(16);
+    FloatBuffer viewBuffer = BufferUtils.createFloatBuffer(16);
+
+    float camX =
+        (float)
+            (cameraState.radius * Math.cos(cameraState.pitch) * Math.sin(cameraState.yaw));
+    float camY = (float) (cameraState.radius * Math.sin(cameraState.pitch));
+    float camZ =
+        (float)
+            (cameraState.radius * Math.cos(cameraState.pitch) * Math.cos(cameraState.yaw));
+    Vector3f cameraPos = new Vector3f(camX, camY, camZ).add(cameraState.target);
+
+    Matrix4f view =
+        new Matrix4f().lookAt(cameraPos, cameraState.target(), new Vector3f(0, 1, 0));
+
+    projection.get(projBuffer);
+    view.get(viewBuffer);
+
+    glUseProgram(shaderProgram);
+    glUniformMatrix4fv(
+        glGetUniformLocation(shaderProgram, "projection"), false, projBuffer);
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), false, viewBuffer);
+
+    glBindVertexArray(vao);
+    glDrawElementsInstanced(
+        GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, setup.positions.length);
+    glBindVertexArray(0);
+
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolveFbo);
+    glBlitFramebuffer(
+        0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    executePendingTasks();
+
+    glfwSwapBuffers(window);
+    glfwPollEvents();
   }
 
   private void init() throws Exception {
@@ -713,24 +783,89 @@ public class InstancedCubes {
 
     glfwFreeCallbacks(window);
     glfwDestroyWindow(window);
-    glfwTerminate();
-    glfwSetErrorCallback(null).free();
   }
 
   public static void renderToFile(
       CubeSetup setup, Path outputPath, int width, int height) throws Exception {
 
-    InstancedCubes renderer = new InstancedCubes(setup);
-    renderer.width = width;
-    renderer.height = height;
-    renderer.headless = true;
+    synchronized (GLFW_LOCK) {
+      Thread currentThread = Thread.currentThread();
+      if (sharedInstance == null) {
+        sharedInstance = new InstancedCubes(setup);
+        sharedInstance.headless = true;
+        sharedInstance.init();
+        singletonOwner = currentThread;
+      }
+      if (currentThread != singletonOwner) {
+        InstancedCubes temp = new InstancedCubes(setup);
+        temp.width = width;
+        temp.height = height;
+        temp.headless = true;
+        CompletableFuture<BufferedImage> future = temp.requestScreenshot();
+        temp.run();
+        Path parent = outputPath.getParent();
+        if (parent != null) Files.createDirectories(parent);
+        ImageIO.write(future.get(30, TimeUnit.SECONDS), "png", outputPath.toFile());
+        return;
+      }
+      if (setup != sharedInstance.setup) {
+        sharedInstance.replaceData(setup);
+      }
+      sharedInstance.width = width;
+      sharedInstance.height = height;
 
-    CompletableFuture<BufferedImage> future = renderer.requestScreenshot();
-    renderer.run();
+      CompletableFuture<BufferedImage> future = sharedInstance.requestScreenshot();
+      sharedInstance.renderOneFrame();
 
-    Path parent = outputPath.getParent();
-    if (parent != null) Files.createDirectories(parent);
-    ImageIO.write(future.get(30, TimeUnit.SECONDS), "png", outputPath.toFile());
+      Path parent = outputPath.getParent();
+      if (parent != null) Files.createDirectories(parent);
+      ImageIO.write(future.get(30, TimeUnit.SECONDS), "png", outputPath.toFile());
+    }
+  }
+
+  /**
+   * Opens the singleton renderer in interactive mode (visible window with keyboard/mouse input).
+   * Blocks until the user closes the window. Must be called from the thread that owns the singleton
+   * (the background {@code render-worker} thread). When called from any other thread, a dedicated
+   * throw-away instance is created instead.
+   */
+  public static void runInteractive(CubeSetup setup) throws Exception {
+    synchronized (GLFW_LOCK) {
+      Thread ct = Thread.currentThread();
+      if (sharedInstance != null && ct != singletonOwner) {
+        new InstancedCubes(setup).run();
+        return;
+      }
+      if (sharedInstance == null) {
+        sharedInstance = new InstancedCubes(setup);
+        sharedInstance.headless = true;
+        sharedInstance.init();
+        singletonOwner = ct;
+      } else {
+        sharedInstance.replaceData(setup);
+        sharedInstance.updateFixedPositions();
+      }
+      sharedInstance.headless = false;
+      sharedInstance.cameraState = sharedInstance.initialPos;
+      sharedInstance.publishedCameraState = sharedInstance.cameraState;
+      sharedInstance.firstMouse = true;
+      sharedInstance.xoffset = 0;
+      sharedInstance.yoffset = 0;
+
+      glfwSetWindowShouldClose(sharedInstance.window, false);
+      glfwSwapInterval(1);
+      glfwShowWindow(sharedInstance.window);
+
+      sharedInstance.loop();
+
+      glfwHideWindow(sharedInstance.window);
+      glfwSwapInterval(0);
+      sharedInstance.headless = true;
+      glfwSetKeyCallback(sharedInstance.window, null);
+      glfwSetScrollCallback(sharedInstance.window, null);
+      glfwSetMouseButtonCallback(sharedInstance.window, null);
+      glfwSetCursorPosCallback(sharedInstance.window, null);
+    }
   }
 
   private void setupShaders() {

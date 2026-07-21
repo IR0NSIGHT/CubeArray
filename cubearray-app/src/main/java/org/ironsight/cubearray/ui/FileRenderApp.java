@@ -1237,49 +1237,12 @@ public class FileRenderApp {
   }
 
   private void renderFiles(List<File> selectedFiles) {
-    // Placeholder logic
     logger.info("Rendering files:");
     for (File f : selectedFiles) {
       logger.info(" - " + f.getAbsolutePath());
     }
-
-    try {
-      Thread glThread =
-          new Thread(
-              () -> {
-                try {
-                  CubeSetup setup =
-                      SchemReader.prepareData(
-                          SchemReader.loadSchematics(
-                              selectedFiles.stream().map(File::toPath).toList(),
-                              f -> logger.warning("can not render " + f.getAbsolutePath())));
-                  if (setup == null) {
-                    SwingUtilities.invokeLater(
-                        () -> {
-                          JOptionPane.showMessageDialog(
-                              frame,
-                              "Error: unable to load schematics from selected "
-                                  + "files. Maybe the file type is not supported or does not exist "
-                                  + "anymore?");
-                        });
-                    return;
-                  }
-                  new InstancedCubes(setup).run();
-                } catch (Exception e) {
-                  throw new RuntimeException(e);
-                }
-              });
-      glThread.start();
-
-      // add to watchlist and update gui
-      synchronized (loadingThreads) {
-        loadingThreads.add(glThread);
-      }
-      checkLoadingThreads();
-
-    } catch (Exception ex) {
-      logger.log(Level.SEVERE, "Error starting render", ex);
-    }
+    var paths = selectedFiles.stream().map(File::toPath).toList();
+    SchematicPreviewHelper.getInstance().queueInteractiveRender(paths);
   }
 
   private void showRenderPreview(int modelRow) {
