@@ -84,6 +84,7 @@ public class FileRenderApp {
   private final JLabel folderRenderInfoLabel = new JLabel();
   private JCheckBox folderRecursiveCheckbox;
   private JTextField folderPathField;
+  private int folderRefreshCounter;
 
   private static final long DEBUG_SEARCH_DELAY_MS = 0;
 
@@ -120,12 +121,13 @@ public class FileRenderApp {
               false,
               context.columnContext(),
               context.folderViewPath(),
-              context.folderViewRecursive());
+              context.folderViewRecursive(), context.maxFolderImportDepth());
       flagContextDirty(newContext);
     }
 
     PeriodicChecker.INSTANCE.addCallback(this::checkContextSaving);
     PeriodicChecker.INSTANCE.addCallback(this::checkLoadingThreads);
+    PeriodicChecker.INSTANCE.addCallback(this::autoRefreshFolderView);
 
     this.tableModel = new FileTableModel(PeriodicChecker.INSTANCE, SchematicPreviewHelper.getInstance());
     FileTableModel.blockIconProvider = blockIconProvider;
@@ -159,7 +161,7 @@ public class FileRenderApp {
                     context.neverBeforeUsed(),
                     context.columnContext(),
                     context.folderViewPath(),
-                    context.folderViewRecursive());
+                    context.folderViewRecursive(), context.maxFolderImportDepth());
             flagContextDirty(newContext);
           }
 
@@ -174,7 +176,7 @@ public class FileRenderApp {
                     context.neverBeforeUsed(),
                     context.columnContext(),
                     context.folderViewPath(),
-                    context.folderViewRecursive());
+                    context.folderViewRecursive(), context.maxFolderImportDepth());
             flagContextDirty(newContext);
           }
         });
@@ -182,7 +184,7 @@ public class FileRenderApp {
     frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
     // --- Global view ---
-    FileListPanel globalPanel = createFileListPanel(tableModel, null, frame);
+    FileListPanel globalPanel = createFileListPanel(tableModel, null, frame, null);
     this.fileTable = globalPanel.table();
     this.rowSorter = globalPanel.sorter();
     this.searchField = globalPanel.searchField();
@@ -205,9 +207,22 @@ public class FileRenderApp {
             return folderRowFilter(entry);
           }
         };
-    FileListPanel folderPanel = createFileListPanel(tableModel, folderRowFilterInstance, frame);
+    FileListPanel folderPanel =
+        createFileListPanel(
+            tableModel, folderRowFilterInstance, frame, dir -> setFolderViewPath(dir));
     this.folderTable = folderPanel.table();
     this.folderRowSorter = folderPanel.sorter();
+    this.folderRowSorter.setComparator(
+        CaColumn.FILE_TYPE.ordinal(),
+        (Comparator<Object>)
+            (a, b) -> {
+              boolean aUp = "Parent folder".equals(a);
+              boolean bUp = "Parent folder".equals(b);
+              if (aUp && bUp) return 0;
+              if (aUp) return -1;
+              if (bUp) return 1;
+              return ((Comparable<Object>) a).compareTo(b);
+            });
     this.folderSearchField = folderPanel.searchField();
     this.folderChipRow = folderPanel.chipRow();
     this.folderSearchSpinner = folderPanel.searchSpinner();
@@ -267,7 +282,7 @@ public class FileRenderApp {
                     context.neverBeforeUsed(),
                     newColumnContext,
                     context.folderViewPath(),
-                    context.folderViewRecursive()));
+                    context.folderViewRecursive(), context.maxFolderImportDepth()));
           }
         });
 
@@ -294,12 +309,15 @@ public class FileRenderApp {
             context.neverBeforeUsed(),
             context.columnContext(),
             context.folderViewPath(),
-            context.folderViewRecursive());
+            context.folderViewRecursive(), context.maxFolderImportDepth());
     flagContextDirty(newContext);
   }
 
   private FileListPanel createFileListPanel(
-      FileTableModel model, RowFilter<FileTableModel, Integer> extraFilter, JFrame parentFrame) {
+      FileTableModel model,
+      RowFilter<FileTableModel, Integer> extraFilter,
+      JFrame parentFrame,
+      Consumer<File> onDirDoubleClick) {
     JTable table = new JTable(model);
     TableRowSorter<FileTableModel> sorter = new TableRowSorter<>(model);
     sorter.setComparator(CaColumn.ICON.ordinal(), (a, b) -> 0);
@@ -311,7 +329,8 @@ public class FileRenderApp {
         new RowFilter<>() {
           @Override
           public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
-            int row = (int) entry.getIdentifier();
+            int row = entry.getIdentifier();
+            if (model.isDirectoryRow(row)) return extraFilter != null;
             if (extraFilter != null && !extraFilter.include(entry)) return false;
             synchronized (searchFilters) {
               for (SearchFilter f : searchFilters) {
@@ -337,12 +356,25 @@ public class FileRenderApp {
 
             if (e.getClickCount() == 1 && SwingUtilities.isRightMouseButton(e)) {
               JPopupMenu rightMenu = createTableContextMenu(table);
-              String title = getSelectedFiles(table).length + " file(s) selected";
+              long fileCount =
+                  Arrays.stream(table.getSelectedRows())
+                      .map(table::convertRowIndexToModel)
+                      .filter(m -> !tableModel.isDirectoryRow(m))
+                      .count();
+              long dirCount = table.getSelectedRowCount() - fileCount;
+              String title = fileCount + " file(s)";
+              if (dirCount > 0) title += ", " + dirCount + " folder(s)";
               ((JLabel) rightMenu.getComponent(0)).setText(title);
               SwingUtilities.invokeLater(
                   () -> rightMenu.show(e.getComponent(), e.getX(), e.getY()));
             }
             if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
+              if (model.isDirectoryRow(modelRow)) {
+                if (onDirDoubleClick != null) {
+                  onDirDoubleClick.accept(model.getFileAt(modelRow));
+                }
+                return;
+              }
               if (modelCol == CaColumn.ICON.ordinal()) {
                 File file = model.getFileAt(modelRow);
                 SchematicPreviewHelper.getInstance().showPreviewDialog(file, frame);
@@ -386,21 +418,6 @@ public class FileRenderApp {
               menu.add(new JLabel(model.getColumn(modelCol).displayName));
               menu.add(scrollPane);
               SwingUtilities.invokeLater(() -> menu.show(e.getComponent(), e.getX(), e.getY()));
-            }
-          }
-        });
-
-    table.addMouseListener(
-        new MouseAdapter() {
-          @Override
-          public void mouseClicked(MouseEvent e) {
-            if (e.getClickCount() == 3 && SwingUtilities.isLeftMouseButton(e)) {
-              int viewRow = table.rowAtPoint(e.getPoint());
-              if (viewRow >= 0) {
-                int modelRow = table.convertRowIndexToModel(viewRow);
-                File file = model.getFileAt(modelRow);
-                renderFiles(List.of(file));
-              }
             }
           }
         });
@@ -579,6 +596,7 @@ public class FileRenderApp {
         a -> {
           for (int viewRow : table.getSelectedRows()) {
             int modelRow = table.convertRowIndexToModel(viewRow);
+            if (tableModel.isDirectoryRow(modelRow)) continue;
             File file = tableModel.getFileAt(modelRow);
             tableModel.flagReloadFile(modelRow);
             tableModel.invalidateIconCache(file);
@@ -597,6 +615,7 @@ public class FileRenderApp {
         a -> {
           List<File> files = Arrays.stream(table.getSelectedRows())
               .map(table::convertRowIndexToModel)
+              .filter(m -> !tableModel.isDirectoryRow(m))
               .mapToObj(tableModel::getFileAt)
               .toList();
           if (!files.isEmpty()) renderFiles(files);
@@ -608,6 +627,7 @@ public class FileRenderApp {
         a -> {
           File[] files = Arrays.stream(table.getSelectedRows())
               .map(table::convertRowIndexToModel)
+              .filter(m -> !tableModel.isDirectoryRow(m))
               .mapToObj(tableModel::getFileAt)
               .toArray(File[]::new);
           tableModel.removeFile(files);
@@ -623,7 +643,7 @@ public class FileRenderApp {
                   context.neverBeforeUsed(),
                   context.columnContext(),
                   context.folderViewPath(),
-                  context.folderViewRecursive()));
+                  context.folderViewRecursive(), context.maxFolderImportDepth()));
         });
     rightMenu.add(removeFilesBtn);
 
@@ -632,6 +652,7 @@ public class FileRenderApp {
         a -> {
           File[] selected = Arrays.stream(table.getSelectedRows())
               .map(table::convertRowIndexToModel)
+              .filter(m -> !tableModel.isDirectoryRow(m))
               .mapToObj(tableModel::getFileAt)
               .toArray(File[]::new);
           if (selected.length == 0) return;
@@ -665,7 +686,7 @@ public class FileRenderApp {
                   context.neverBeforeUsed(),
                   context.columnContext(),
                   context.folderViewPath(),
-                  context.folderViewRecursive()));
+                  context.folderViewRecursive(), context.maxFolderImportDepth()));
           if (!failed.isEmpty()) {
             JOptionPane.showMessageDialog(
                 frame,
@@ -685,7 +706,12 @@ public class FileRenderApp {
               .toArray(File[]::new);
           Desktop desktop = Desktop.getDesktop();
           if (desktop == null) return;
-          List<File> folders = Arrays.stream(files).map(File::getParentFile).distinct().toList();
+          List<File> folders =
+              Arrays.stream(files)
+                  .filter(f -> !"..".equals(f.getName()))
+                  .map(f -> f.isDirectory() ? f : f.getParentFile())
+                  .distinct()
+                  .toList();
           if (folders.size() > 2) {
             int reply2 =
                 JOptionPane.showConfirmDialog(
@@ -720,6 +746,7 @@ public class FileRenderApp {
   private void convertSelectedToSponge3(JTable table) {
     List<File> selected = Arrays.stream(table.getSelectedRows())
         .map(table::convertRowIndexToModel)
+        .filter(m -> !tableModel.isDirectoryRow(m))
         .mapToObj(tableModel::getFileAt)
         .toList();
     if (selected.isEmpty()) {
@@ -765,7 +792,7 @@ public class FileRenderApp {
                             context.neverBeforeUsed(),
                             context.columnContext(),
                             context.folderViewPath(),
-                            context.folderViewRecursive()));
+                            context.folderViewRecursive(), context.maxFolderImportDepth()));
                     List<File> failed = result.failedFiles();
                     if (failed.isEmpty()) {
                       JOptionPane.showMessageDialog(
@@ -792,6 +819,7 @@ public class FileRenderApp {
   private void replaceSandstoneWithCobblestone(JTable table) {
     File[] selected = Arrays.stream(table.getSelectedRows())
         .map(table::convertRowIndexToModel)
+        .filter(m -> !tableModel.isDirectoryRow(m))
         .mapToObj(tableModel::getFileAt)
         .toArray(File[]::new);
     if (selected.length == 0) {
@@ -860,7 +888,7 @@ public class FileRenderApp {
             context.neverBeforeUsed(),
             context.columnContext(),
             context.folderViewPath(),
-            context.folderViewRecursive()));
+            context.folderViewRecursive(), context.maxFolderImportDepth()));
     String msg = written.size() + " file(s) written.";
     if (!failed.isEmpty())
       msg += "\nFailed: " + failed.stream().map(File::getName).collect(Collectors.joining(", "));
@@ -896,7 +924,8 @@ public class FileRenderApp {
                   context.neverBeforeUsed(),
                   context.columnContext(),
                   context.folderViewPath(),
-                  recursive));
+                  recursive,
+                  context.maxFolderImportDepth()));
           folderRowSorter.sort();
         });
 
@@ -949,8 +978,21 @@ public class FileRenderApp {
   }
 
   private void setFolderViewPath(File folder) {
+    if ("..".equals(folder.getName())) {
+      folder = folderViewPath.getParentFile();
+      if (folder == null) return;
+    }
     this.folderViewPath = folder;
     folderPathField.setText(folder.getAbsolutePath());
+    List<File> dirs = new ArrayList<>();
+    if (folder.getParentFile() != null) {
+      dirs.add(new File(".."));
+    }
+    File[] subdirs = folder.listFiles(File::isDirectory);
+    if (subdirs != null) {
+      Arrays.stream(subdirs).sorted().forEach(dirs::add);
+    }
+    tableModel.setDirectories(dirs);
     flagContextDirty(
         new AppContext(
             context.filesAndTimestamps(),
@@ -959,8 +1001,10 @@ public class FileRenderApp {
             context.neverBeforeUsed(),
             context.columnContext(),
             folder,
-            folderRecursiveCheckbox.isSelected()));
+            folderRecursiveCheckbox.isSelected(),
+            context.maxFolderImportDepth()));
     folderRowSorter.sort();
+    autoImportFolderView();
   }
 
   private boolean folderRowFilter(RowFilter.Entry<? extends FileTableModel, ? extends Integer> entry) {
@@ -974,6 +1018,110 @@ public class FileRenderApp {
       return filePath.equals(folderPath) || filePath.startsWith(folderPath + File.separator);
     } else {
       return file.getParentFile().equals(folderViewPath);
+    }
+  }
+
+  private void autoImportFolderView() {
+    File folder = folderViewPath;
+    if (folder == null) return;
+
+    boolean recursive = folderRecursiveCheckbox.isSelected();
+    int depth = recursive ? context.maxFolderImportDepth() : 1;
+    Map<File, Long> currentTimestamps = context.filesAndTimestamps();
+
+    new Thread(
+            () -> {
+              try {
+                List<File> discovered = getAllFiles(folder, depth);
+                if (discovered.isEmpty()) return;
+
+                var newTimestamps = new HashMap<>(currentTimestamps);
+                for (File f : discovered) {
+                  newTimestamps.putIfAbsent(f, System.currentTimeMillis());
+                }
+                SwingUtilities.invokeLater(
+                    () -> {
+                      tableModel.addFiles(discovered);
+                      flagContextDirty(
+                          new AppContext(
+                              newTimestamps,
+                              context.lastSearchPath(),
+                              context.guiBounds(),
+                              context.neverBeforeUsed(),
+                              context.columnContext(),
+                              context.folderViewPath(),
+                              context.folderViewRecursive(),
+                              context.maxFolderImportDepth()));
+                    });
+              } catch (IOException e) {
+                logger.log(Level.WARNING, "Auto-import failed for " + folder, e);
+              }
+            },
+            "folder-auto-import")
+        .start();
+  }
+
+  private void autoRefreshFolderView() {
+    folderRefreshCounter++;
+    if (folderRefreshCounter % 3 != 0) return;
+
+    File folder = folderViewPath;
+    if (folder == null) return;
+
+    boolean recursive = folderRecursiveCheckbox.isSelected();
+    int depth = recursive ? context.maxFolderImportDepth() : 1;
+    Map<File, Long> currentTimestamps = context.filesAndTimestamps();
+
+    try {
+      List<File> currentFiles = getAllFiles(folder, depth);
+      Set<File> currentSet = new HashSet<>(currentFiles);
+
+      SwingUtilities.invokeLater(
+          () -> {
+            List<File> toAdd = new ArrayList<>();
+            for (File f : currentFiles) {
+              if (tableModel.indexOfFile(f) < 0) {
+                toAdd.add(f);
+              }
+            }
+            if (!toAdd.isEmpty()) tableModel.addFiles(toAdd);
+
+            List<File> toRemove = new ArrayList<>();
+            int count = tableModel.getRowCount();
+            for (int i = 0; i < count; i++) {
+              File f = tableModel.getFileAt(i);
+              if (f != null
+                  && f.isFile()
+                  && f.getAbsolutePath().startsWith(folder.getAbsolutePath())
+                  && !currentSet.contains(f)) {
+                toRemove.add(f);
+              }
+            }
+            if (!toRemove.isEmpty())
+              tableModel.removeFile(toRemove.toArray(File[]::new));
+
+            if (!toAdd.isEmpty() || !toRemove.isEmpty()) {
+              var newTimestamps = new HashMap<>(currentTimestamps);
+              for (File f : currentFiles) {
+                newTimestamps.putIfAbsent(f, System.currentTimeMillis());
+              }
+              for (File f : toRemove) {
+                newTimestamps.remove(f);
+              }
+              flagContextDirty(
+                  new AppContext(
+                      newTimestamps,
+                      context.lastSearchPath(),
+                      context.guiBounds(),
+                      context.neverBeforeUsed(),
+                      context.columnContext(),
+                      context.folderViewPath(),
+                      context.folderViewRecursive(),
+                      context.maxFolderImportDepth()));
+            }
+          });
+    } catch (IOException e) {
+      // skip this cycle
     }
   }
 
@@ -1033,13 +1181,6 @@ public class FileRenderApp {
     }
   }
 
-  private File[] getSelectedFiles(JTable table) {
-    return Arrays.stream(table.getSelectedRows())
-        .map(table::convertRowIndexToModel)
-        .mapToObj(tableModel::getFileAt)
-        .toArray(File[]::new);
-  }
-
   private void importFolder() {
     JFileChooser chooser = getFileChooser(true);
     if (chooser.showOpenDialog(frame) != JFileChooser.APPROVE_OPTION) return;
@@ -1055,7 +1196,7 @@ public class FileRenderApp {
 
               for (File folder : selectedFolders) {
                 try {
-                  allDiscoveredFiles.addAll(getAllFiles(folder));
+                  allDiscoveredFiles.addAll(getAllFiles(folder, context.maxFolderImportDepth()));
                 } catch (IOException e) {
                   errorMessage =
                       "Importing of folder '"
@@ -1081,7 +1222,7 @@ public class FileRenderApp {
                             context.neverBeforeUsed(),
                             context.columnContext(),
                             context.folderViewPath(),
-                            context.folderViewRecursive()));
+                            context.folderViewRecursive(), context.maxFolderImportDepth()));
                     if (finalError != null) {
                       JOptionPane.showMessageDialog(
                           frame, finalError, "Error", JOptionPane.ERROR_MESSAGE);
@@ -1095,19 +1236,19 @@ public class FileRenderApp {
   /**
    * Recursively collects all files in a folder and its subfolders.
    *
-   * @param folder the root folder to start from
+   * @param folder   the root folder to start from
+   * @param maxDepth maximum recursion depth
    * @return list of files found
    * @throws IOException if an I/O error occurs
    */
-  public static List<File> getAllFiles(File folder) throws IOException {
+  public static List<File> getAllFiles(File folder, int maxDepth) throws IOException {
     if (folder == null || !folder.isDirectory()) {
       throw new IllegalArgumentException("Input must be a valid directory");
     }
 
     List<File> fileList = new ArrayList<>();
 
-    // Using java.nio.file.Files.walk
-    try (Stream<Path> paths = Files.walk(folder.toPath())) {
+    try (Stream<Path> paths = Files.walk(folder.toPath(), maxDepth)) {
       paths
           .filter(Files::isRegularFile) // only files, ignore directories
           .filter(isSupportedSchematicType)
@@ -1151,7 +1292,7 @@ public class FileRenderApp {
             context.neverBeforeUsed(),
             context.columnContext(),
             context.folderViewPath(),
-            context.folderViewRecursive()));
+            context.folderViewRecursive(), context.maxFolderImportDepth()));
   }
 
   public static void startApp(final AppContext context) {
@@ -1207,7 +1348,7 @@ public class FileRenderApp {
                             context.neverBeforeUsed(),
                             newColumnContext,
                             context.folderViewPath(),
-                            context.folderViewRecursive()));
+                            context.folderViewRecursive(), context.maxFolderImportDepth()));
                     updateDisplayColumns(
                         new ArrayList<>(newColumnContext.displayedColumns()),
                         new ArrayList<>(newColumnContext.columnWidths()),
@@ -1261,6 +1402,28 @@ public class FileRenderApp {
             }
           });
       appPanel.add(openLogFileBtn);
+
+      JPanel depthPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+      depthPanel.add(new JLabel("Max folder import depth:"));
+      int curDepth = Math.max(1, Math.min(1000, context.maxFolderImportDepth()));
+      JSpinner depthSpinner =
+          new JSpinner(new SpinnerNumberModel(curDepth, 1, 1000, 1));
+      depthSpinner.addChangeListener(
+          e -> {
+            int depth = (int) depthSpinner.getValue();
+            flagContextDirty(
+                new AppContext(
+                    context.filesAndTimestamps(),
+                    context.lastSearchPath(),
+                    context.guiBounds(),
+                    context.neverBeforeUsed(),
+                    context.columnContext(),
+                    context.folderViewPath(),
+                    context.folderViewRecursive(),
+                    depth));
+          });
+      depthPanel.add(depthSpinner);
+      appPanel.add(depthPanel);
 
       JPanel settingsContentPane = new JPanel();
       settingsContentPane.setLayout(new GridLayout(0, 1));
@@ -1380,7 +1543,7 @@ public class FileRenderApp {
             context.neverBeforeUsed(),
             newColumnContext,
             context.folderViewPath(),
-            context.folderViewRecursive()));
+            context.folderViewRecursive(), context.maxFolderImportDepth()));
   }
 
   void checkContextSaving() {

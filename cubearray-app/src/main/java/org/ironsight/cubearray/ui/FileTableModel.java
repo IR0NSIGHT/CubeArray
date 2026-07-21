@@ -214,6 +214,20 @@ class FileTableModel extends AbstractTableModel {
   private final List<File> files = new java.util.ArrayList<>();
   private final ConcurrentHashMap<File, WPObject> schematicObjects = new ConcurrentHashMap<>();
   private final Set<File> loadingFiles = ConcurrentHashMap.newKeySet();
+  private volatile List<File> directoryRows = List.of();
+
+  public boolean isDirectoryRow(int modelRow) {
+    int fileCount;
+    synchronized (files) {
+      fileCount = files.size();
+    }
+    return modelRow >= fileCount && modelRow < fileCount + directoryRows.size();
+  }
+
+  public void setDirectories(List<File> dirs) {
+    directoryRows = dirs;
+    fireTableDataChanged();
+  }
 
   public FileTableModel(PeriodicChecker checker, SchematicPreviewHelper previewHelper) {
     this.previewHelper = previewHelper;
@@ -295,21 +309,31 @@ class FileTableModel extends AbstractTableModel {
   }
 
   public void flagReloadFile(int modelRow) {
+    synchronized (files) {
+      if (modelRow >= files.size()) return;
+    }
     File file = getFile(modelRow);
     schematicObjects.remove(file);
     errorFiles.remove(file);
     loadingFiles.remove(file);
     fireTableRowsUpdated(modelRow, modelRow);
     if (remainingFileCountChangedCallback != null) {
-      int remainingCount = Math.max(0, files.size() - schematicObjects.size());
-      remainingFileCountChangedCallback.accept(remainingCount);
+      synchronized (files) {
+        int remainingCount = Math.max(0, files.size() - schematicObjects.size());
+        remainingFileCountChangedCallback.accept(remainingCount);
+      }
     }
   }
 
   public File getFile(int modelRow) {
     synchronized (files) {
-      if (modelRow < 0 || modelRow >= files.size()) return null;
-      return files.get(modelRow);
+      int fileCount = files.size();
+      if (modelRow < fileCount) {
+        if (modelRow < 0) return null;
+        return files.get(modelRow);
+      }
+      int dirIdx = modelRow - fileCount;
+      return (dirIdx >= 0 && dirIdx < directoryRows.size()) ? directoryRows.get(dirIdx) : null;
     }
   }
 
@@ -331,7 +355,7 @@ class FileTableModel extends AbstractTableModel {
   @Override
   public int getRowCount() {
     synchronized (files) {
-      return files.size();
+      return files.size() + directoryRows.size();
     }
   }
 
@@ -349,9 +373,35 @@ class FileTableModel extends AbstractTableModel {
     if (col >= CaColumn.values().length) return null;
 
     File f;
+    boolean isDir;
     synchronized (files) {
-      if (row < 0 || row >= files.size()) return null;
-      f = files.get(row);
+      int fileCount = files.size();
+      if (row < fileCount) {
+        if (row < 0) return null;
+        f = files.get(row);
+        isDir = false;
+      } else {
+        int dirIdx = row - fileCount;
+        if (dirIdx >= directoryRows.size()) return null;
+        f = directoryRows.get(dirIdx);
+        isDir = true;
+      }
+    }
+    if (isDir) {
+      boolean isUpLink = "..".equals(f.getName());
+      return switch (CaColumn.values()[col]) {
+        case ICON -> Icons.get("folder");
+        case FILE -> isUpLink ? ".." : f.getName();
+        case PATH -> isUpLink ? ".." : f.getAbsolutePath();
+        case FILE_SIZE -> 0L;
+        case FILE_TYPE -> isUpLink ? "Parent folder" : "Directory";
+        case LAST_CHANGED -> isUpLink ? new Date(0) : new Date(f.lastModified());
+        case DIMENSION_WIDTH, DIMENSION_HEIGHT, DIMENSION_DEPTH, DIMENSION_DIAGONAL -> NO_VALUE;
+        case OFFSET, MIN_POS, MAX_POS -> "";
+        case BLOCKS, ENTITIES, TILE_ENTITIES -> List.of();
+        case ATTRIBUTES -> new HashMap<String, String>(0);
+        case LOADING_STATE -> "loaded";
+      };
     }
     WPObject obj = getSchematicFor(f);
     return switch (CaColumn.values()[col]) {
@@ -447,6 +497,9 @@ class FileTableModel extends AbstractTableModel {
   }
 
   public boolean isFileLoaded(int modelRow) {
+    synchronized (files) {
+      if (modelRow >= files.size()) return true;
+    }
     return schematicObjects.containsKey(getFile(modelRow));
   }
 
@@ -481,7 +534,12 @@ class FileTableModel extends AbstractTableModel {
 
   public File getFileAt(int row) {
     synchronized (files) {
-      return files.get(row);
+      int fileCount = files.size();
+      if (row < fileCount) {
+        return files.get(row);
+      }
+      int dirIdx = row - fileCount;
+      return (dirIdx >= 0 && dirIdx < directoryRows.size()) ? directoryRows.get(dirIdx) : null;
     }
   }
 
