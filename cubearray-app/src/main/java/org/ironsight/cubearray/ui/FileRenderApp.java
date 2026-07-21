@@ -61,7 +61,6 @@ public class FileRenderApp {
 
   private ChipSearchManager chipSearchManager;
   private DebouncedDocumentListener debouncer;
-  private FreeTextSearchFilter freeTextFilter;
 
   private JTextField searchField;
   private JPanel chipRow;
@@ -70,10 +69,41 @@ public class FileRenderApp {
   private final List<SearchFilter> searchFilters = new ArrayList<>();
   private final Map<String, ChipSearchFilter> chipFilters = new HashMap<>();
 
+  // Folder view components
+  private JTable folderTable;
+  private TableRowSorter<FileTableModel> folderRowSorter;
+  private JTextField folderSearchField;
+  private JPanel folderChipRow;
+  private JProgressBar folderSearchSpinner;
+  private final List<SearchFilter> folderSearchFilters = new ArrayList<>();
+  private final Map<String, ChipSearchFilter> folderChipFilters = new HashMap<>();
+  private ChipSearchManager folderChipManager;
+  private DebouncedDocumentListener folderDebouncer;
+  private File folderViewPath;
+  private final JLabel folderTopInfoLabel = new JLabel();
+  private final JLabel folderRenderInfoLabel = new JLabel();
+  private JCheckBox folderRecursiveCheckbox;
+  private JTextField folderPathField;
+
   private static final long DEBUG_SEARCH_DELAY_MS = 0;
 
   private final JLabel topInfoLabel;
   private final JLabel renderInfoLabel;
+
+  private record FileListPanel(
+      JPanel panel,
+      JTable table,
+      TableRowSorter<FileTableModel> sorter,
+      JTextField searchField,
+      ChipSearchManager chipManager,
+      JPanel chipRow,
+      JProgressBar searchSpinner,
+      List<SearchFilter> searchFilters,
+      Map<String, ChipSearchFilter> chipFilters,
+      DebouncedDocumentListener debouncer,
+      JLabel topInfoLabel,
+      JLabel renderInfoLabel
+  ) {}
 
   public FileRenderApp(final AppContext initialContext) {
     this.context = initialContext;
@@ -88,7 +118,9 @@ public class FileRenderApp {
               context.lastSearchPath(),
               context.guiBounds(),
               false,
-              context.columnContext());
+              context.columnContext(),
+              context.folderViewPath(),
+              context.folderViewRecursive());
       flagContextDirty(newContext);
     }
 
@@ -109,61 +141,6 @@ public class FileRenderApp {
           else this.setTextRenderingSchematics("Rendering " + count + " schematic(s)");
         });
 
-    this.fileTable = new JTable(tableModel);
-    this.rowSorter = new TableRowSorter<>(tableModel);
-    rowSorter.setComparator(CaColumn.ICON.ordinal(), (a, b) -> 0);
-
-    freeTextFilter = new FreeTextSearchFilter(tableModel, context);
-    addFilter(freeTextFilter);
-    rowSorter.setRowFilter(
-        new RowFilter<>() {
-          @Override
-          public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
-            int row = (int) entry.getIdentifier();
-            synchronized (searchFilters) {
-              for (SearchFilter f : searchFilters) {
-                if (!f.contains(row)) return false;
-              }
-            }
-            return true;
-          }
-        });
-
-    tableAddMouseClickListener(fileTable);
-
-    fileTable
-        .getColumnModel()
-        .addColumnModelListener(
-            new TableColumnModelListener() {
-
-              @Override
-              public void columnAdded(TableColumnModelEvent e) {
-                updateContextColumns(fileTable.getColumnModel());
-              }
-
-              @Override
-              public void columnRemoved(TableColumnModelEvent e) {
-                updateContextColumns(fileTable.getColumnModel());
-              }
-
-              @Override
-              public void columnMoved(TableColumnModelEvent e) {
-                updateContextColumns(fileTable.getColumnModel());
-              }
-
-              @Override
-              public void columnMarginChanged(ChangeEvent e) {
-                updateContextColumns(fileTable.getColumnModel());
-              }
-
-              @Override
-              public void columnSelectionChanged(ListSelectionEvent e) {
-                // Usually ignore
-              }
-            });
-
-    // construct UI
-
     frame = new JFrame("File Renderer");
     frame.setSize(context.guiBounds().width, context.guiBounds().height);
     frame.setLocation(context.guiBounds().x, context.guiBounds().y);
@@ -180,7 +157,9 @@ public class FileRenderApp {
                     context.lastSearchPath(),
                     bounds,
                     context.neverBeforeUsed(),
-                    context.columnContext());
+                    context.columnContext(),
+                    context.folderViewPath(),
+                    context.folderViewRecursive());
             flagContextDirty(newContext);
           }
 
@@ -193,148 +172,60 @@ public class FileRenderApp {
                     context.lastSearchPath(),
                     bounds,
                     context.neverBeforeUsed(),
-                    context.columnContext());
+                    context.columnContext(),
+                    context.folderViewPath(),
+                    context.folderViewRecursive());
             flagContextDirty(newContext);
           }
         });
 
     frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-    fileTable.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
-    fileTable.setRowSorter(rowSorter);
+    // --- Global view ---
+    FileListPanel globalPanel = createFileListPanel(tableModel, null, frame);
+    this.fileTable = globalPanel.table();
+    this.rowSorter = globalPanel.sorter();
+    this.searchField = globalPanel.searchField();
+    this.chipRow = globalPanel.chipRow();
+    this.searchSpinner = globalPanel.searchSpinner();
+    this.searchFilters.clear();
+    this.searchFilters.addAll(globalPanel.searchFilters());
+    this.chipFilters.clear();
+    this.chipFilters.putAll(globalPanel.chipFilters());
+    this.chipSearchManager = globalPanel.chipManager();
+    this.debouncer = globalPanel.debouncer();
+    this.topInfoLabel = globalPanel.topInfoLabel();
+    this.renderInfoLabel = globalPanel.renderInfoLabel();
 
-    fileTable.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
-
-    for (CaColumn c : CaColumn.values()) {
-      fileTable.getColumnModel().getColumn(c.ordinal()).setCellRenderer(c.renderer);
-    }
-    {
-      Function<CaColumn, List<String>> highlightFn = col -> {
-        synchronized (searchFilters) {
-          List<String> result = new ArrayList<>();
-          for (SearchFilter f : searchFilters) {
-            String s = f.getHighlightString(col);
-            if (s != null && !s.isEmpty()) result.add(s.toLowerCase());
+    // --- Folder view ---
+    RowFilter<FileTableModel, Integer> folderRowFilterInstance =
+        new RowFilter<>() {
+          @Override
+          public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
+            return folderRowFilter(entry);
           }
-          return result;
-        }
-      };
-      for (CaColumn c : CaColumn.values()) {
-        c.renderer.setHighlightLookup(highlightFn);
-      }
-    }
-    fileTable.setRowHeight(64);
+        };
+    FileListPanel folderPanel = createFileListPanel(tableModel, folderRowFilterInstance, frame);
+    this.folderTable = folderPanel.table();
+    this.folderRowSorter = folderPanel.sorter();
+    this.folderSearchField = folderPanel.searchField();
+    this.folderChipRow = folderPanel.chipRow();
+    this.folderSearchSpinner = folderPanel.searchSpinner();
+    this.folderSearchFilters.clear();
+    this.folderSearchFilters.addAll(folderPanel.searchFilters());
+    this.folderChipFilters.clear();
+    this.folderChipFilters.putAll(folderPanel.chipFilters());
+    this.folderChipManager = folderPanel.chipManager();
+    this.folderDebouncer = folderPanel.debouncer();
 
-    searchField = new JTextField(40);
-    searchField.setText("Search");
-    searchField.putClientProperty("JTextField.placeholderText", "Search...");
-    debouncer = DebouncedDocumentListener.create(
-        200, () -> freeTextFilter.setSearchText(searchField.getText()));
-    searchField.getDocument().addDocumentListener(debouncer);
-
-    searchSpinner = new JProgressBar();
-    searchSpinner.setIndeterminate(true);
-    searchSpinner.setPreferredSize(new Dimension(16, 16));
-    searchSpinner.setMaximumSize(new Dimension(16, 16));
-    searchSpinner.setVisible(false);
-    debouncer.addPropertyChangeListener(
-        DebouncedDocumentListener.PROP_SEARCHING,
-        e -> searchSpinner.setVisible((boolean) e.getNewValue()));
-
-    chipRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
-    chipRow.setVisible(false);
-
-    chipSearchManager =
-        new ChipSearchManager(searchField, chipRow, this::syncChipFilters, frame);
-    JButton addConditionBtn = chipSearchManager.createAddConditionButton();
-
-    fileTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF); // allows wide table + horizontal scrolling
-    JScrollPane scrollPane = new JScrollPane(fileTable);
-
-    JPanel topPanel = new JPanel();
-    topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));
-    {
-      JPanel searchRow = new JPanel(new FlowLayout(FlowLayout.LEFT));
-      {
-        JButton addBtn = new JButton(Icons.get("menu"));
-        final JPopupMenu filesMenu =
-            new JPopupMenu() {
-              @Override
-              public Dimension getPreferredSize() { // snugly assume width of button
-                Dimension d = super.getPreferredSize();
-                if (d.width < addBtn.getWidth()) d.width = addBtn.getWidth();
-                return d;
-              }
-            };
-        filesMenu.setLayout(new GridLayout(0, 1));
-        {
-          {
-            JButton importSingleFile = new JButton("Import file");
-            importSingleFile.addActionListener(a -> this.importFile());
-            filesMenu.add(importSingleFile);
-          }
-
-          {
-            JButton importFolder = new JButton("Import folder");
-            importFolder.addActionListener(a -> this.importFolder());
-            filesMenu.add(importFolder);
-          }
-
-          {
-            JButton reloadAll = new JButton("Reload all");
-            reloadAll.addActionListener(a -> this.reloadAllFiles());
-            filesMenu.add(reloadAll);
-          }
-
-          {
-            JButton reloadAll = new JButton("Remove all");
-            reloadAll.addActionListener(a -> this.removeAllFiles());
-            filesMenu.add(reloadAll);
-          }
-        }
-
-        addBtn.addActionListener(
-            e -> {
-              SwingUtilities.invokeLater(
-                  () -> {
-                    filesMenu.show(addBtn, 0, addBtn.getHeight());
-                  });
-            });
-        searchRow.add(addBtn);
-
-        searchRow.add(searchField);
-        searchRow.add(addConditionBtn);
-        searchRow.add(searchSpinner);
-      }
-      topPanel.add(searchRow);
-
-      topPanel.add(chipRow);
-
-      JPanel topInfo = new JPanel(new FlowLayout(FlowLayout.LEFT));
-      {
-        JLabel topInfoLabel = new JLabel();
-        topInfo.add(topInfoLabel);
-        this.topInfoLabel = topInfoLabel;
-
-        JLabel renderInfoLabel = new JLabel();
-        topInfo.add(Box.createHorizontalStrut(16));
-        topInfo.add(renderInfoLabel);
-        this.renderInfoLabel = renderInfoLabel;
-      }
-      topPanel.add(topInfo);
-    }
-
-    JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-
-    JPanel fileListPanel = new JPanel(new BorderLayout());
-    {
-      fileListPanel.add(topPanel, BorderLayout.NORTH);
-      fileListPanel.add(scrollPane, BorderLayout.CENTER);
-      fileListPanel.add(bottomPanel, BorderLayout.SOUTH);
-    }
+    // Wrap folder panel with path bar
+    JPanel folderViewPanel = new JPanel(new BorderLayout());
+    folderViewPanel.add(createFolderPathBar(), BorderLayout.NORTH);
+    folderViewPanel.add(folderPanel.panel(), BorderLayout.CENTER);
 
     JTabbedPane tabbedPane = new JTabbedPane(SwingConstants.LEFT);
-    tabbedPane.addTab(null, Icons.get("folder"), fileListPanel);
+    tabbedPane.addTab(null, Icons.get("folder"), globalPanel.panel());
+    tabbedPane.addTab(null, Icons.get("tree"), folderViewPanel);
     tabbedPane.addTab(null, Icons.get("settings"),
         getSettingsComponent(context.columnContext().displayedColumns()));
     frame.add(tabbedPane);
@@ -374,7 +265,9 @@ public class FileRenderApp {
                     context.lastSearchPath(),
                     context.guiBounds(),
                     context.neverBeforeUsed(),
-                    newColumnContext));
+                    newColumnContext,
+                    context.folderViewPath(),
+                    context.folderViewRecursive()));
           }
         });
 
@@ -399,8 +292,752 @@ public class FileRenderApp {
             chooser.getCurrentDirectory(),
             context.guiBounds(),
             context.neverBeforeUsed(),
-            context.columnContext());
+            context.columnContext(),
+            context.folderViewPath(),
+            context.folderViewRecursive());
     flagContextDirty(newContext);
+  }
+
+  private FileListPanel createFileListPanel(
+      FileTableModel model, RowFilter<FileTableModel, Integer> extraFilter, JFrame parentFrame) {
+    JTable table = new JTable(model);
+    TableRowSorter<FileTableModel> sorter = new TableRowSorter<>(model);
+    sorter.setComparator(CaColumn.ICON.ordinal(), (a, b) -> 0);
+
+    List<SearchFilter> searchFilters = new ArrayList<>();
+    Map<String, ChipSearchFilter> chipFilters = new HashMap<>();
+
+    sorter.setRowFilter(
+        new RowFilter<>() {
+          @Override
+          public boolean include(Entry<? extends FileTableModel, ? extends Integer> entry) {
+            int row = (int) entry.getIdentifier();
+            if (extraFilter != null && !extraFilter.include(entry)) return false;
+            synchronized (searchFilters) {
+              for (SearchFilter f : searchFilters) {
+                if (!f.contains(row)) return false;
+              }
+            }
+            return true;
+          }
+        });
+
+    table.addMouseListener(
+        new MouseAdapter() {
+          @Override
+          public void mouseClicked(MouseEvent e) {
+            int viewRow = table.rowAtPoint(e.getPoint());
+            int viewCol = table.columnAtPoint(e.getPoint());
+            if (viewRow == -1 || viewCol == -1) {
+              return;
+            }
+            int modelRow = table.convertRowIndexToModel(viewRow);
+            int modelCol = table.convertColumnIndexToModel(viewCol);
+            Object object = model.getValueAt(modelRow, modelCol);
+
+            if (e.getClickCount() == 1 && SwingUtilities.isRightMouseButton(e)) {
+              JPopupMenu rightMenu = createTableContextMenu(table);
+              String title = getSelectedFiles(table).length + " file(s) selected";
+              ((JLabel) rightMenu.getComponent(0)).setText(title);
+              SwingUtilities.invokeLater(
+                  () -> rightMenu.show(e.getComponent(), e.getX(), e.getY()));
+            }
+            if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
+              if (modelCol == CaColumn.ICON.ordinal()) {
+                File file = model.getFileAt(modelRow);
+                SchematicPreviewHelper.getInstance().showPreviewDialog(file, frame);
+                return;
+              }
+              if (modelCol == CaColumn.BLOCKS.ordinal() && object instanceof List<?> list) {
+                showBlocksPopup(e, list.stream().map(Object::toString).toList());
+                return;
+              }
+              JPopupMenu menu = new JPopupMenu();
+              menu.setLightWeightPopupEnabled(false);
+              JTextArea textArea = new JTextArea(10, 50);
+              textArea.setLineWrap(true);
+              textArea.setWrapStyleWord(true);
+              textArea.setEditable(false);
+              String content = "EMPTY";
+              if (object instanceof List<?> list) {
+                content = list.stream().map(Object::toString).collect(Collectors.joining("\n"));
+              } else if (object instanceof Map<?, ?> map) {
+                content =
+                    map.entrySet().stream()
+                        .map(entry -> entry.getKey().toString() + ": " + entry.getValue().toString())
+                        .collect(Collectors.joining("\n"));
+              } else if (object instanceof String s) {
+                content = s;
+              } else {
+                content = object.toString();
+              }
+              var longestLine =
+                  Arrays.stream(content.split("\n")).max(Comparator.comparing(String::length));
+              if (longestLine.isEmpty()) return;
+              textArea.setText(content);
+              FontMetrics metrics = textArea.getFontMetrics(textArea.getFont());
+              float pxWidth = metrics.stringWidth(longestLine.get());
+              pxWidth /= metrics.stringWidth("m");
+              int columns = (int) Math.ceil(pxWidth);
+              textArea.setColumns(Math.max(Math.min(100, columns + 5), 20));
+              textArea.setRows(Math.max(7, Math.min(30, content.split("\n").length)));
+              textArea.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
+              JScrollPane scrollPane = new JScrollPane(textArea);
+              menu.add(new JLabel(model.getColumn(modelCol).displayName));
+              menu.add(scrollPane);
+              SwingUtilities.invokeLater(() -> menu.show(e.getComponent(), e.getX(), e.getY()));
+            }
+          }
+        });
+
+    table.addMouseListener(
+        new MouseAdapter() {
+          @Override
+          public void mouseClicked(MouseEvent e) {
+            if (e.getClickCount() == 3 && SwingUtilities.isLeftMouseButton(e)) {
+              int viewRow = table.rowAtPoint(e.getPoint());
+              if (viewRow >= 0) {
+                int modelRow = table.convertRowIndexToModel(viewRow);
+                File file = model.getFileAt(modelRow);
+                renderFiles(List.of(file));
+              }
+            }
+          }
+        });
+
+    table
+        .getColumnModel()
+        .addColumnModelListener(
+            new TableColumnModelListener() {
+              @Override
+              public void columnAdded(TableColumnModelEvent e) {
+                updateContextColumns(table.getColumnModel());
+              }
+
+              @Override
+              public void columnRemoved(TableColumnModelEvent e) {
+                updateContextColumns(table.getColumnModel());
+              }
+
+              @Override
+              public void columnMoved(TableColumnModelEvent e) {
+                updateContextColumns(table.getColumnModel());
+              }
+
+              @Override
+              public void columnMarginChanged(ChangeEvent e) {
+                updateContextColumns(table.getColumnModel());
+              }
+
+              @Override
+              public void columnSelectionChanged(ListSelectionEvent e) {}
+            });
+
+    table.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+    table.setRowSorter(sorter);
+    table.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
+
+    for (CaColumn c : CaColumn.values()) {
+      table.getColumnModel().getColumn(c.ordinal()).setCellRenderer(c.renderer);
+    }
+    {
+      Function<CaColumn, List<String>> highlightFn = col -> {
+        synchronized (searchFilters) {
+          List<String> result = new ArrayList<>();
+          for (SearchFilter f : searchFilters) {
+            String s = f.getHighlightString(col);
+            if (s != null && !s.isEmpty()) result.add(s.toLowerCase());
+          }
+          return result;
+        }
+      };
+      for (CaColumn c : CaColumn.values()) {
+        c.renderer.setHighlightLookup(highlightFn);
+      }
+    }
+    table.setRowHeight(64);
+
+    JTextField searchField = new JTextField(40);
+    searchField.setText("Search");
+    searchField.putClientProperty("JTextField.placeholderText", "Search...");
+
+    FreeTextSearchFilter freeTextFilter = new FreeTextSearchFilter(model, context);
+    synchronized (searchFilters) {
+      searchFilters.add(freeTextFilter);
+    }
+    freeTextFilter.setOnProgressCallback(
+        progress -> SwingUtilities.invokeLater(() -> tableModel.fireTableDataChanged()));
+    freeTextFilter.startThread();
+
+    DebouncedDocumentListener debouncer =
+        DebouncedDocumentListener.create(
+            200, () -> freeTextFilter.setSearchText(searchField.getText()));
+    searchField.getDocument().addDocumentListener(debouncer);
+
+    JProgressBar searchSpinner = new JProgressBar();
+    searchSpinner.setIndeterminate(true);
+    searchSpinner.setPreferredSize(new Dimension(16, 16));
+    searchSpinner.setMaximumSize(new Dimension(16, 16));
+    searchSpinner.setVisible(false);
+    debouncer.addPropertyChangeListener(
+        DebouncedDocumentListener.PROP_SEARCHING,
+        e -> searchSpinner.setVisible((boolean) e.getNewValue()));
+
+    JPanel chipRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
+    chipRow.setVisible(false);
+
+    ChipSearchManager[] chipManagerRef = new ChipSearchManager[1];
+    chipManagerRef[0] =
+        new ChipSearchManager(
+            searchField,
+            chipRow,
+            () -> syncChipFilters(chipFilters, searchFilters, chipManagerRef[0]),
+            parentFrame);
+    ChipSearchManager chipManager = chipManagerRef[0];
+    JButton addConditionBtn = chipManager.createAddConditionButton();
+
+    table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+    JScrollPane scrollPane = new JScrollPane(table);
+
+    JPanel topPanel = new JPanel();
+    topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));
+    {
+      JPanel searchRow = new JPanel(new FlowLayout(FlowLayout.LEFT));
+      {
+        JButton addBtn = new JButton(Icons.get("menu"));
+        final JPopupMenu filesMenu =
+            new JPopupMenu() {
+              @Override
+              public Dimension getPreferredSize() {
+                Dimension d = super.getPreferredSize();
+                if (d.width < addBtn.getWidth()) d.width = addBtn.getWidth();
+                return d;
+              }
+            };
+        filesMenu.setLayout(new GridLayout(0, 1));
+        {
+          JButton importSingleFile = new JButton("Import file");
+          importSingleFile.addActionListener(a -> this.importFile());
+          filesMenu.add(importSingleFile);
+
+          JButton importFolder = new JButton("Import folder");
+          importFolder.addActionListener(a -> this.importFolder());
+          filesMenu.add(importFolder);
+
+          JButton reloadAll = new JButton("Reload all");
+          reloadAll.addActionListener(a -> this.reloadAllFiles());
+          filesMenu.add(reloadAll);
+
+          JButton removeAll = new JButton("Remove all");
+          removeAll.addActionListener(a -> this.removeAllFiles());
+          filesMenu.add(removeAll);
+        }
+
+        addBtn.addActionListener(
+            e ->
+                SwingUtilities.invokeLater(
+                    () -> filesMenu.show(addBtn, 0, addBtn.getHeight())));
+        searchRow.add(addBtn);
+        searchRow.add(searchField);
+        searchRow.add(addConditionBtn);
+        searchRow.add(searchSpinner);
+      }
+      topPanel.add(searchRow);
+
+      topPanel.add(chipRow);
+
+      JPanel topInfo = new JPanel(new FlowLayout(FlowLayout.LEFT));
+      JLabel topInfoLabel = new JLabel();
+      JLabel renderInfoLabel = new JLabel();
+      topInfo.add(topInfoLabel);
+      topInfo.add(Box.createHorizontalStrut(16));
+      topInfo.add(renderInfoLabel);
+      topPanel.add(topInfo);
+    }
+
+    JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+
+    JPanel panel = new JPanel(new BorderLayout());
+    panel.add(topPanel, BorderLayout.NORTH);
+    panel.add(scrollPane, BorderLayout.CENTER);
+    panel.add(bottomPanel, BorderLayout.SOUTH);
+
+    return new FileListPanel(
+        panel, table, sorter, searchField, chipManager, chipRow, searchSpinner,
+        searchFilters, chipFilters, debouncer, topInfoLabel, renderInfoLabel);
+  }
+
+  private JPopupMenu createTableContextMenu(JTable table) {
+    JPopupMenu rightMenu = new JPopupMenu();
+    rightMenu.setLayout(new GridLayout(0, 1));
+
+    JLabel menuTitleLbl = new JLabel("");
+    rightMenu.add(menuTitleLbl);
+
+    JButton reloadFileBtn = new JButton("Reload");
+    reloadFileBtn.addActionListener(
+        a -> {
+          for (int viewRow : table.getSelectedRows()) {
+            int modelRow = table.convertRowIndexToModel(viewRow);
+            File file = tableModel.getFileAt(modelRow);
+            tableModel.flagReloadFile(modelRow);
+            tableModel.invalidateIconCache(file);
+            try {
+              Files.deleteIfExists(ResourceUtils.getRenderPathForFile(file));
+              Files.deleteIfExists(ResourceUtils.getThumbPathForFile(file));
+            } catch (IOException ex) {
+              // ignore
+            }
+          }
+        });
+    rightMenu.add(reloadFileBtn);
+
+    JButton renderFilesBtn = new JButton("Render");
+    renderFilesBtn.addActionListener(
+        a -> {
+          List<File> files = Arrays.stream(table.getSelectedRows())
+              .map(table::convertRowIndexToModel)
+              .mapToObj(tableModel::getFileAt)
+              .toList();
+          if (!files.isEmpty()) renderFiles(files);
+        });
+    rightMenu.add(renderFilesBtn);
+
+    JButton removeFilesBtn = new JButton("Remove");
+    removeFilesBtn.addActionListener(
+        a -> {
+          File[] files = Arrays.stream(table.getSelectedRows())
+              .map(table::convertRowIndexToModel)
+              .mapToObj(tableModel::getFileAt)
+              .toArray(File[]::new);
+          tableModel.removeFile(files);
+          var newFilesAndTimestamps = new HashMap<>(context.filesAndTimestamps());
+          for (File file : files) {
+            newFilesAndTimestamps.remove(file);
+          }
+          flagContextDirty(
+              new AppContext(
+                  newFilesAndTimestamps,
+                  context.lastSearchPath(),
+                  context.guiBounds(),
+                  context.neverBeforeUsed(),
+                  context.columnContext(),
+                  context.folderViewPath(),
+                  context.folderViewRecursive()));
+        });
+    rightMenu.add(removeFilesBtn);
+
+    JButton deleteFilesBtn = new JButton("Delete from disk");
+    deleteFilesBtn.addActionListener(
+        a -> {
+          File[] selected = Arrays.stream(table.getSelectedRows())
+              .map(table::convertRowIndexToModel)
+              .mapToObj(tableModel::getFileAt)
+              .toArray(File[]::new);
+          if (selected.length == 0) return;
+          String fileList = Arrays.stream(selected).map(File::getName).collect(Collectors.joining("\n"));
+          int reply =
+              JOptionPane.showConfirmDialog(
+                  frame,
+                  "Permanently delete " + selected.length + " file(s) from disk?\n\n" + fileList,
+                  "Delete from disk",
+                  JOptionPane.YES_NO_OPTION,
+                  JOptionPane.WARNING_MESSAGE);
+          if (reply != JOptionPane.YES_OPTION) return;
+          List<File> failed = new ArrayList<>();
+          for (File file : selected) {
+            try {
+              Files.delete(file.toPath());
+            } catch (IOException ex) {
+              failed.add(file);
+            }
+          }
+          tableModel.removeFile(selected);
+          var newFilesAndTimestamps = new HashMap<>(context.filesAndTimestamps());
+          for (File file : selected) {
+            newFilesAndTimestamps.remove(file);
+          }
+          flagContextDirty(
+              new AppContext(
+                  newFilesAndTimestamps,
+                  context.lastSearchPath(),
+                  context.guiBounds(),
+                  context.neverBeforeUsed(),
+                  context.columnContext(),
+                  context.folderViewPath(),
+                  context.folderViewRecursive()));
+          if (!failed.isEmpty()) {
+            JOptionPane.showMessageDialog(
+                frame,
+                "Could not delete:\n" + failed.stream().map(File::getName).collect(Collectors.joining("\n")),
+                "Delete from disk",
+                JOptionPane.ERROR_MESSAGE);
+          }
+        });
+    rightMenu.add(deleteFilesBtn);
+
+    JButton openFolderBtn = new JButton("Open folder");
+    openFolderBtn.addActionListener(
+        a -> {
+          File[] files = Arrays.stream(table.getSelectedRows())
+              .map(table::convertRowIndexToModel)
+              .mapToObj(tableModel::getFileAt)
+              .toArray(File[]::new);
+          Desktop desktop = Desktop.getDesktop();
+          if (desktop == null) return;
+          List<File> folders = Arrays.stream(files).map(File::getParentFile).distinct().toList();
+          if (folders.size() > 2) {
+            int reply2 =
+                JOptionPane.showConfirmDialog(
+                    frame,
+                    "You are trying to open " + folders.size() + " folders at once. Do you want to continue?",
+                    "Open folders",
+                    JOptionPane.YES_NO_OPTION);
+            if (reply2 != JOptionPane.YES_OPTION) return;
+          }
+          folders.forEach(
+              folder -> {
+                try {
+                  desktop.open(folder);
+                } catch (IOException ex) {
+                  throw new RuntimeException(ex);
+                }
+              });
+        });
+    rightMenu.add(openFolderBtn);
+
+    JButton convertToSponge3Btn = new JButton("Convert to Sponge3");
+    convertToSponge3Btn.addActionListener(a -> convertSelectedToSponge3(table));
+    rightMenu.add(convertToSponge3Btn);
+
+    JButton replaceSandstoneBtn = new JButton("Replace blocks");
+    replaceSandstoneBtn.addActionListener(a -> replaceSandstoneWithCobblestone(table));
+    rightMenu.add(replaceSandstoneBtn);
+
+    return rightMenu;
+  }
+
+  private void convertSelectedToSponge3(JTable table) {
+    List<File> selected = Arrays.stream(table.getSelectedRows())
+        .map(table::convertRowIndexToModel)
+        .mapToObj(tableModel::getFileAt)
+        .toList();
+    if (selected.isEmpty()) {
+      JOptionPane.showMessageDialog(
+          frame, "No files selected.", "Convert to Sponge3", JOptionPane.WARNING_MESSAGE);
+      return;
+    }
+    JFileChooser chooser = new JFileChooser();
+    chooser.setCurrentDirectory(selected.get(0).getParentFile());
+    chooser.setDialogTitle("Select output folder for converted .schem files");
+    chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+    chooser.setAcceptAllFileFilterUsed(false);
+    if (chooser.showOpenDialog(frame) != JFileChooser.APPROVE_OPTION) return;
+    File outputDir = chooser.getSelectedFile();
+    new Thread(
+            () -> {
+              List<Path> paths = selected.stream().map(File::toPath).toList();
+              BatchConverter.ConversionResult result;
+              try {
+                result = BatchConverter.convertToSponge3(paths, outputDir);
+              } catch (IOException e) {
+                SwingUtilities.invokeLater(
+                    () ->
+                        JOptionPane.showMessageDialog(
+                            frame,
+                            "Conversion failed: " + e.getMessage(),
+                            "Convert to Sponge3",
+                            JOptionPane.ERROR_MESSAGE));
+                return;
+              }
+              SwingUtilities.invokeLater(
+                  () -> {
+                    var newFilesAndTimestamps = new HashMap<>(context.filesAndTimestamps());
+                    for (File produced : result.convertedFiles()) {
+                      tableModel.addFile(produced);
+                      newFilesAndTimestamps.put(produced, System.currentTimeMillis());
+                    }
+                    flagContextDirty(
+                        new AppContext(
+                            newFilesAndTimestamps,
+                            context.lastSearchPath(),
+                            context.guiBounds(),
+                            context.neverBeforeUsed(),
+                            context.columnContext(),
+                            context.folderViewPath(),
+                            context.folderViewRecursive()));
+                    List<File> failed = result.failedFiles();
+                    if (failed.isEmpty()) {
+                      JOptionPane.showMessageDialog(
+                          frame,
+                          "Converted " + result.convertedFiles().size() + " file(s) to Sponge v3.",
+                          "Convert to Sponge3",
+                          JOptionPane.INFORMATION_MESSAGE);
+                    } else {
+                      String failedNames =
+                          failed.stream().map(File::getName).collect(Collectors.joining("\n"));
+                      JOptionPane.showMessageDialog(
+                          frame,
+                          "Converted " + result.convertedFiles().size() + " of " + selected.size()
+                              + " file(s).\n\nFailed:\n" + failedNames,
+                          "Convert to Sponge3",
+                          JOptionPane.WARNING_MESSAGE);
+                    }
+                  });
+            },
+            "sponge3-converter")
+        .start();
+  }
+
+  private void replaceSandstoneWithCobblestone(JTable table) {
+    File[] selected = Arrays.stream(table.getSelectedRows())
+        .map(table::convertRowIndexToModel)
+        .mapToObj(tableModel::getFileAt)
+        .toArray(File[]::new);
+    if (selected.length == 0) {
+      JOptionPane.showMessageDialog(
+          frame, "No files selected.", "Replace blocks", JOptionPane.WARNING_MESSAGE);
+      return;
+    }
+    Set<String> palette = new LinkedHashSet<>();
+    Map<File, pitheguy.schemconvert.converter.Schematic> loaded = new LinkedHashMap<>();
+    for (File file : selected) {
+      try {
+        var schematic = BlockReplacer.load(file);
+        loaded.put(file, schematic);
+        palette.addAll(BlockReplacer.getPalette(schematic));
+      } catch (IOException e) {
+        JOptionPane.showMessageDialog(
+            frame,
+            "Could not load: " + file.getName() + "\n" + e.getMessage(),
+            "Replace blocks",
+            JOptionPane.ERROR_MESSAGE);
+        return;
+      }
+    }
+    Set<String> availableBlocks;
+    try {
+      availableBlocks = BlockReplacer.loadDefaultPalette();
+    } catch (IOException e) {
+      JOptionPane.showMessageDialog(
+          frame,
+          "Could not load block list: " + e.getMessage(),
+          "Replace blocks",
+          JOptionPane.ERROR_MESSAGE);
+      return;
+    }
+    var mapping = BlockReplacerDialog.show(frame, palette, availableBlocks, loaded);
+    if (mapping.isEmpty()) return;
+    var replaceResult = mapping.get();
+    File firstFile = loaded.keySet().iterator().next();
+    var outputOptions = OutputOptionsDialog.show(frame, firstFile);
+    if (outputOptions.isEmpty()) return;
+    var options = outputOptions.get();
+    List<File> failed = new ArrayList<>();
+    List<File> written = new ArrayList<>();
+    for (var entry : loaded.entrySet()) {
+      File file = entry.getKey();
+      try {
+        var replaced = BlockReplacer.replace(entry.getValue(), replaceResult.replacements());
+        File output = options.outputFileFor(file);
+        if (output.getParentFile() != null) output.getParentFile().mkdirs();
+        BlockReplacer.write(replaced, output);
+        written.add(output);
+        tableModel.addFile(output);
+      } catch (IOException e) {
+        failed.add(file);
+      }
+    }
+    var newFilesAndTimestamps = new HashMap<>(context.filesAndTimestamps());
+    for (File output : written) {
+      newFilesAndTimestamps.put(output, System.currentTimeMillis());
+    }
+    flagContextDirty(
+        new AppContext(
+            newFilesAndTimestamps,
+            context.lastSearchPath(),
+            context.guiBounds(),
+            context.neverBeforeUsed(),
+            context.columnContext(),
+            context.folderViewPath(),
+            context.folderViewRecursive()));
+    String msg = written.size() + " file(s) written.";
+    if (!failed.isEmpty())
+      msg += "\nFailed: " + failed.stream().map(File::getName).collect(Collectors.joining(", "));
+    JOptionPane.showMessageDialog(
+        frame,
+        msg,
+        "Replace blocks",
+        failed.isEmpty() ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.WARNING_MESSAGE);
+  }
+
+  private JPanel createFolderPathBar() {
+    JPanel pathBar = new JPanel(new BorderLayout(4, 2));
+    pathBar.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+
+    folderPathField = new JTextField();
+    folderPathField.setEditable(false);
+    folderPathField.setFont(folderPathField.getFont().deriveFont(Font.PLAIN, 12f));
+    folderPathField.setColumns(30);
+
+    folderRecursiveCheckbox = new JCheckBox("Recursive");
+    folderRecursiveCheckbox.setToolTipText(
+        "When checked, show files from all subfolders recursively. "
+            + "When unchecked, only show files directly in this folder.");
+    folderRecursiveCheckbox.setSelected(context.folderViewRecursive());
+    folderRecursiveCheckbox.addActionListener(
+        e -> {
+          boolean recursive = folderRecursiveCheckbox.isSelected();
+          flagContextDirty(
+              new AppContext(
+                  context.filesAndTimestamps(),
+                  context.lastSearchPath(),
+                  context.guiBounds(),
+                  context.neverBeforeUsed(),
+                  context.columnContext(),
+                  context.folderViewPath(),
+                  recursive));
+          folderRowSorter.sort();
+        });
+
+    JButton upBtn = new JButton("\u2191 Up");
+    upBtn.setToolTipText("Go to parent folder");
+    upBtn.addActionListener(
+        e -> {
+          if (folderViewPath == null) return;
+          File parent = folderViewPath.getParentFile();
+          if (parent != null) {
+            setFolderViewPath(parent);
+          }
+        });
+
+    JButton browseBtn = new JButton("Browse...");
+    browseBtn.setToolTipText("Select a folder");
+    browseBtn.addActionListener(
+        e -> {
+          JFileChooser chooser = new JFileChooser();
+          chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+          chooser.setDialogTitle("Select folder to display");
+          if (folderViewPath != null) {
+            chooser.setCurrentDirectory(folderViewPath);
+          }
+          if (chooser.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) {
+            setFolderViewPath(chooser.getSelectedFile());
+          }
+        });
+
+    JPanel leftGroup = new JPanel(new BorderLayout(4, 0));
+    leftGroup.add(new JLabel("Folder: "), BorderLayout.WEST);
+    leftGroup.add(folderPathField, BorderLayout.CENTER);
+
+    JPanel rightGroup = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 0));
+    rightGroup.add(upBtn);
+    rightGroup.add(folderRecursiveCheckbox);
+    rightGroup.add(browseBtn);
+
+    pathBar.add(leftGroup, BorderLayout.CENTER);
+    pathBar.add(rightGroup, BorderLayout.EAST);
+
+    // Restore saved folder if any, else default to home
+    if (context.folderViewPath() != null) {
+      setFolderViewPath(context.folderViewPath());
+    } else {
+      setFolderViewPath(new File(System.getProperty("user.home")));
+    }
+
+    return pathBar;
+  }
+
+  private void setFolderViewPath(File folder) {
+    this.folderViewPath = folder;
+    folderPathField.setText(folder.getAbsolutePath());
+    flagContextDirty(
+        new AppContext(
+            context.filesAndTimestamps(),
+            context.lastSearchPath(),
+            context.guiBounds(),
+            context.neverBeforeUsed(),
+            context.columnContext(),
+            folder,
+            folderRecursiveCheckbox.isSelected()));
+    folderRowSorter.sort();
+  }
+
+  private boolean folderRowFilter(RowFilter.Entry<? extends FileTableModel, ? extends Integer> entry) {
+    if (folderViewPath == null) return false;
+    int row = (int) entry.getIdentifier();
+    File file = tableModel.getFileAt(row);
+    if (file == null) return false;
+    String filePath = file.getAbsolutePath();
+    String folderPath = folderViewPath.getAbsolutePath();
+    if (folderRecursiveCheckbox != null && folderRecursiveCheckbox.isSelected()) {
+      return filePath.equals(folderPath) || filePath.startsWith(folderPath + File.separator);
+    } else {
+      return file.getParentFile().equals(folderViewPath);
+    }
+  }
+
+  private void syncChipFilters(
+      Map<String, ChipSearchFilter> chipFilters,
+      List<SearchFilter> searchFilters,
+      ChipSearchManager chipManager) {
+    Set<String> activeKeys =
+        chipManager.getConditions().stream()
+            .map(c -> c.column().name() + ":" + c.searchTerm().toLowerCase())
+            .collect(Collectors.toSet());
+
+    var it = chipFilters.entrySet().iterator();
+    while (it.hasNext()) {
+      var e = it.next();
+      if (!activeKeys.contains(e.getKey())) {
+        removeFilter(e.getValue(), searchFilters);
+        it.remove();
+      }
+    }
+
+    for (ChipSearchManager.SearchCondition cond : chipManager.getConditions()) {
+      String key = cond.column().name() + ":" + cond.searchTerm().toLowerCase();
+      if (!chipFilters.containsKey(key)) {
+        ChipSearchFilter f = new ChipSearchFilter(tableModel, cond.column(), cond.searchTerm());
+        chipFilters.put(key, f);
+        addFilter(f, searchFilters);
+      }
+    }
+  }
+
+  private void addFilter(SearchFilter filter, List<SearchFilter> searchFilters) {
+    synchronized (searchFilters) {
+      searchFilters.add(filter);
+    }
+    filter.setOnProgressCallback(
+        progress ->
+            SwingUtilities.invokeLater(
+                () -> {
+                  int n = tableModel.getRowCount();
+                  if (n > 0) {
+                    tableModel.fireTableDataChanged();
+                  }
+                }));
+    filter.startThread();
+  }
+
+  private void removeFilter(SearchFilter filter, List<SearchFilter> searchFilters) {
+    filter.stop();
+    filter.setOnProgressCallback(null);
+    synchronized (searchFilters) {
+      searchFilters.remove(filter);
+    }
+    int n = tableModel.getRowCount();
+    if (n > 0) {
+      tableModel.fireTableDataChanged();
+    }
+  }
+
+  private File[] getSelectedFiles(JTable table) {
+    return Arrays.stream(table.getSelectedRows())
+        .map(table::convertRowIndexToModel)
+        .mapToObj(tableModel::getFileAt)
+        .toArray(File[]::new);
   }
 
   private void importFolder() {
@@ -442,7 +1079,9 @@ public class FileRenderApp {
                             currentDirectory,
                             context.guiBounds(),
                             context.neverBeforeUsed(),
-                            context.columnContext()));
+                            context.columnContext(),
+                            context.folderViewPath(),
+                            context.folderViewRecursive()));
                     if (finalError != null) {
                       JOptionPane.showMessageDialog(
                           frame, finalError, "Error", JOptionPane.ERROR_MESSAGE);
@@ -510,7 +1149,9 @@ public class FileRenderApp {
             context.lastSearchPath(),
             context.guiBounds(),
             context.neverBeforeUsed(),
-            context.columnContext()));
+            context.columnContext(),
+            context.folderViewPath(),
+            context.folderViewRecursive()));
   }
 
   public static void startApp(final AppContext context) {
@@ -564,7 +1205,9 @@ public class FileRenderApp {
                             context.lastSearchPath(),
                             context.guiBounds(),
                             context.neverBeforeUsed(),
-                            newColumnContext));
+                            newColumnContext,
+                            context.folderViewPath(),
+                            context.folderViewRecursive()));
                     updateDisplayColumns(
                         new ArrayList<>(newColumnContext.displayedColumns()),
                         new ArrayList<>(newColumnContext.columnWidths()),
@@ -735,7 +1378,9 @@ public class FileRenderApp {
             context.lastSearchPath(),
             context.guiBounds(),
             context.neverBeforeUsed(),
-            newColumnContext));
+            newColumnContext,
+            context.folderViewPath(),
+            context.folderViewRecursive()));
   }
 
   void checkContextSaving() {
@@ -748,307 +1393,20 @@ public class FileRenderApp {
   }
 
   private void setTextRemainingFiles(String text) {
+    if (topInfoLabel == null || folderTopInfoLabel == null) return;
     topInfoLabel.setText(text);
+    folderTopInfoLabel.setText(text);
   }
 
   private void setTextRenderingSchematics(String text) {
+    if (renderInfoLabel == null || folderRenderInfoLabel == null) return;
     renderInfoLabel.setText(text);
-  }
-
-  private void reloadSelectedFiles() {
-    var rows = getSelectedModelRows();
-    for (int row : rows) {
-      File file = tableModel.getFileAt(row);
-      tableModel.flagReloadFile(row);
-      tableModel.invalidateIconCache(file);
-      try {
-        Files.deleteIfExists(ResourceUtils.getRenderPathForFile(file));
-        Files.deleteIfExists(ResourceUtils.getThumbPathForFile(file));
-      } catch (IOException e) {
-        // ignore
-      }
-    }
-  }
-
-  private void openFolderSelectedFiles() {
-    var files = getSelectedFiles();
-    Desktop desktop = Desktop.getDesktop();
-    if (desktop == null) {
-      assert false : "desktop is null";
-      return;
-    }
-    List<File> folders = Arrays.stream(files).map(File::getParentFile).distinct().toList();
-    if (folders.size() > 2) {
-      int reply =
-          JOptionPane.showConfirmDialog(
-              frame,
-              "You are trying to open "
-                  + folders.size()
-                  + " folders at once. Do you want to continue?",
-              "Open folders",
-              JOptionPane.YES_NO_OPTION);
-      if (reply != JOptionPane.YES_OPTION) {
-        return;
-      }
-    }
-    folders.forEach(
-        folder -> {
-          try {
-            desktop.open(folder);
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-        });
-  }
-
-  private void tableAddMouseClickListener(JTable table) {
-    final JPopupMenu rightMenu = new JPopupMenu();
-    final JButton reloadFileBtn;
-    final JButton renderFilesBtn;
-    final JLabel menuTitleLbl;
-    {
-      rightMenu.setLayout(new GridLayout(0, 1));
-
-      menuTitleLbl = new JLabel("");
-      rightMenu.add(menuTitleLbl);
-
-      reloadFileBtn = new JButton("Reload");
-      reloadFileBtn.addActionListener(a -> this.reloadSelectedFiles());
-      rightMenu.add(reloadFileBtn);
-
-      renderFilesBtn = new JButton("Render");
-      renderFilesBtn.addActionListener(a -> this.renderSelectedFiles());
-      rightMenu.add(renderFilesBtn);
-
-
-
-      JButton removeFilesBtn = new JButton("Remove");
-      removeFilesBtn.addActionListener(a -> this.removeSelectedFiles());
-      rightMenu.add(removeFilesBtn);
-
-      JButton deleteFilesBtn = new JButton("Delete from disk");
-      deleteFilesBtn.addActionListener(a -> this.deleteSelectedFiles());
-      rightMenu.add(deleteFilesBtn);
-
-      JButton openFolderBtn = new JButton("Open folder");
-      openFolderBtn.addActionListener(a -> this.openFolderSelectedFiles());
-      rightMenu.add(openFolderBtn);
-
-      JButton convertToSponge3Btn = new JButton("Convert to Sponge3");
-      convertToSponge3Btn.addActionListener(a -> this.convertSelectedToSponge3());
-      rightMenu.add(convertToSponge3Btn);
-
-      JButton replaceSandstoneBtn = new JButton("Replace blocks");
-      replaceSandstoneBtn.addActionListener(a -> this.replaceSandstoneWithCobblestone());
-      rightMenu.add(replaceSandstoneBtn);
-    }
-
-    Consumer<Integer> updateRightMenu =
-        modelRow -> {
-          reloadFileBtn.setEnabled(
-              Arrays.stream(getSelectedModelRows()).anyMatch(tableModel::isFileLoaded));
-          renderFilesBtn.setEnabled(
-              Arrays.stream(getSelectedModelRows()).allMatch(tableModel::isFileLoaded));
-          menuTitleLbl.setText(getSelectedFiles().length + " file(s) selected");
-        };
-
-    table.addMouseListener(
-        new MouseAdapter() {
-          @Override
-          public void mouseClicked(MouseEvent e) {
-            int viewRow = table.rowAtPoint(e.getPoint());
-            int viewCol = table.columnAtPoint(e.getPoint());
-            if (viewRow == -1 || viewCol == -1) {
-              return; // click outside cells
-            }
-            int modelRow = table.convertRowIndexToModel(viewRow);
-            int modelCol = table.convertColumnIndexToModel(viewCol);
-            Object object = tableModel.getValueAt(modelRow, modelCol);
-
-            if (e.getClickCount() == 1 && SwingUtilities.isRightMouseButton(e)) {
-              updateRightMenu.accept(modelRow);
-              SwingUtilities.invokeLater(
-                  () -> rightMenu.show(e.getComponent(), e.getX(), e.getY()));
-            }
-            if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
-              if (modelCol == CaColumn.ICON.ordinal()) {
-                showRenderPreview(modelRow);
-                return;
-              }
-              if (modelCol == CaColumn.BLOCKS.ordinal() && object instanceof List<?> list) {
-                showBlocksPopup(e, list.stream().map(Object::toString).toList());
-                return;
-              }
-
-              logger.fine("Model row=" + modelRow + ", model col=" + modelCol);
-
-              JPopupMenu menu = new JPopupMenu();
-              menu.setLightWeightPopupEnabled(false);
-              JTextArea textArea = new JTextArea(10, 50);
-              textArea.setLineWrap(true);
-              textArea.setWrapStyleWord(true);
-              textArea.setEditable(false);
-              String content = "EMPTY";
-              if (object instanceof List<?> list) {
-                content = list.stream().map(Object::toString).collect(Collectors.joining("\n"));
-              } else if (object instanceof Map<?, ?> map) {
-                content =
-                    map.entrySet().stream()
-                        .map(
-                            entry -> entry.getKey().toString() + ": " + entry.getValue().toString())
-                        .collect(Collectors.joining("\n"));
-              } else if (object instanceof String s) {
-                content = s;
-              } else {
-                content = object.toString();
-              }
-
-              var longestLine =
-                  Arrays.stream(content.split("\n")).max(Comparator.comparing(String::length));
-              if (longestLine.isEmpty()) return; //
-
-              textArea.setText(content);
-
-              FontMetrics metrics = textArea.getFontMetrics(textArea.getFont());
-              float pxWidth = metrics.stringWidth(longestLine.get());
-              pxWidth /= metrics.stringWidth("m"); // what column size is based off
-              int columns = (int) Math.ceil(pxWidth);
-
-              textArea.setColumns(Math.max(Math.min(100, columns + 5), 20));
-              textArea.setRows(Math.max(7, Math.min(30, content.split("\n").length)));
-
-              textArea.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
-
-              logger.fine("object string = " + textArea.getText());
-              JScrollPane scrollPane = new JScrollPane(textArea);
-              menu.add(new JLabel(tableModel.getColumn(modelCol).displayName));
-              menu.add(scrollPane);
-
-              SwingUtilities.invokeLater(() -> menu.show(e.getComponent(), e.getX(), e.getY()));
-            }
-          }
-        });
-
-    table.addMouseListener(
-        new MouseAdapter() {
-          @Override
-          public void mouseClicked(MouseEvent e) {
-            if (e.getClickCount() == 3 && SwingUtilities.isLeftMouseButton(e)) {
-              int viewRow = table.rowAtPoint(e.getPoint());
-              if (viewRow >= 0) {
-                renderSelectedFiles();
-              }
-            }
-          }
-        });
+    folderRenderInfoLabel.setText(text);
   }
 
   private void checkLoadingThreads() {
     synchronized (loadingThreads) {
       loadingThreads.removeIf(t -> !t.isAlive());
-    }
-  }
-
-  private void renderSelectedFiles() {
-    if (!loadingThreads.isEmpty()) {
-      return;
-    }
-
-    int[] viewRows = fileTable.getSelectedRows();
-    List<File> selected =
-        java.util.Arrays.stream(viewRows)
-            .map(fileTable::convertRowIndexToModel)
-            .mapToObj(tableModel::getFileAt)
-            .toList();
-
-    if (selected.isEmpty()) {
-      JOptionPane.showMessageDialog(null, "No files selected.");
-    } else {
-      // Your action goes here
-      renderFiles(selected);
-    }
-  }
-
-  private File[] getSelectedFiles() {
-    int[] viewRows = fileTable.getSelectedRows();
-    File[] files =
-        Arrays.stream(viewRows)
-            .map(fileTable::convertRowIndexToModel)
-            .mapToObj(tableModel::getFileAt)
-            .toArray(File[]::new);
-
-    return files;
-  }
-
-  private int[] getSelectedModelRows() {
-    int[] viewRows = fileTable.getSelectedRows();
-    int[] rows = Arrays.stream(viewRows).map(fileTable::convertRowIndexToModel).toArray();
-    return rows;
-  }
-
-  private void removeSelectedFiles() {
-    var files = getSelectedFiles();
-    tableModel.removeFile(files);
-
-    var newFilesAndTimestamps = new HashMap<>(context.filesAndTimestamps());
-    for (File file : files) {
-      newFilesAndTimestamps.remove(file);
-    }
-    flagContextDirty(
-        new AppContext(
-            newFilesAndTimestamps,
-            context.lastSearchPath(),
-            context.guiBounds(),
-            context.neverBeforeUsed(),
-            context.columnContext()));
-  }
-
-  private void deleteSelectedFiles() {
-    File[] selected = getSelectedFiles();
-    if (selected.length == 0) return;
-
-    String fileList = Arrays.stream(selected).map(File::getName).collect(Collectors.joining("\n"));
-    int reply =
-        JOptionPane.showConfirmDialog(
-            frame,
-            "Permanently delete " + selected.length + " file(s) from disk?\n\n" + fileList,
-            "Delete from disk",
-            JOptionPane.YES_NO_OPTION,
-            JOptionPane.WARNING_MESSAGE);
-    if (reply != JOptionPane.YES_OPTION) return;
-
-    List<File> failed = new ArrayList<>();
-    for (File file : selected) {
-      try {
-        Files.delete(file.toPath());
-        logger.info("Deleted file: " + file.getAbsolutePath());
-      } catch (IOException e) {
-        failed.add(file);
-        logger.log(Level.WARNING, "Could not delete file: " + file.getAbsolutePath(), e);
-      }
-    }
-
-    // Remove all selected from the table regardless of delete success
-    tableModel.removeFile(selected);
-    var newFilesAndTimestamps = new HashMap<>(context.filesAndTimestamps());
-    for (File file : selected) {
-      newFilesAndTimestamps.remove(file);
-    }
-    flagContextDirty(
-        new AppContext(
-            newFilesAndTimestamps,
-            context.lastSearchPath(),
-            context.guiBounds(),
-            context.neverBeforeUsed(),
-            context.columnContext()));
-
-    if (!failed.isEmpty()) {
-      JOptionPane.showMessageDialog(
-          frame,
-          "Could not delete:\n"
-              + failed.stream().map(File::getName).collect(Collectors.joining("\n")),
-          "Delete from disk",
-          JOptionPane.ERROR_MESSAGE);
     }
   }
 
@@ -1070,171 +1428,6 @@ public class FileRenderApp {
     SwingUtilities.invokeLater(() -> menu.show(e.getComponent(), e.getX(), e.getY()));
   }
 
-  private void replaceSandstoneWithCobblestone() {
-    File[] selected = getSelectedFiles();
-    if (selected.length == 0) {
-      JOptionPane.showMessageDialog(
-          frame, "No files selected.", "Replace blocks", JOptionPane.WARNING_MESSAGE);
-      return;
-    }
-
-    // Collect the union palette across all selected files
-    Set<String> palette = new LinkedHashSet<>();
-    Map<File, pitheguy.schemconvert.converter.Schematic> loaded = new LinkedHashMap<>();
-    for (File file : selected) {
-      try {
-        var schematic = BlockReplacer.load(file);
-        loaded.put(file, schematic);
-        palette.addAll(BlockReplacer.getPalette(schematic));
-      } catch (IOException e) {
-        JOptionPane.showMessageDialog(
-            frame,
-            "Could not load: " + file.getName() + "\n" + e.getMessage(),
-            "Replace blocks",
-            JOptionPane.ERROR_MESSAGE);
-        return;
-      }
-    }
-
-    // Load the full block ID list from the bundled resource
-    Set<String> availableBlocks;
-    try {
-      availableBlocks = BlockReplacer.loadDefaultPalette();
-    } catch (IOException e) {
-      JOptionPane.showMessageDialog(
-          frame,
-          "Could not load block list: " + e.getMessage(),
-          "Replace blocks",
-          JOptionPane.ERROR_MESSAGE);
-      return;
-    }
-
-    // Show the mapping dialog — palette = rows, full block list = available choices
-    var mapping = BlockReplacerDialog.show(frame, palette, availableBlocks, loaded);
-    if (mapping.isEmpty()) return;
-    var replaceResult = mapping.get();
-
-    // Ask for output options (postfix + optional target folder)
-    File firstFile = loaded.keySet().iterator().next();
-    var outputOptions = OutputOptionsDialog.show(frame, firstFile);
-    if (outputOptions.isEmpty()) return;
-    var options = outputOptions.get();
-
-    List<File> failed = new ArrayList<>();
-    List<File> written = new ArrayList<>();
-
-    for (var entry : loaded.entrySet()) {
-      File file = entry.getKey();
-      try {
-        var replaced = BlockReplacer.replace(entry.getValue(), replaceResult.replacements());
-        File output = options.outputFileFor(file);
-        if (output.getParentFile() != null) output.getParentFile().mkdirs();
-        BlockReplacer.write(replaced, output);
-        written.add(output);
-        tableModel.addFile(output);
-      } catch (IOException e) {
-        failed.add(file);
-        logger.log(Level.SEVERE, "failed to write replaced schematic for: " + file.getName(), e);
-      }
-    }
-
-    var newFilesAndTimestamps = new HashMap<>(context.filesAndTimestamps());
-    for (File output : written) {
-      newFilesAndTimestamps.put(output, System.currentTimeMillis());
-    }
-    flagContextDirty(
-        new AppContext(
-            newFilesAndTimestamps,
-            context.lastSearchPath(),
-            context.guiBounds(),
-            context.neverBeforeUsed(),
-            context.columnContext()));
-
-    String msg = written.size() + " file(s) written.";
-    if (!failed.isEmpty())
-      msg += "\nFailed: " + failed.stream().map(File::getName).collect(Collectors.joining(", "));
-    JOptionPane.showMessageDialog(
-        frame,
-        msg,
-        "Replace blocks",
-        failed.isEmpty() ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.WARNING_MESSAGE);
-  }
-
-  private void convertSelectedToSponge3() {
-    List<File> selected = Arrays.asList(getSelectedFiles());
-    if (selected.isEmpty()) {
-      JOptionPane.showMessageDialog(
-          frame, "No files selected.", "Convert to Sponge3", JOptionPane.WARNING_MESSAGE);
-      return;
-    }
-
-    JFileChooser chooser = new JFileChooser();
-    chooser.setCurrentDirectory(selected.get(0).getParentFile());
-    chooser.setDialogTitle("Select output folder for converted .schem files");
-    chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-    chooser.setAcceptAllFileFilterUsed(false);
-    if (chooser.showOpenDialog(frame) != JFileChooser.APPROVE_OPTION) return;
-    final File outputDir = chooser.getSelectedFile();
-
-    new Thread(
-            () -> {
-              List<Path> paths = selected.stream().map(File::toPath).toList();
-              BatchConverter.ConversionResult result;
-              try {
-                result = BatchConverter.convertToSponge3(paths, outputDir);
-              } catch (IOException e) {
-                SwingUtilities.invokeLater(
-                    () ->
-                        JOptionPane.showMessageDialog(
-                            frame,
-                            "Conversion failed: " + e.getMessage(),
-                            "Convert to Sponge3",
-                            JOptionPane.ERROR_MESSAGE));
-                return;
-              }
-
-              SwingUtilities.invokeLater(
-                  () -> {
-                    // add each newly produced .schem file to the table
-                    var newFilesAndTimestamps = new HashMap<>(context.filesAndTimestamps());
-                    for (File produced : result.convertedFiles()) {
-                      tableModel.addFile(produced);
-                      newFilesAndTimestamps.put(produced, System.currentTimeMillis());
-                    }
-                    flagContextDirty(
-                        new AppContext(
-                            newFilesAndTimestamps,
-                            context.lastSearchPath(),
-                            context.guiBounds(),
-                            context.neverBeforeUsed(),
-                            context.columnContext()));
-
-                    List<File> failed = result.failedFiles();
-                    if (failed.isEmpty()) {
-                      JOptionPane.showMessageDialog(
-                          frame,
-                          "Converted " + result.convertedFiles().size() + " file(s) to Sponge v3.",
-                          "Convert to Sponge3",
-                          JOptionPane.INFORMATION_MESSAGE);
-                    } else {
-                      String failedNames =
-                          failed.stream().map(File::getName).collect(Collectors.joining("\n"));
-                      JOptionPane.showMessageDialog(
-                          frame,
-                          "Converted "
-                              + result.convertedFiles().size()
-                              + " of "
-                              + selected.size()
-                              + " file(s).\n\nFailed:\n"
-                              + failedNames,
-                          "Convert to Sponge3",
-                          JOptionPane.WARNING_MESSAGE);
-                    }
-                  });
-            },
-            "sponge3-converter")
-        .start();
-  }
 
   private void renderFiles(List<File> selectedFiles) {
     logger.info("Rendering files:");
@@ -1273,65 +1466,16 @@ public class FileRenderApp {
           f.markDirty(row);
         }
       }
+      synchronized (folderSearchFilters) {
+        for (SearchFilter f : folderSearchFilters) {
+          f.markDirty(row);
+        }
+      }
     }
     renderSchematicIcon(file);
   }
 
-  void addFilter(SearchFilter filter) {
-    System.out.println("[FileRenderApp] addFilter " + filter.getClass().getSimpleName());
-    synchronized (searchFilters) {
-      searchFilters.add(filter);
-    }
-    filter.setOnProgressCallback(
-        progress -> SwingUtilities.invokeLater(() -> {
-          int n = tableModel.getRowCount();
-          if (n > 0) {
-            System.out.println("[FileRenderApp] fireTableDataChanged (progress tick)");
-            tableModel.fireTableDataChanged();
-          }
-        }));
-    filter.startThread();
-  }
 
-  void removeFilter(SearchFilter filter) {
-    System.out.println("[FileRenderApp] removeFilter " + filter.getClass().getSimpleName());
-    filter.stop();
-    filter.setOnProgressCallback(null);
-    synchronized (searchFilters) {
-      searchFilters.remove(filter);
-    }
-    int n = tableModel.getRowCount();
-    if (n > 0) {
-      System.out.println("[FileRenderApp] fireTableDataChanged (removeFilter)");
-      tableModel.fireTableDataChanged();
-    }
-  }
-
-  private void syncChipFilters() {
-    Set<String> activeKeys = chipSearchManager.getConditions().stream()
-        .map(c -> c.column().name() + ":" + c.searchTerm().toLowerCase())
-        .collect(Collectors.toSet());
-
-    var it = chipFilters.entrySet().iterator();
-    while (it.hasNext()) {
-      var e = it.next();
-      if (!activeKeys.contains(e.getKey())) {
-        System.out.println("[FileRenderApp] syncChipFilters remove " + e.getKey());
-        removeFilter(e.getValue());
-        it.remove();
-      }
-    }
-
-    for (ChipSearchManager.SearchCondition cond : chipSearchManager.getConditions()) {
-      String key = cond.column().name() + ":" + cond.searchTerm().toLowerCase();
-      if (!chipFilters.containsKey(key)) {
-        System.out.println("[FileRenderApp] syncChipFilters add " + key);
-        ChipSearchFilter f = new ChipSearchFilter(tableModel, cond.column(), cond.searchTerm());
-        chipFilters.put(key, f);
-        addFilter(f);
-      }
-    }
-  }
 
   private JFileChooser getFileChooser(boolean folder) {
     JFileChooser chooser = new JFileChooser();

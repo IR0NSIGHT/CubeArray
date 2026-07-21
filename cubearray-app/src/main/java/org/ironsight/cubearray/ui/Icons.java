@@ -14,7 +14,8 @@ public class Icons {
           "settings", "icons8-settings-50.png",
           "search", "icons8-search-50.png",
           "folder", "icons8-folder-50.png",
-          "menu", "icons8-menu-50.png");
+          "menu", "icons8-menu-50.png",
+          "tree", "icons8-tree-52.png");
 
   public static Icon get(String name) {
     return cache.computeIfAbsent(name, Icons::load);
