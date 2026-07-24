@@ -478,23 +478,29 @@ public class FileRenderApp {
     table.setRowSorter(sorter);
     table.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
 
+    Function<CaColumn, List<String>> highlightFn = col -> {
+      synchronized (searchFilters) {
+        List<String> result = new ArrayList<>();
+        for (SearchFilter f : searchFilters) {
+          String s = f.getHighlightString(col);
+          if (s != null && !s.isEmpty()) result.add(s.toLowerCase());
+        }
+        return result;
+      }
+    };
     for (CaColumn c : CaColumn.values()) {
-      table.getColumnModel().getColumn(c.ordinal()).setCellRenderer(c.renderer);
-    }
-    {
-      Function<CaColumn, List<String>> highlightFn = col -> {
-        synchronized (searchFilters) {
-          List<String> result = new ArrayList<>();
-          for (SearchFilter f : searchFilters) {
-            String s = f.getHighlightString(col);
-            if (s != null && !s.isEmpty()) result.add(s.toLowerCase());
-          }
-          return result;
+      FileTableModel.StringConverter base = c.renderer;
+      FileTableModel.StringConverter wrapper = new FileTableModel.StringConverter() {
+        @Override
+        public Component getTableCellRendererComponent(
+            JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+          this.currentColumn = column;
+          base.setHighlightLookup(highlightFn);
+          base.currentColumn = column;
+          return base.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
         }
       };
-      for (CaColumn c : CaColumn.values()) {
-        c.renderer.setHighlightLookup(highlightFn);
-      }
+      table.getColumnModel().getColumn(c.ordinal()).setCellRenderer(wrapper);
     }
     table.setRowHeight(64);
 
