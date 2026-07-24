@@ -14,9 +14,7 @@ public record AppContext(
     Rectangle guiBounds,
     boolean neverBeforeUsed,
     ColumnContext columnContext,
-    File folderViewPath,
-    boolean folderViewRecursive,
-    int maxFolderImportDepth)
+    File folderViewPath)
     implements Serializable {
 
   private static final Logger logger = AppLogger.get(AppContext.class);
@@ -28,9 +26,7 @@ public record AppContext(
         new Rectangle(0, 0, 800, 600),
         true,
         new ColumnContext(),
-        null,
-        true,
-        10);
+        null);
   }
 
   public AppContext copy() {
@@ -40,9 +36,7 @@ public record AppContext(
         new Rectangle(this.guiBounds),
         this.neverBeforeUsed,
         this.columnContext.copy(),
-        this.folderViewPath,
-        this.folderViewRecursive,
-        this.maxFolderImportDepth);
+        this.folderViewPath);
   }
 
   public static AppContext read() {
@@ -63,9 +57,7 @@ public record AppContext(
               ctx.guiBounds(),
               ctx.neverBeforeUsed(),
               new ColumnContext(),
-              ctx.folderViewPath(),
-              ctx.folderViewRecursive(),
-              10);
+              ctx.folderViewPath());
         }
         return ctx;
       } else {

@@ -215,6 +215,7 @@ class FileTableModel extends AbstractTableModel {
   private final ConcurrentHashMap<File, WPObject> schematicObjects = new ConcurrentHashMap<>();
   private final Set<File> loadingFiles = ConcurrentHashMap.newKeySet();
   private volatile List<File> directoryRows = List.of();
+  private String parentDirPath = "";
 
   public boolean isDirectoryRow(int modelRow) {
     int fileCount;
@@ -227,6 +228,10 @@ class FileTableModel extends AbstractTableModel {
   public void setDirectories(List<File> dirs) {
     directoryRows = dirs;
     fireTableDataChanged();
+  }
+
+  public void setParentDirPath(String path) {
+    parentDirPath = path;
   }
 
   public FileTableModel(PeriodicChecker checker, SchematicPreviewHelper previewHelper) {
@@ -392,7 +397,7 @@ class FileTableModel extends AbstractTableModel {
       return switch (CaColumn.values()[col]) {
         case ICON -> Icons.get("folder");
         case FILE -> isUpLink ? ".." : f.getName();
-        case PATH -> isUpLink ? ".." : f.getAbsolutePath();
+        case PATH -> isUpLink ? parentDirPath : f.getAbsolutePath();
         case FILE_SIZE -> 0L;
         case FILE_TYPE -> isUpLink ? "Parent folder" : "Directory";
         case LAST_CHANGED -> isUpLink ? new Date(0) : new Date(f.lastModified());

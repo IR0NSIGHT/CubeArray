@@ -352,6 +352,9 @@ public class ResourceUtils {
    * <p>We stop after reading enough to make a decision (a few hundred bytes at most).
    */
   private static int readSpongeVersion(File file) throws IOException {
+    return 0;
+    /*
+
     try (InputStream fis = java.nio.file.Files.newInputStream(file.toPath());
         GZIPInputStream gzip = new GZIPInputStream(fis);
         DataInputStream in = new DataInputStream(gzip)) {
@@ -380,6 +383,9 @@ public class ResourceUtils {
       }
       return 0;
     }
+         */
+
+
   }
 
   private static String readNbtString(DataInputStream in) throws IOException {
