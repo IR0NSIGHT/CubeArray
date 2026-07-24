@@ -82,16 +82,14 @@ public class FileRenderApp {
   private ChipSearchManager folderChipManager;
   private DebouncedDocumentListener folderDebouncer;
   private File folderViewPath;
-  private final JLabel folderTopInfoLabel = new JLabel();
-  private final JLabel folderRenderInfoLabel = new JLabel();
   private JTextField folderPathField;
   private JLabel folderErrorIcon;
   private int folderRefreshCounter;
 
   private static final long DEBUG_SEARCH_DELAY_MS = 0;
 
-  private final JLabel topInfoLabel;
-  private final JLabel renderInfoLabel;
+  private final JLabel topInfoLabel = new JLabel();
+  private final JLabel renderInfoLabel = new JLabel();
 
   private record FileListPanel(
       JPanel panel,
@@ -103,9 +101,7 @@ public class FileRenderApp {
       JProgressBar searchSpinner,
       List<SearchFilter> searchFilters,
       Map<String, ChipSearchFilter> chipFilters,
-      DebouncedDocumentListener debouncer,
-      JLabel topInfoLabel,
-      JLabel renderInfoLabel
+      DebouncedDocumentListener debouncer
   ) {}
 
   public FileRenderApp(final AppContext initialContext) {
@@ -195,8 +191,6 @@ public class FileRenderApp {
     this.chipFilters.putAll(globalPanel.chipFilters());
     this.chipSearchManager = globalPanel.chipManager();
     this.debouncer = globalPanel.debouncer();
-    this.topInfoLabel = globalPanel.topInfoLabel();
-    this.renderInfoLabel = globalPanel.renderInfoLabel();
 
     // --- Folder view ---
     RowFilter<FileTableModel, Integer> folderRowFilterInstance =
@@ -242,7 +236,12 @@ public class FileRenderApp {
     tabbedPane.addTab(null, Icons.get("tree"), folderViewPanel);
     tabbedPane.addTab(null, Icons.get("settings"),
         getSettingsComponent(context.columnContext().displayedColumns()));
-    frame.add(tabbedPane);
+    JPanel topStatusBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
+    topStatusBar.add(topInfoLabel);
+    topStatusBar.add(Box.createHorizontalStrut(16));
+    topStatusBar.add(renderInfoLabel);
+    frame.add(topStatusBar, BorderLayout.NORTH);
+    frame.add(tabbedPane, BorderLayout.CENTER);
     context.filesAndTimestamps().keySet().forEach(tableModel::addFile);
 
     initDisplayedColumns(context);
@@ -587,14 +586,6 @@ public class FileRenderApp {
       topPanel.add(searchRow);
 
       topPanel.add(chipRow);
-
-      JPanel topInfo = new JPanel(new FlowLayout(FlowLayout.LEFT));
-      JLabel topInfoLabel = new JLabel();
-      JLabel renderInfoLabel = new JLabel();
-      topInfo.add(topInfoLabel);
-      topInfo.add(Box.createHorizontalStrut(16));
-      topInfo.add(renderInfoLabel);
-      topPanel.add(topInfo);
     }
 
     JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
@@ -606,7 +597,7 @@ public class FileRenderApp {
 
     return new FileListPanel(
         panel, table, sorter, searchField, chipManager, chipRow, searchSpinner,
-        searchFilters, chipFilters, debouncer, topInfoLabel, renderInfoLabel);
+        searchFilters, chipFilters, debouncer);
   }
 
   private JPopupMenu createTableContextMenu(JTable table) {
@@ -1547,15 +1538,11 @@ public class FileRenderApp {
   }
 
   private void setTextRemainingFiles(String text) {
-    if (topInfoLabel == null || folderTopInfoLabel == null) return;
     topInfoLabel.setText(text);
-    folderTopInfoLabel.setText(text);
   }
 
   private void setTextRenderingSchematics(String text) {
-    if (renderInfoLabel == null || folderRenderInfoLabel == null) return;
     renderInfoLabel.setText(text);
-    folderRenderInfoLabel.setText(text);
   }
 
   private void checkLoadingThreads() {
