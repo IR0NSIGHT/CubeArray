@@ -47,10 +47,16 @@ public class SchematicPreviewGenerator  {
   private static class PriorityTask implements Runnable, Comparable<PriorityTask> {
     private final Runnable task;
     private final long priority;
+    private final String filePath;
 
     PriorityTask(Runnable task, long priority) {
+      this(task, priority, null);
+    }
+
+    PriorityTask(Runnable task, long priority, String filePath) {
       this.task = task;
       this.priority = priority;
+      this.filePath = filePath;
     }
 
     @Override
@@ -61,6 +67,18 @@ public class SchematicPreviewGenerator  {
     @Override
     public int compareTo(PriorityTask other) {
       return Long.compare(this.priority, other.priority);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (!(o instanceof PriorityTask that)) return false;
+      return filePath != null && filePath.equals(that.filePath);
+    }
+
+    @Override
+    public int hashCode() {
+      return filePath != null ? filePath.hashCode() : 0;
     }
   }
 
@@ -117,6 +135,19 @@ public class SchematicPreviewGenerator  {
 
           if (p0.toFile().exists()) {
             for (int i = 0; i < 4; i++) {
+              Path thumb = ResourceUtils.getThumbPathForFile(file).resolveSibling(
+                  insertSuffix(ResourceUtils.getThumbPathForFile(file).getFileName().toString(), "_" + i));
+              if (thumb.toFile().exists()) {
+                try {
+                  BufferedImage angle = ImageIO.read(thumb.toFile());
+                  if (angle != null) {
+                    g.drawImage(angle, i * 64, 0, null);
+                    continue;
+                  }
+                } catch (Exception e) {
+                  logger.log(Level.FINE, "Failed to read thumb " + thumb, e);
+                }
+              }
               Path p = renderPath.resolveSibling(
                   insertSuffix(renderPath.getFileName().toString(), "_" + i));
               if (p.toFile().exists()) {
@@ -257,58 +288,75 @@ public class SchematicPreviewGenerator  {
       logger.info("Render needed for " + file.getName() + ": schematic file changed since last render");
     }
     firePendingRenderCountChanged();
-    renderExecutor.execute(
-        new PriorityTask(
-            () -> {
-              try {
-                ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
-                CubeSetup setup = SchemReader.prepareData(List.of(obj));
-                if (setup == null) return;
-                Path renderPath = ResourceUtils.getRenderPathForFile(file);
-                Files.createDirectories(renderPath.getParent());
+    PriorityTask task = new PriorityTask(
+        () -> {
+          try {
+            if (!ResourceUtils.needsNewRender(file)) {
+              logger.fine("Render skipped for " + file.getName() + ": already up to date");
+              return;
+            }
+            ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
+            CubeSetup setup = SchemReader.prepareData(List.of(obj));
+            if (setup == null) return;
+            Path renderPath = ResourceUtils.getRenderPathForFile(file);
+            Files.createDirectories(renderPath.getParent());
 
-                List<InstancedCubes.CameraState> effectiveSetups;
-                if (cameraSetups != null && !cameraSetups.isEmpty()) {
-                  var dim = new Vector3f(setup.max).sub(setup.min);
-                  var center = new Vector3f(setup.min).add(setup.max).mul(0.5f);
-                  float radius = Math.max(dim.x, Math.max(dim.y, dim.z)) * 2;
-                  effectiveSetups =
-                      cameraSetups.stream()
-                          .map(
-                              cs ->
-                                  new InstancedCubes.CameraState(
-                                      center, cs.yaw(), cs.pitch(), cs.roll(), radius))
-                          .toList();
-                } else {
-                  effectiveSetups = List.of();
-                }
-                InstancedCubes.renderToFile(setup, renderPath, 640, 640, effectiveSetups);
-                try {
-                  Path thumbSource = (cameraSetups != null && !cameraSetups.isEmpty())
-                      ? renderPath.resolveSibling(insertSuffix(renderPath.getFileName().toString(), "_0"))
-                      : renderPath;
-                  BufferedImage full = ImageIO.read(thumbSource.toFile());
+            List<InstancedCubes.CameraState> effectiveSetups;
+            if (cameraSetups != null && !cameraSetups.isEmpty()) {
+              var dim = new Vector3f(setup.max).sub(setup.min);
+              var center = new Vector3f(setup.min).add(setup.max).mul(0.5f);
+              float radius = Math.max(dim.x, Math.max(dim.y, dim.z)) * 2;
+              effectiveSetups =
+                  cameraSetups.stream()
+                      .map(
+                          cs ->
+                              new InstancedCubes.CameraState(
+                                  center, cs.yaw(), cs.pitch(), cs.roll(), radius))
+                      .toList();
+            } else {
+              effectiveSetups = List.of();
+            }
+            InstancedCubes.renderToFile(setup, renderPath, 640, 640, effectiveSetups);
+            try {
+              int angleCount = (cameraSetups != null && !cameraSetups.isEmpty()) ? cameraSetups.size() : 1;
+              for (int i = 0; i < angleCount; i++) {
+                Path anglePath = angleCount > 1
+                    ? renderPath.resolveSibling(insertSuffix(renderPath.getFileName().toString(), "_" + i))
+                    : renderPath;
+                if (anglePath.toFile().exists()) {
+                  BufferedImage full = ImageIO.read(anglePath.toFile());
                   BufferedImage thumb = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
                   Graphics2D g = thumb.createGraphics();
                   g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
                   g.drawImage(full, 0, 0, 64, 64, null);
                   g.dispose();
-                  ImageIO.write(thumb, "PNG", ResourceUtils.getThumbPathForFile(file).toFile());
-                } catch (Exception e) {
-                  logger.log(Level.FINE, "Failed to generate thumbnail for " + file.getName(), e);
+                  Path thumbPath = angleCount > 1
+                      ? ResourceUtils.getThumbPathForFile(file).resolveSibling(
+                          insertSuffix(ResourceUtils.getThumbPathForFile(file).getFileName().toString(), "_" + i))
+                      : ResourceUtils.getThumbPathForFile(file);
+                  ImageIO.write(thumb, "PNG", thumbPath.toFile());
                 }
-                SwingUtilities.invokeLater(
-                    () -> {
-                      if (onComplete != null) onComplete.run();
-                    });
-              } catch (Exception e) {
-                logger.log(Level.WARNING, "Failed to render icon for " + file.getName(), e);
-              } finally {
-                SwingUtilities.invokeLater(
-                    () -> firePendingRenderCountChanged());
               }
-            },
-            file.length()));
+            } catch (Exception e) {
+              logger.log(Level.FINE, "Failed to generate thumbnails for " + file.getName(), e);
+            }
+            SwingUtilities.invokeLater(
+                () -> {
+                  if (onComplete != null) onComplete.run();
+                });
+          } catch (Exception e) {
+            logger.log(Level.WARNING, "Failed to render icon for " + file.getName(), e);
+          } finally {
+            SwingUtilities.invokeLater(
+                () -> firePendingRenderCountChanged());
+          }
+        },
+        file.length(),
+        file.getAbsolutePath());
+
+    if (!((ThreadPoolExecutor) renderExecutor).getQueue().contains(task)) {
+      renderExecutor.execute(task);
+    }
   }
 
   /**
