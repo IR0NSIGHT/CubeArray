@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.awt.RenderingHints;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.PriorityBlockingQueue;
@@ -44,7 +45,7 @@ public class SchematicPreviewGenerator  {
             return t;
           });
 
-  private static class PriorityTask implements Runnable, Comparable<PriorityTask> {
+  static class PriorityTask implements Runnable, Comparable<PriorityTask> {
     private final Runnable task;
     private final long priority;
     private final String filePath;
@@ -83,6 +84,7 @@ public class SchematicPreviewGenerator  {
   }
 
   private final Map<String, Icon> iconCache = new ConcurrentHashMap<>();
+  private final Set<String> pendingFiles = ConcurrentHashMap.newKeySet();
 
   private Consumer<Integer> pendingRenderCountChangedCallback;
 
@@ -288,6 +290,11 @@ public class SchematicPreviewGenerator  {
       logger.info("Render needed for " + file.getName() + ": schematic file changed since last render");
     }
     firePendingRenderCountChanged();
+    String absPath = file.getAbsolutePath();
+    if (!pendingFiles.add(absPath)) {
+      logger.fine("Render already queued for " + file.getName());
+      return;
+    }
     PriorityTask task = new PriorityTask(
         () -> {
           try {
@@ -347,16 +354,15 @@ public class SchematicPreviewGenerator  {
           } catch (Exception e) {
             logger.log(Level.WARNING, "Failed to render icon for " + file.getName(), e);
           } finally {
+            pendingFiles.remove(absPath);
             SwingUtilities.invokeLater(
                 () -> firePendingRenderCountChanged());
           }
         },
         file.length(),
-        file.getAbsolutePath());
+        absPath);
 
-    if (!((ThreadPoolExecutor) renderExecutor).getQueue().contains(task)) {
-      renderExecutor.execute(task);
-    }
+    renderExecutor.execute(task);
   }
 
   /**
@@ -400,6 +406,12 @@ public class SchematicPreviewGenerator  {
 
   public void dispose() {
     renderExecutor.shutdown();
+  }
+
+  // testing support
+  int getPendingRenderCount() {
+    ThreadPoolExecutor tpe = (ThreadPoolExecutor) renderExecutor;
+    return tpe.getQueue().size() + tpe.getActiveCount();
   }
 
   private static String insertSuffix(String filename, String suffix) {
