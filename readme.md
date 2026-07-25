@@ -78,3 +78,192 @@ its not a schematic editor. its a viewer.
 - uses textures from Faithful 32x - 1.21.7 resource pack: https://faithfulpack.net/
 - front end is Java Swing
 - 10% vibecoded. expect bugs
+
+## Using CubeArray Core as a Maven dependency
+
+CubeArray Core is published via [JitPack](https://jitpack.io/#IR0NSIGHT/CubeArray).  
+Add the JitPack repository and the dependency to your `pom.xml`:
+
+```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
+<dependency>
+    <groupId>com.github.IR0NSIGHT</groupId>
+    <artifactId>cubearray-core</artifactId>
+    <version>v1.4.4</version>
+</dependency>
+```
+
+### What you get
+
+| Package | Purpose | LWJGL required? |
+|---|---|---|
+| `org.ironsight.cubearray.mcmodel` | Minecraft block model / blockstate parsing | No |
+| `org.ironsight.cubearray.schematic` | Schematic file reading (sponge, .schem, .schematic, .nbt, .bo2, .bo3) | No |
+| `org.ironsight.cubearray.edit` | Block replacement / batch conversion utilities | No |
+| `org.ironsight.cubearray.platform` | Logging, resource utils, app info | No |
+| `org.ironsight.cubearray.render` | OpenGL rendering (LWJGL) | **Yes** |
+| `org.ironsight.cubearray.preview` | Headless schematic preview generation (Swing + LWJGL) | **Yes** |
+
+LWJGL is declared as `<optional>true</optional>` in the core library — it is **not** pulled transitively. If you only use `mcmodel`, `schematic`, `edit`, or `platform`, no extra setup is needed.
+
+### Setting up LWJGL for rendering / preview
+
+If you use the `render` or `preview` packages, add LWJGL with platform-specific natives.  
+Use the LWJGL BOM and Maven OS-activated profiles:
+
+```xml
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.lwjgl</groupId>
+            <artifactId>lwjgl-bom</artifactId>
+            <version>3.3.3</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+
+<dependencies>
+    <dependency>
+        <groupId>org.lwjgl</groupId>
+        <artifactId>lwjgl</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.lwjgl</groupId>
+        <artifactId>lwjgl-glfw</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.lwjgl</groupId>
+        <artifactId>lwjgl-opengl</artifactId>
+    </dependency>
+</dependencies>
+
+<profiles>
+    <!-- Windows natives -->
+    <profile>
+        <id>lwjgl-natives-windows</id>
+        <activation>
+            <os>
+                <family>windows</family>
+            </os>
+        </activation>
+        <dependencies>
+            <dependency>
+                <groupId>org.lwjgl</groupId>
+                <artifactId>lwjgl</artifactId>
+                <classifier>natives-windows</classifier>
+            </dependency>
+            <dependency>
+                <groupId>org.lwjgl</groupId>
+                <artifactId>lwjgl-glfw</artifactId>
+                <classifier>natives-windows</classifier>
+            </dependency>
+            <dependency>
+                <groupId>org.lwjgl</groupId>
+                <artifactId>lwjgl-opengl</artifactId>
+                <classifier>natives-windows</classifier>
+            </dependency>
+        </dependencies>
+    </profile>
+
+    <!-- Linux natives -->
+    <profile>
+        <id>lwjgl-natives-linux</id>
+        <activation>
+            <os>
+                <family>unix</family>
+            </os>
+        </activation>
+        <dependencies>
+            <dependency>
+                <groupId>org.lwjgl</groupId>
+                <artifactId>lwjgl</artifactId>
+                <classifier>natives-linux</classifier>
+            </dependency>
+            <dependency>
+                <groupId>org.lwjgl</groupId>
+                <artifactId>lwjgl-glfw</artifactId>
+                <classifier>natives-linux</classifier>
+            </dependency>
+            <dependency>
+                <groupId>org.lwjgl</groupId>
+                <artifactId>lwjgl-opengl</artifactId>
+                <classifier>natives-linux</classifier>
+            </dependency>
+        </dependencies>
+    </profile>
+
+    <!-- macOS natives (x86_64) -->
+    <profile>
+        <id>lwjgl-natives-macos</id>
+        <activation>
+            <os>
+                <family>mac</family>
+            </os>
+        </activation>
+        <dependencies>
+            <dependency>
+                <groupId>org.lwjgl</groupId>
+                <artifactId>lwjgl</artifactId>
+                <classifier>natives-macos</classifier>
+            </dependency>
+            <dependency>
+                <groupId>org.lwjgl</groupId>
+                <artifactId>lwjgl-glfw</artifactId>
+                <classifier>natives-macos</classifier>
+            </dependency>
+            <dependency>
+                <groupId>org.lwjgl</groupId>
+                <artifactId>lwjgl-opengl</artifactId>
+                <classifier>natives-macos</classifier>
+            </dependency>
+        </dependencies>
+    </profile>
+</profiles>
+```
+
+For Apple Silicon (ARM64) Macs, replace `natives-macos` with `natives-macos-arm64` in the macOS profile, or include both classifiers.
+
+> **Note:** CubeArray has only been tested on Windows and Linux. macOS support via LWJGL should work in theory but is untested.
+
+### Transitive dependencies
+
+CubeArray Core depends on:
+- **JOML** (`org.joml:joml:1.10.5`) — available from Maven Central
+- **WPCore** (`org.pepsoft.worldpainter:WPCore:2.25.0`) — requires the [EngineHub repository](https://maven.enginehub.org/repo/)
+- **SchemConvert** (`com.github.PiTheGuy:SchemConvert:v1.2.5`) — published on JitPack
+- **Jackson** (`com.fasterxml.jackson.core:jackson-databind:2.19.1`) — available from Maven Central
+- **Commons IO** (`commons-io:commons-io:2.14.0`) — available from Maven Central
+
+If your project has resolution issues with `WPCore`, add the EngineHub repository to your `pom.xml`:
+
+```xml
+<repository>
+    <id>enginehub</id>
+    <url>https://maven.enginehub.org/repo/</url>
+</repository>
+```
+
+### Quick usage example
+
+```java
+import org.ironsight.cubearray.schematic.SchemReader;
+import org.pepsoft.worldpainter.objects.WPObject;
+import java.io.File;
+import java.util.List;
+
+public class Example {
+    public static void main(String[] args) throws Exception {
+        SchemReader reader = new SchemReader();
+        List<WPObject> objects = reader.loadSchematic(new File("build.schem"));
+        System.out.println("Loaded " + objects.size() + " objects");
+    }
+}
+```
