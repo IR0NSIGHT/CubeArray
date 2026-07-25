@@ -552,6 +552,12 @@ class FileTableModel extends AbstractTableModel {
     }
   }
 
+  public List<File> getAllFiles() {
+    synchronized (files) {
+      return List.copyOf(files);
+    }
+  }
+
   public void invalidateIconCache(File f) {
     previewHelper.invalidateIcon(f);
   }

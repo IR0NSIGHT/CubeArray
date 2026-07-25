@@ -90,16 +90,54 @@ public class ResourceUtils {
     return renderPath.resolveSibling(thumb);
   }
 
+  public static void cleanOrphanedRenders(Collection<File> currentFiles) throws IOException {
+    Path rendersDir = getInstallPath().resolve("renders");
+    if (!Files.isDirectory(rendersDir)) return;
+
+    Set<String> validPrefixes = new HashSet<>();
+    for (File f : currentFiles) {
+      String name = f.getName();
+      int dot = name.lastIndexOf('.');
+      String baseName = (dot > 0) ? name.substring(0, dot) : name;
+      validPrefixes.add(baseName + "__");
+    }
+
+    try (DirectoryStream<Path> stream = Files.newDirectoryStream(rendersDir)) {
+      for (Path entry : stream) {
+        if (Files.isRegularFile(entry)) {
+          String fn = entry.getFileName().toString();
+          if (validPrefixes.stream().noneMatch(fn::startsWith)) {
+            Files.deleteIfExists(entry);
+          }
+        }
+      }
+    }
+  }
+
   public static boolean needsNewRender(File schematicFile) {
     Path renderPath = getRenderPathForFile(schematicFile);
     if (!Files.exists(renderPath)) {
       String name = renderPath.getFileName().toString();
       int dot = name.lastIndexOf('.');
-      Path p0 = renderPath.resolveSibling(name.substring(0, dot) + "_0" + name.substring(dot));
+      String base = name.substring(0, dot);
+      String ext = name.substring(dot);
+      Path p0 = renderPath.resolveSibling(base + "_0" + ext);
       if (!Files.exists(p0)) return true;
-      return schematicFile.lastModified() > p0.toFile().lastModified();
+      if (schematicFile.lastModified() > p0.toFile().lastModified()) return true;
+      for (int i = 0; ; i++) {
+        Path angle = renderPath.resolveSibling(base + "_" + i + ext);
+        if (!Files.exists(angle)) break;
+        Path thumb = getThumbPathForFile(schematicFile);
+        String tName = thumb.getFileName().toString();
+        int tDot = tName.lastIndexOf('.');
+        Path angleThumb = thumb.resolveSibling(tName.substring(0, tDot) + "_" + i + tName.substring(tDot));
+        if (!Files.exists(angleThumb)) return true;
+      }
+      return false;
     }
-    return schematicFile.lastModified() > renderPath.toFile().lastModified();
+    if (schematicFile.lastModified() > renderPath.toFile().lastModified()) return true;
+    if (!Files.exists(getThumbPathForFile(schematicFile))) return true;
+    return false;
   }
 
   public static void revealFileInFolder(Path file) {

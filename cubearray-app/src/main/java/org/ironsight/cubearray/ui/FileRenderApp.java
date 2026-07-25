@@ -620,12 +620,6 @@ public class FileRenderApp {
             File file = tableModel.getFileAt(modelRow);
             tableModel.flagReloadFile(modelRow);
             tableModel.invalidateIconCache(file);
-            try {
-              Files.deleteIfExists(ResourceUtils.getRenderPathForFile(file));
-              Files.deleteIfExists(ResourceUtils.getThumbPathForFile(file));
-            } catch (IOException ex) {
-              // ignore
-            }
           }
         });
     rightMenu.add(reloadFileBtn);
@@ -663,6 +657,11 @@ public class FileRenderApp {
                   context.neverBeforeUsed(),
                   context.columnContext(),
                   context.folderViewPath()));
+          try {
+            ResourceUtils.cleanOrphanedRenders(tableModel.getAllFiles());
+          } catch (IOException e) {
+            logger.log(Level.WARNING, "Failed to clean orphaned renders", e);
+          }
         });
     rightMenu.add(removeFilesBtn);
 
@@ -705,6 +704,11 @@ public class FileRenderApp {
                   context.neverBeforeUsed(),
                   context.columnContext(),
                   context.folderViewPath()));
+          try {
+            ResourceUtils.cleanOrphanedRenders(tableModel.getAllFiles());
+          } catch (IOException e) {
+            logger.log(Level.WARNING, "Failed to clean orphaned renders", e);
+          }
           if (!failed.isEmpty()) {
             JOptionPane.showMessageDialog(
                 frame,
@@ -1160,12 +1164,6 @@ public class FileRenderApp {
               File file = entry.getValue();
               tableModel.flagReloadFile(row);
               tableModel.invalidateIconCache(file);
-              try {
-                Files.deleteIfExists(ResourceUtils.getRenderPathForFile(file));
-                Files.deleteIfExists(ResourceUtils.getThumbPathForFile(file));
-              } catch (IOException e) {
-                // ignore
-              }
             });
   }
 
@@ -1184,6 +1182,12 @@ public class FileRenderApp {
             context.neverBeforeUsed(),
             context.columnContext(),
             context.folderViewPath()));
+
+    try {
+      ResourceUtils.cleanOrphanedRenders(tableModel.getAllFiles());
+    } catch (IOException e) {
+      logger.log(Level.WARNING, "Failed to clean orphaned renders", e);
+    }
   }
 
   private void updateFolderErrorIcon() {
@@ -1247,12 +1251,6 @@ public class FileRenderApp {
 
     for (File f : toReload) {
       tableModel.invalidateIconCache(f);
-      try {
-        Files.deleteIfExists(ResourceUtils.getRenderPathForFile(f));
-        Files.deleteIfExists(ResourceUtils.getThumbPathForFile(f));
-      } catch (IOException e) {
-        // ignore
-      }
     }
 
     if (toRemove.isEmpty() && toReload.isEmpty() && toAdd.isEmpty()) return;
@@ -1263,7 +1261,14 @@ public class FileRenderApp {
     for (File f : toAdd) newTimestamps.putIfAbsent(f, f.lastModified());
 
     SwingUtilities.invokeLater(() -> {
-      if (!toRemove.isEmpty()) tableModel.removeFile(toRemove.toArray(File[]::new));
+      if (!toRemove.isEmpty()) {
+        tableModel.removeFile(toRemove.toArray(File[]::new));
+        try {
+          ResourceUtils.cleanOrphanedRenders(tableModel.getAllFiles());
+        } catch (IOException e) {
+          logger.log(Level.WARNING, "Failed to clean orphaned renders", e);
+        }
+      }
       for (File f : toReload) {
         int row = tableModel.indexOfFile(f);
         if (row >= 0) tableModel.flagReloadFile(row);

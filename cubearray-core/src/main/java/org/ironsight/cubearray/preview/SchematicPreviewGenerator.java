@@ -149,21 +149,8 @@ public class SchematicPreviewGenerator  {
                 } catch (Exception e) {
                   logger.log(Level.FINE, "Failed to read thumb " + thumb, e);
                 }
-              }
-              Path p = renderPath.resolveSibling(
-                  insertSuffix(renderPath.getFileName().toString(), "_" + i));
-              if (p.toFile().exists()) {
-                try {
-                  BufferedImage angle = ImageIO.read(p.toFile());
-                  if (angle != null) {
-                    g.drawImage(
-                        angle.getScaledInstance(64, 64, Image.SCALE_SMOOTH),
-                        i * 64, 0, null);
-                    continue;
-                  }
-                } catch (Exception e) {
-                  logger.log(Level.FINE, "Failed to read render " + p, e);
-                }
+              } else {
+                System.err.println("no thumbnail present for " + file + " at thumbnail file path " + thumb);
               }
               g.setColor(new Color(0x33, 0x33, 0x33));
               g.fillRect(i * 64, 0, 64, 64);
