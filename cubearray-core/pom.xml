@@ -9,7 +9,7 @@
     <parent>
         <groupId>org.ironsight</groupId>
         <artifactId>CubeArray</artifactId>
-        <version>1.4.4-SNAPSHOT</version>
+        <version>1.7.2-experimental</version>
     </parent>
 
     <artifactId>cubearray-core</artifactId>
