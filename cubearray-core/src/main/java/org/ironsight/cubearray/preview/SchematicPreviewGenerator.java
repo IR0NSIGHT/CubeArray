@@ -344,9 +344,22 @@ public class SchematicPreviewGenerator  {
                   ImageIO.write(thumb, "PNG", thumbPath.toFile());
                 }
               }
-            } catch (Exception e) {
-              logger.log(Level.FINE, "Failed to generate thumbnails for " + file.getName(), e);
-            }
+                if (angleCount > 1) {
+                  Path p0 = renderPath.resolveSibling(
+                      insertSuffix(renderPath.getFileName().toString(), "_0"));
+                  if (p0.toFile().exists()) {
+                    BufferedImage full = ImageIO.read(p0.toFile());
+                    BufferedImage thumb = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
+                    Graphics2D g2 = thumb.createGraphics();
+                    g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                    g2.drawImage(full, 0, 0, 64, 64, null);
+                    g2.dispose();
+                    ImageIO.write(thumb, "PNG", ResourceUtils.getThumbPathForFile(file).toFile());
+                  }
+                }
+              } catch (Exception e) {
+                logger.log(Level.FINE, "Failed to generate thumbnails for " + file.getName(), e);
+              }
             SwingUtilities.invokeLater(
                 () -> {
                   if (onComplete != null) onComplete.run();
