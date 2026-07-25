@@ -135,7 +135,8 @@ public class FileRenderApp {
           else this.setTextRenderingSchematics("Rendering " + count + " schematic(s)");
         });
 
-    frame = new JFrame("File Renderer");
+    String ver = getClass().getPackage().getImplementationVersion();
+    frame = new JFrame("CubeArray" + (ver != null ? " " + ver : ""));
     frame.setSize(context.guiBounds().width, context.guiBounds().height);
     frame.setLocation(context.guiBounds().x, context.guiBounds().y);
 

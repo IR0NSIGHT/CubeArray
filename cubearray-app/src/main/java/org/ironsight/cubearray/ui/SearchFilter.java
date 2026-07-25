@@ -35,13 +35,11 @@ abstract class AbstractSearchFilter implements SearchFilter {
     @Override
     public void markAllDirty() {
         allDirty.set(true);
-        System.out.println("[" + filterThreadName() + "] markAllDirty");
     }
 
     @Override
     public void markDirty(int row) {
         dirtyRows.add(row);
-        System.out.println("[" + filterThreadName() + "] markDirty row=" + row);
     }
 
     @Override
@@ -56,7 +54,6 @@ abstract class AbstractSearchFilter implements SearchFilter {
         thread = new Thread(this::loop, filterThreadName());
         thread.setDaemon(true);
         thread.start();
-        System.out.println("[" + filterThreadName() + "] thread started");
     }
 
     @Override
@@ -65,7 +62,6 @@ abstract class AbstractSearchFilter implements SearchFilter {
         if (thread != null) {
             thread.interrupt();
             thread = null;
-            System.out.println("[" + filterThreadName() + "] thread stopped");
         }
     }
 
@@ -100,16 +96,13 @@ abstract class AbstractSearchFilter implements SearchFilter {
     }
 
     private void recomputeFull(int rowCount) {
-        System.out.println("[" + filterThreadName() + "] recomputeFull start rows=" + rowCount);
         matchingRows.clear();
         if (!isActive()) {
             reportProgress(0);
-            System.out.println("[" + filterThreadName() + "] recomputeFull inactive, cleared");
             return;
         }
         for (int row = 0; row < rowCount; row++) {
             if (!running) {
-                System.out.println("[" + filterThreadName() + "] recomputeFull aborted");
                 return;
             }
             try {
@@ -122,16 +115,13 @@ abstract class AbstractSearchFilter implements SearchFilter {
                 reportProgress(row + 1);
             }
         }
-        System.out.println("[" + filterThreadName() + "] recomputeFull done matches=" + matchingRows.size());
     }
 
     private void recomputeDirtyRows() {
         Set<Integer> copy = new HashSet<>(dirtyRows);
         dirtyRows.clear();
-        System.out.println("[" + filterThreadName() + "] recomputeDirtyRows start rows=" + copy);
         for (int row : copy) {
             if (!running) {
-                System.out.println("[" + filterThreadName() + "] recomputeDirtyRows aborted");
                 return;
             }
             try {
@@ -143,7 +133,6 @@ abstract class AbstractSearchFilter implements SearchFilter {
             } catch (Exception e) {
             }
         }
-        System.out.println("[" + filterThreadName() + "] recomputeDirtyRows done matches=" + matchingRows.size());
         reportProgress(0);
     }
 

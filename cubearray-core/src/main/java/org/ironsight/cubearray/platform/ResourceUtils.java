@@ -92,7 +92,13 @@ public class ResourceUtils {
 
   public static boolean needsNewRender(File schematicFile) {
     Path renderPath = getRenderPathForFile(schematicFile);
-    if (!Files.exists(renderPath)) return true;
+    if (!Files.exists(renderPath)) {
+      String name = renderPath.getFileName().toString();
+      int dot = name.lastIndexOf('.');
+      Path p0 = renderPath.resolveSibling(name.substring(0, dot) + "_0" + name.substring(dot));
+      if (!Files.exists(p0)) return true;
+      return schematicFile.lastModified() > p0.toFile().lastModified();
+    }
     return schematicFile.lastModified() > renderPath.toFile().lastModified();
   }
 

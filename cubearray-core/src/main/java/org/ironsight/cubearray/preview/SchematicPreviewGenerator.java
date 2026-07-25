@@ -250,6 +250,12 @@ public class SchematicPreviewGenerator  {
       if (onComplete != null) onComplete.run();
       return;
     }
+    Path rp = ResourceUtils.getRenderPathForFile(file);
+    if (!Files.exists(rp)) {
+      logger.info("Render needed for " + file.getName() + ": no cached render");
+    } else {
+      logger.info("Render needed for " + file.getName() + ": schematic file changed since last render");
+    }
     firePendingRenderCountChanged();
     renderExecutor.execute(
         new PriorityTask(

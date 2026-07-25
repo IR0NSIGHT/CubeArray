@@ -8,7 +8,6 @@ class FreeTextSearchFilter extends AbstractSearchFilter {
     }
 
     void setSearchText(String text) {
-        System.out.println("[free-text-search] setSearchText \"" + text + "\"" + " for " + this);
         searchText = text.toLowerCase();
         markAllDirty();
     }

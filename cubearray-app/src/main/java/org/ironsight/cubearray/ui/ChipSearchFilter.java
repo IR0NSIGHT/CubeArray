@@ -8,7 +8,6 @@ class ChipSearchFilter extends AbstractSearchFilter {
         super(model, null);
         this.column = column;
         this.searchTerm = searchTerm.toLowerCase();
-        System.out.println("[chip-search-" + column.name() + "] created term=\"" + searchTerm + "\"");
     }
 
     @Override
