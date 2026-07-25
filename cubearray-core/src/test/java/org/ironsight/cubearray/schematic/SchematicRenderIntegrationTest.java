@@ -2,6 +2,7 @@ package org.ironsight.cubearray.schematic;
 import org.ironsight.cubearray.render.InstancedCubes;
 import org.ironsight.cubearray.render.CubeSetup;
 import org.ironsight.cubearray.platform.ResourceUtils;
+import org.joml.Vector3f;
 
 import static org.junit.Assert.*;
 
@@ -138,6 +139,48 @@ public class SchematicRenderIntegrationTest {
     assertFalse("Off-thread render did not finish in time", renderThread.isAlive());
     assertTrue("Output file missing", outputPath.toFile().exists());
     assertNonBlank(outputPath, schemFile.getName() + " (off-thread)");
+  }
+
+  @Test
+  public void renderWithMultipleCameraAngles() throws Exception {
+    ensureTextures();
+    File dir = new File("src/test/resources/schematics/Dannypan");
+    File[] schemFiles = dir.listFiles((d, name) -> name.endsWith(".schem"));
+    assertNotNull(schemFiles);
+    assertTrue(schemFiles.length > 0);
+    File schemFile = schemFiles[0];
+
+    Path outputPath =
+        OUTPUT_DIR.resolve("multi-camera/" + schemFile.getName().replace(".schem", ".png"));
+    Files.createDirectories(outputPath.getParent());
+
+    CubeSetup setup =
+        SchemReader.prepareData(
+            SchemReader.loadSchematics(List.of(schemFile.toPath()), f -> {}));
+    assertNotNull("Failed to prepare data", setup);
+
+    var dim = new Vector3f(setup.max).sub(setup.min);
+    var center = new Vector3f(setup.min).add(setup.max).mul(0.5f);
+    float radius = Math.max(dim.x, Math.max(dim.y, dim.z)) * 2;
+
+    List<InstancedCubes.CameraState> cameraSetups = List.of(
+        new InstancedCubes.CameraState(center, (float) Math.toRadians(210), (float) Math.toRadians(30), 0f, radius),
+        new InstancedCubes.CameraState(center, (float) Math.toRadians(90), 0f, 0f, radius),
+        new InstancedCubes.CameraState(center, (float) Math.toRadians(180), 0f, 0f, radius),
+        new InstancedCubes.CameraState(center, 0f, (float) Math.toRadians(90), 0f, radius));
+
+    InstancedCubes.renderToFile(setup, outputPath, 640, 640, cameraSetups);
+
+    for (int i = 0; i < cameraSetups.size(); i++) {
+      String suffix = "_" + i;
+      String name = outputPath.getFileName().toString();
+      int dot = name.lastIndexOf('.');
+      Path p = dot == -1
+          ? outputPath.resolveSibling(name + suffix)
+          : outputPath.resolveSibling(name.substring(0, dot) + suffix + name.substring(dot));
+      assertTrue("Missing render for angle " + i, p.toFile().exists());
+      assertNonBlank(p, schemFile.getName() + " angle " + i);
+    }
   }
 
   @Test

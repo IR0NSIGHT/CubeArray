@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -24,12 +23,13 @@ import org.ironsight.cubearray.platform.AppLogger;
 import org.ironsight.cubearray.platform.ResourceUtils;
 import org.ironsight.cubearray.render.CubeSetup;
 import org.ironsight.cubearray.render.InstancedCubes;
+import org.joml.Vector3f;
 import org.ironsight.cubearray.schematic.SchemReader;
 import org.pepsoft.worldpainter.objects.WPObject;
 
-public class SchematicPreviewHelper {
-  private static final Logger logger = AppLogger.get(SchematicPreviewHelper.class);
-  private static final SchematicPreviewHelper INSTANCE = new SchematicPreviewHelper();
+public class SchematicPreviewGenerator  {
+  private static final Logger logger = AppLogger.get(SchematicPreviewGenerator.class);
+  private static final SchematicPreviewGenerator INSTANCE = new SchematicPreviewGenerator();
 
   private final ExecutorService renderExecutor =
       new ThreadPoolExecutor(
@@ -68,10 +68,28 @@ public class SchematicPreviewHelper {
 
   private Consumer<Integer> pendingRenderCountChangedCallback;
 
-  private SchematicPreviewHelper() {}
+  private List<InstancedCubes.CameraState> cameraSetups;
+
+  private SchematicPreviewGenerator() {
+    this.cameraSetups =
+        List.of(
+            new InstancedCubes.CameraState(
+                null, (float) Math.toRadians(210), (float) Math.toRadians(30), 0f, 0f),
+            new InstancedCubes.CameraState(null, (float) Math.toRadians(90), 0f, 0f, 0f),
+            new InstancedCubes.CameraState(null, (float) Math.toRadians(180), 0f, 0f, 0f),
+            new InstancedCubes.CameraState(null, 0f, (float) Math.toRadians(90), 0f, 0f));
+  }
 
   public void setPendingRenderCountChangedCallback(Consumer<Integer> callback) {
     this.pendingRenderCountChangedCallback = callback;
+  }
+
+  public void setCameraSetups(List<InstancedCubes.CameraState> cameraSetups) {
+    this.cameraSetups = cameraSetups;
+  }
+
+  public List<InstancedCubes.CameraState> getCameraSetups() {
+    return cameraSetups;
   }
 
   private void firePendingRenderCountChanged() {
@@ -82,7 +100,7 @@ public class SchematicPreviewHelper {
     }
   }
 
-  public static SchematicPreviewHelper getInstance() {
+  public static SchematicPreviewGenerator getInstance() {
     return INSTANCE;
   }
 
@@ -134,7 +152,7 @@ public class SchematicPreviewHelper {
     JOptionPane.showMessageDialog(parent, panel, file.getName(), JOptionPane.PLAIN_MESSAGE);
   }
 
-  public void render(File file, WPObject obj, Runnable onComplete) {
+  public void queueRender(File file, WPObject obj, Runnable onComplete) {
     if (file == null || obj == null) return;
     if (!ResourceUtils.needsNewRender(file)) {
       if (onComplete != null) onComplete.run();
@@ -150,9 +168,28 @@ public class SchematicPreviewHelper {
                 if (setup == null) return;
                 Path renderPath = ResourceUtils.getRenderPathForFile(file);
                 Files.createDirectories(renderPath.getParent());
-                InstancedCubes.renderToFile(setup, renderPath, 640, 640);
+
+                List<InstancedCubes.CameraState> effectiveSetups;
+                if (cameraSetups != null && !cameraSetups.isEmpty()) {
+                  var dim = new Vector3f(setup.max).sub(setup.min);
+                  var center = new Vector3f(setup.min).add(setup.max).mul(0.5f);
+                  float radius = Math.max(dim.x, Math.max(dim.y, dim.z)) * 2;
+                  effectiveSetups =
+                      cameraSetups.stream()
+                          .map(
+                              cs ->
+                                  new InstancedCubes.CameraState(
+                                      center, cs.yaw(), cs.pitch(), cs.roll(), radius))
+                          .toList();
+                } else {
+                  effectiveSetups = List.of();
+                }
+                InstancedCubes.renderToFile(setup, renderPath, 640, 640, effectiveSetups);
                 try {
-                  BufferedImage full = ImageIO.read(renderPath.toFile());
+                  Path thumbSource = (cameraSetups != null && !cameraSetups.isEmpty())
+                      ? renderPath.resolveSibling(insertSuffix(renderPath.getFileName().toString(), "_0"))
+                      : renderPath;
+                  BufferedImage full = ImageIO.read(thumbSource.toFile());
                   BufferedImage thumb = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
                   Graphics2D g = thumb.createGraphics();
                   g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
@@ -217,6 +254,12 @@ public class SchematicPreviewHelper {
 
   public void dispose() {
     renderExecutor.shutdown();
+  }
+
+  private static String insertSuffix(String filename, String suffix) {
+    int dot = filename.lastIndexOf('.');
+    return dot == -1 ? filename + suffix
+                     : filename.substring(0, dot) + suffix + filename.substring(dot);
   }
 
   private static Icon generatePlaceholderIcon(File f) {

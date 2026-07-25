@@ -2,8 +2,6 @@ package org.ironsight.cubearray.ui;
 
 import static org.ironsight.cubearray.platform.ResourceUtils.isSupportedSchematicType;
 
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
-
 import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
@@ -28,13 +26,10 @@ import javax.swing.table.TableColumnModel;
 import javax.swing.table.TableRowSorter;
 import org.ironsight.cubearray.platform.AppLogger;
 import org.ironsight.cubearray.platform.PeriodicChecker;
-import org.ironsight.cubearray.render.CubeSetup;
-import org.ironsight.cubearray.render.InstancedCubes;
 import org.ironsight.cubearray.platform.ResourceUtils;
-import org.ironsight.cubearray.schematic.SchemReader;
 import org.ironsight.cubearray.edit.BatchConverter;
 import org.ironsight.cubearray.edit.BlockReplacer;
-import org.ironsight.cubearray.preview.SchematicPreviewHelper;
+import org.ironsight.cubearray.preview.SchematicPreviewGenerator;
 import org.pepsoft.worldpainter.objects.WPObject;
 
 public class FileRenderApp {
@@ -126,7 +121,7 @@ public class FileRenderApp {
     PeriodicChecker.INSTANCE.addCallback(this::checkLoadingThreads);
     PeriodicChecker.INSTANCE.addCallback(this::autoRefreshFolderView);
 
-    this.tableModel = new FileTableModel(PeriodicChecker.INSTANCE, SchematicPreviewHelper.getInstance());
+    this.tableModel = new FileTableModel(PeriodicChecker.INSTANCE, SchematicPreviewGenerator.getInstance());
     FileTableModel.blockIconProvider = blockIconProvider;
     tableModel.setFileQueueSizeChangedCallback(
         count -> {
@@ -134,7 +129,7 @@ public class FileRenderApp {
           else this.setTextRemainingFiles("Loading " + count + " file(s)");
         });
     tableModel.setOnSchematicLoadedCallback(this::onSchematicLoaded);
-    SchematicPreviewHelper.getInstance().setPendingRenderCountChangedCallback(
+    SchematicPreviewGenerator.getInstance().setPendingRenderCountChangedCallback(
         count -> {
           if (count == 0) this.setTextRenderingSchematics("");
           else this.setTextRenderingSchematics("Rendering " + count + " schematic(s)");
@@ -401,7 +396,7 @@ public class FileRenderApp {
               }
               if (modelCol == CaColumn.ICON.ordinal()) {
                 File file = model.getFileAt(modelRow);
-                SchematicPreviewHelper.getInstance().showPreviewDialog(file, frame);
+                SchematicPreviewGenerator.getInstance().showPreviewDialog(file, frame);
                 return;
               }
               if (modelCol == CaColumn.BLOCKS.ordinal() && object instanceof List<?> list) {
@@ -1582,19 +1577,19 @@ public class FileRenderApp {
       logger.info(" - " + f.getAbsolutePath());
     }
     var paths = selectedFiles.stream().map(File::toPath).toList();
-    SchematicPreviewHelper.getInstance().queueInteractiveRender(paths);
+    SchematicPreviewGenerator.getInstance().queueInteractiveRender(paths);
   }
 
   private void showRenderPreview(int modelRow) {
     File file = tableModel.getFileAt(modelRow);
-    SchematicPreviewHelper.getInstance().showPreviewDialog(file, frame);
+    SchematicPreviewGenerator.getInstance().showPreviewDialog(file, frame);
   }
 
-  private void renderSchematicIcon(File file) {
+  private void queueRenderSchematicIcon(File file) {
     if (file == null) return;
     WPObject obj = tableModel.getSchematicFor(file);
     if (obj == null) return;
-    SchematicPreviewHelper.getInstance().render(
+    SchematicPreviewGenerator.getInstance().queueRender(
         file,
         obj,
         () -> {
@@ -1619,7 +1614,7 @@ public class FileRenderApp {
         }
       }
     }
-    renderSchematicIcon(file);
+    queueRenderSchematicIcon(file);
   }
 
 

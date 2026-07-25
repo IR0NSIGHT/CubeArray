@@ -5,7 +5,7 @@ import static org.junit.Assert.assertEquals;
 import java.io.File;
 import java.util.List;
 import org.junit.Test;
-import org.ironsight.cubearray.preview.SchematicPreviewHelper;
+import org.ironsight.cubearray.preview.SchematicPreviewGenerator;
 
 public class FileTableModelTest {
 
@@ -26,7 +26,7 @@ public class FileTableModelTest {
 
   @Test
   public void addFile() {
-    final var model = new FileTableModel(null, SchematicPreviewHelper.getInstance());
+    final var model = new FileTableModel(null, SchematicPreviewGenerator.getInstance());
     var myFile = new File("~/myFile.txt");
     model.addFile(myFile);
     assertEquals(1, model.getRowCount());
@@ -52,7 +52,7 @@ public class FileTableModelTest {
 
   @Test
   public void addFiles() {
-    final var model = new FileTableModel(null, SchematicPreviewHelper.getInstance());
+    final var model = new FileTableModel(null, SchematicPreviewGenerator.getInstance());
 
     model.addFiles(List.of(new File("~/a.txt"), new File("~/b.txt"), new File("~/c.txt")));
     assertEquals(3, model.getRowCount());
@@ -69,7 +69,7 @@ public class FileTableModelTest {
   @Test
   public void removeFile() {
     { // 3 items, delete 1
-      final var model = new FileTableModel(null, SchematicPreviewHelper.getInstance());
+      final var model = new FileTableModel(null, SchematicPreviewGenerator.getInstance());
       var myFile = new File("~/myFile.txt");
       model.addFile(myFile);
       model.addFile(new File("~/myFile_2.txt"));
@@ -82,7 +82,7 @@ public class FileTableModelTest {
       assertEquals(2, model.getRowCount());
     }
     { // 3 items, delete all
-      final var model = new FileTableModel(null, SchematicPreviewHelper.getInstance());
+      final var model = new FileTableModel(null, SchematicPreviewGenerator.getInstance());
       model.addFile(new File("~/myFile.txt"));
       model.addFile(new File("~/myFile_2.txt"));
       model.addFile(new File("~/myFile_3.txt"));

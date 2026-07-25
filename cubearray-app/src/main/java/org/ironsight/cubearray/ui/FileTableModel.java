@@ -1,13 +1,11 @@
 package org.ironsight.cubearray.ui;
 
-import org.ironsight.cubearray.preview.SchematicPreviewHelper;
+import org.ironsight.cubearray.preview.SchematicPreviewGenerator;
 
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
-import java.net.URL;
 import java.nio.file.InvalidPathException;
-import java.nio.file.Path;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.List;
@@ -30,7 +28,7 @@ import org.pepsoft.worldpainter.layers.bo2.Schem;
 import org.pepsoft.worldpainter.objects.WPObject;
 
 class FileTableModel extends AbstractTableModel {
-  private final SchematicPreviewHelper previewHelper;
+  private final SchematicPreviewGenerator previewHelper;
 
   private static final Logger logger = AppLogger.get(FileTableModel.class);
   public static final StringConverter dateRenderer =
@@ -234,7 +232,7 @@ class FileTableModel extends AbstractTableModel {
     parentDirPath = path;
   }
 
-  public FileTableModel(PeriodicChecker checker, SchematicPreviewHelper previewHelper) {
+  public FileTableModel(PeriodicChecker checker, SchematicPreviewGenerator previewHelper) {
     this.previewHelper = previewHelper;
     if (checker != null) checker.addCallback(this::tryLoadSchematics);
   }

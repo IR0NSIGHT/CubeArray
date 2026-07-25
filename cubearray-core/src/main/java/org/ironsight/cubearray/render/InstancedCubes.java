@@ -151,6 +151,10 @@ public class InstancedCubes {
    * each render starts from the default angle regardless of any prior interactive session.
    */
   private void renderOneFrame() {
+    renderOneFrame(null);
+  }
+
+  private void renderOneFrame(CameraState cameraOverride) {
     boolean dataChanged = setup != lastUploadedSetup;
     if (dataChanged) {
       uploadInstanceData();
@@ -159,7 +163,7 @@ public class InstancedCubes {
       lastUploadedSetup = setup;
     }
 
-    cameraState = initialPos;
+    cameraState = (cameraOverride != null) ? cameraOverride : initialPos;
 
     glViewport(0, 0, width, height);
     projection =
@@ -787,6 +791,12 @@ public class InstancedCubes {
 
   public static void renderToFile(
       CubeSetup setup, Path outputPath, int width, int height) throws Exception {
+    renderToFile(setup, outputPath, width, height, List.of());
+  }
+
+  public static void renderToFile(
+      CubeSetup setup, Path outputPath, int width, int height, List<CameraState> cameraSetups)
+      throws Exception {
 
     synchronized (GLFW_LOCK) {
       Thread currentThread = Thread.currentThread();
@@ -801,11 +811,25 @@ public class InstancedCubes {
         temp.width = width;
         temp.height = height;
         temp.headless = true;
-        CompletableFuture<BufferedImage> future = temp.requestScreenshot();
-        temp.run();
-        Path parent = outputPath.getParent();
-        if (parent != null) Files.createDirectories(parent);
-        ImageIO.write(future.get(30, TimeUnit.SECONDS), "png", outputPath.toFile());
+        temp.init();
+        try {
+          Path parent = outputPath.getParent();
+          if (parent != null) Files.createDirectories(parent);
+          if (cameraSetups.isEmpty()) {
+            CompletableFuture<BufferedImage> future = temp.requestScreenshot();
+            temp.renderOneFrame();
+            ImageIO.write(future.get(30, TimeUnit.SECONDS), "png", outputPath.toFile());
+          } else {
+            for (int i = 0; i < cameraSetups.size(); i++) {
+              CompletableFuture<BufferedImage> future = temp.requestScreenshot();
+              temp.renderOneFrame(cameraSetups.get(i));
+              ImageIO.write(
+                  future.get(30, TimeUnit.SECONDS), "png", withSuffix(outputPath, "_" + i).toFile());
+            }
+          }
+        } finally {
+          temp.cleanup();
+        }
         return;
       }
       if (setup != sharedInstance.setup) {
@@ -814,13 +838,28 @@ public class InstancedCubes {
       sharedInstance.width = width;
       sharedInstance.height = height;
 
-      CompletableFuture<BufferedImage> future = sharedInstance.requestScreenshot();
-      sharedInstance.renderOneFrame();
-
       Path parent = outputPath.getParent();
       if (parent != null) Files.createDirectories(parent);
-      ImageIO.write(future.get(30, TimeUnit.SECONDS), "png", outputPath.toFile());
+      if (cameraSetups.isEmpty()) {
+        CompletableFuture<BufferedImage> future = sharedInstance.requestScreenshot();
+        sharedInstance.renderOneFrame();
+        ImageIO.write(future.get(30, TimeUnit.SECONDS), "png", outputPath.toFile());
+      } else {
+        for (int i = 0; i < cameraSetups.size(); i++) {
+          CompletableFuture<BufferedImage> future = sharedInstance.requestScreenshot();
+          sharedInstance.renderOneFrame(cameraSetups.get(i));
+          ImageIO.write(
+              future.get(30, TimeUnit.SECONDS), "png", withSuffix(outputPath, "_" + i).toFile());
+        }
+      }
     }
+  }
+
+  private static Path withSuffix(Path path, String suffix) {
+    String filename = path.getFileName().toString();
+    int dot = filename.lastIndexOf('.');
+    if (dot == -1) return path.resolveSibling(filename + suffix);
+    return path.resolveSibling(filename.substring(0, dot) + suffix + filename.substring(dot));
   }
 
   /**
@@ -1164,7 +1203,7 @@ public class InstancedCubes {
           new Vector3f(this.target).add(other.target), // create new Vector3f to keep immutability
           this.yaw + other.yaw,
           this.pitch + other.pitch,
-          this.roll + other.roll,
+        this.roll + other.roll,
           this.radius + other.radius);
     }
 
