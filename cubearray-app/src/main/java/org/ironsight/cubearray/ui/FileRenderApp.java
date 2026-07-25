@@ -396,7 +396,9 @@ public class FileRenderApp {
               }
               if (modelCol == CaColumn.ICON.ordinal()) {
                 File file = model.getFileAt(modelRow);
-                SchematicPreviewGenerator.getInstance().showPreviewDialog(file, frame);
+                Rectangle cellRect = table.getCellRect(viewRow, viewCol, true);
+                int angleIndex = Math.max(0, Math.min(3, (e.getX() - cellRect.x) / 64));
+                SchematicPreviewGenerator.getInstance().showPreviewDialog(file, frame, angleIndex);
                 return;
               }
               if (modelCol == CaColumn.BLOCKS.ordinal() && object instanceof List<?> list) {

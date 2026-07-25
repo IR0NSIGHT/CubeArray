@@ -108,18 +108,51 @@ public class SchematicPreviewGenerator  {
     return iconCache.computeIfAbsent(
         file.getAbsolutePath(),
         k -> {
-          Path thumbPath = ResourceUtils.getThumbPathForFile(file);
-          if (thumbPath.toFile().exists()) {
-            return new ImageIcon(thumbPath.toString());
-          }
           Path renderPath = ResourceUtils.getRenderPathForFile(file);
-          if (renderPath.toFile().exists()) {
-            return new ImageIcon(
-                new ImageIcon(renderPath.toString())
-                    .getImage()
-                    .getScaledInstance(64, 64, Image.SCALE_SMOOTH));
+          Path p0 = renderPath.resolveSibling(
+              insertSuffix(renderPath.getFileName().toString(), "_0"));
+
+          BufferedImage composite = new BufferedImage(256, 64, BufferedImage.TYPE_INT_ARGB);
+          Graphics2D g = composite.createGraphics();
+
+          if (p0.toFile().exists()) {
+            for (int i = 0; i < 4; i++) {
+              Path p = renderPath.resolveSibling(
+                  insertSuffix(renderPath.getFileName().toString(), "_" + i));
+              if (p.toFile().exists()) {
+                try {
+                  BufferedImage angle = ImageIO.read(p.toFile());
+                  if (angle != null) {
+                    g.drawImage(
+                        angle.getScaledInstance(64, 64, Image.SCALE_SMOOTH),
+                        i * 64, 0, null);
+                    continue;
+                  }
+                } catch (Exception e) {
+                  logger.log(Level.FINE, "Failed to read render " + p, e);
+                }
+              }
+              g.setColor(new Color(0x33, 0x33, 0x33));
+              g.fillRect(i * 64, 0, 64, 64);
+            }
+          } else {
+            Path thumbPath = ResourceUtils.getThumbPathForFile(file);
+            Icon single;
+            if (thumbPath.toFile().exists()) {
+              single = new ImageIcon(thumbPath.toString());
+            } else if (renderPath.toFile().exists()) {
+              Image scaled = new ImageIcon(renderPath.toString())
+                  .getImage()
+                  .getScaledInstance(64, 64, Image.SCALE_SMOOTH);
+              single = new ImageIcon(scaled);
+            } else {
+              single = generatePlaceholderIcon(file);
+            }
+            single.paintIcon(null, g, 0, 0);
           }
-          return generatePlaceholderIcon(file);
+
+          g.dispose();
+          return new ImageIcon(composite);
         });
   }
 
@@ -128,25 +161,84 @@ public class SchematicPreviewGenerator  {
   }
 
   public void showPreviewDialog(File file, Component parent) {
+    showPreviewDialog(file, parent, 0);
+  }
+
+  public void showPreviewDialog(File file, Component parent, int initialIndex) {
     Path renderPath = ResourceUtils.getRenderPathForFile(file);
-    if (!Files.exists(renderPath)) {
+
+    int tmp = 0;
+    for (int i = 0; i < 10; i++) {
+      Path p = renderPath.resolveSibling(
+          insertSuffix(renderPath.getFileName().toString(), "_" + i));
+      if (p.toFile().exists()) tmp++;
+    }
+    if (tmp == 0 && renderPath.toFile().exists()) tmp = 1;
+    final int count = tmp;
+
+    if (count == 0) {
       JOptionPane.showMessageDialog(
           parent, "No render available yet.", file.getName(), JOptionPane.PLAIN_MESSAGE);
       return;
     }
-    ImageIcon image =
-        new ImageIcon(
-            new ImageIcon(renderPath.toString())
-                .getImage()
-                .getScaledInstance(640, 640, Image.SCALE_SMOOTH));
+
+    int[] currentIndex = {Math.max(0, Math.min(count - 1, initialIndex))};
+    JLabel imageLabel = new JLabel();
+    imageLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+    Runnable updateImage =
+        () -> {
+          Path path =
+              count > 1
+                  ? renderPath.resolveSibling(
+                      insertSuffix(renderPath.getFileName().toString(), "_" + currentIndex[0]))
+                  : renderPath;
+          ImageIcon icon =
+              new ImageIcon(
+                  new ImageIcon(path.toString())
+                      .getImage()
+                      .getScaledInstance(640, 640, Image.SCALE_SMOOTH));
+          imageLabel.setIcon(icon);
+        };
+    updateImage.run();
 
     JPanel panel = new JPanel(new BorderLayout(0, 8));
-    panel.add(new JLabel(image), BorderLayout.CENTER);
+    panel.add(imageLabel, BorderLayout.CENTER);
+
+    JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+
+    if (count > 1) {
+      JButton prevBtn = new JButton("<");
+      prevBtn.addActionListener(
+          e -> {
+            currentIndex[0] = (currentIndex[0] - 1 + count) % count;
+            updateImage.run();
+          });
+      btnPanel.add(prevBtn);
+    }
 
     JButton openBtn = new JButton("Open render in folder");
-    openBtn.addActionListener(e -> ResourceUtils.revealFileInFolder(renderPath));
-    JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+    openBtn.addActionListener(
+        e -> {
+          Path path =
+              count > 1
+                  ? renderPath.resolveSibling(
+                      insertSuffix(renderPath.getFileName().toString(), "_" + currentIndex[0]))
+                  : renderPath;
+          ResourceUtils.revealFileInFolder(path);
+        });
     btnPanel.add(openBtn);
+
+    if (count > 1) {
+      JButton nextBtn = new JButton(">");
+      nextBtn.addActionListener(
+          e -> {
+            currentIndex[0] = (currentIndex[0] + 1) % count;
+            updateImage.run();
+          });
+      btnPanel.add(nextBtn);
+    }
+
     panel.add(btnPanel, BorderLayout.SOUTH);
 
     JOptionPane.showMessageDialog(parent, panel, file.getName(), JOptionPane.PLAIN_MESSAGE);

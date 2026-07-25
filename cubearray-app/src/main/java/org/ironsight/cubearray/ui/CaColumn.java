@@ -10,7 +10,7 @@ import javax.swing.Icon;
  * required to store across restarts and display to user
  */
 public enum CaColumn {
-  ICON("", Icon.class, FileTableModel.iconRenderer, "File icon", 64),
+  ICON("", Icon.class, FileTableModel.iconRenderer, "File icon", 256),
   FILE("File", String.class, FileTableModel.defaultRenderer, "Name of the file", 240),
   LAST_CHANGED(
       "Last Changed",
