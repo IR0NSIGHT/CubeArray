@@ -24,6 +24,7 @@ public enum KeyBinding {
   MOVE_FAST(GLFW_KEY_LEFT_CONTROL, "Left Ctrl"),
   TOGGLE_AUTOROTATE(GLFW_KEY_SPACE, "Space"),
   TOGGLE_FPV(GLFW_KEY_V, "V"),
+  TOGGLE_ORTHO(GLFW_KEY_O, "O"),
   SCREENSHOT(GLFW_KEY_P, "P"),
 
   // Mouse

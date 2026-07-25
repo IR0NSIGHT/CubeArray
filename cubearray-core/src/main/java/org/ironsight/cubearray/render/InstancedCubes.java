@@ -165,13 +165,18 @@ public class InstancedCubes {
 
     cameraState = (cameraOverride != null) ? cameraOverride : initialPos;
 
-    boolean orthographic = cameraState.orthographicCamera;
-
     glViewport(0, 0, width, height);
-    projection =
-        new Matrix4f()
-            .perspective(
-                (float) toRadians(45.0f), (float) width / height, .1f, 10000.0f);
+    if (cameraState.orthographicCamera) {
+      float aspect = (float) width / height;
+      float halfH = cameraState.radius * (float) Math.tan(Math.toRadians(45.0) / 2.0);
+      float halfW = halfH * aspect;
+      projection = new Matrix4f().setOrtho(-halfW, halfW, -halfH, halfH, 0.1f, 10000.0f);
+    } else {
+      projection =
+          new Matrix4f()
+              .perspective(
+                  (float) toRadians(45.0f), (float) width / height, .1f, 10000.0f);
+    }
 
     glClearColor(0.53f, 0.81f, 0.92f, 1f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -349,8 +354,8 @@ public class InstancedCubes {
                           cameraState.yaw(),
                           cameraState.pitch(),
                           0f,
-                          0.1f // new radius
-                          );
+                          0.1f, // new radius
+                          cameraState.orthographicCamera());
                 } else {
                   newState =
                       new CameraState(
@@ -358,8 +363,8 @@ public class InstancedCubes {
                           cameraState.yaw(),
                           cameraState.pitch(),
                           0f,
-                          orbitCamera.radius // new radius
-                          );
+                          orbitCamera.radius, // new radius
+                          cameraState.orthographicCamera());
                 }
                 isFPV = !isFPV;
                 transition =
@@ -368,11 +373,20 @@ public class InstancedCubes {
                         newState,
                         System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
+              } else if (key == TOGGLE_ORTHO.key) {
+                cameraState =
+                    new CameraState(
+                        cameraState.target(),
+                        cameraState.yaw(),
+                        cameraState.pitch(),
+                        cameraState.roll(),
+                        cameraState.radius(),
+                        !cameraState.orthographicCamera());
               } else if (key == CAM_FIX_POS_0.key) {
                 CameraState target =
                     new CameraState(
                         cameraState.target(), fixPos_0.yaw(),
-                        (float) toRadians(30), 0f, cameraState.radius());
+                        (float) toRadians(30), 0f, cameraState.radius(), cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
@@ -381,7 +395,7 @@ public class InstancedCubes {
                 CameraState target =
                     new CameraState(
                         cameraState.target(), fixPos_1.yaw(),
-                        cameraState.pitch(), 0f, cameraState.radius());
+                        cameraState.pitch(), 0f, cameraState.radius(), cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
@@ -390,7 +404,7 @@ public class InstancedCubes {
                 CameraState target =
                     new CameraState(
                         cameraState.target(), fixPos_2.yaw(),
-                        cameraState.pitch(), 0f, cameraState.radius());
+                        cameraState.pitch(), 0f, cameraState.radius(), cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
@@ -399,7 +413,7 @@ public class InstancedCubes {
                 CameraState target =
                     new CameraState(
                         cameraState.target(), fixPos_3.yaw(),
-                        cameraState.pitch(), 0f, cameraState.radius());
+                        cameraState.pitch(), 0f, cameraState.radius(), cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
@@ -408,7 +422,7 @@ public class InstancedCubes {
                 CameraState target =
                     new CameraState(
                         cameraState.target(), fixPos_4.yaw(),
-                        cameraState.pitch(), 0f, cameraState.radius());
+                        cameraState.pitch(), 0f, cameraState.radius(), cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
@@ -417,7 +431,7 @@ public class InstancedCubes {
                 CameraState target =
                     new CameraState(
                         schematicCenter, fixPos_5.yaw(),
-                        (float) toRadians(89), 0f, cameraState.radius());
+                        (float) toRadians(89), 0f, cameraState.radius(), cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
@@ -426,7 +440,7 @@ public class InstancedCubes {
                 CameraState target =
                     new CameraState(
                         cameraState.target(), fixPos_6.yaw(),
-                        cameraState.pitch(), 0f, cameraState.radius());
+                        cameraState.pitch(), 0f, cameraState.radius(), cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
@@ -435,7 +449,7 @@ public class InstancedCubes {
                 CameraState target =
                     new CameraState(
                         cameraState.target(), fixPos_7.yaw(),
-                        cameraState.pitch(), 0f, cameraState.radius());
+                        cameraState.pitch(), 0f, cameraState.radius(), cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
@@ -444,7 +458,7 @@ public class InstancedCubes {
                 CameraState target =
                     new CameraState(
                         cameraState.target(), fixPos_8.yaw(),
-                        cameraState.pitch(), 0f, cameraState.radius());
+                        cameraState.pitch(), 0f, cameraState.radius(), cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
@@ -453,7 +467,7 @@ public class InstancedCubes {
                 CameraState target =
                     new CameraState(
                         cameraState.target(), fixPos_9.yaw(),
-                        cameraState.pitch(), 0f, cameraState.radius());
+                        cameraState.pitch(), 0f, cameraState.radius(), cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
                         cameraState, target, System.currentTimeMillis(),
@@ -537,7 +551,8 @@ public class InstancedCubes {
         pitch = Math.max(-1.5f, Math.min(1.5f, pitch));
         cameraState =
             new CameraState(
-                cameraState.target(), yaw, pitch, 0f, cameraState.radius // new radius
+                cameraState.target(), yaw, pitch, 0f, cameraState.radius, // new radius
+                cameraState.orthographicCamera
                 );
 
       } else if (moveCameraByMouse) {
@@ -554,7 +569,8 @@ public class InstancedCubes {
                     toRadians((toDegrees(cameraState.yaw) + autoRotate * deltaTime + 360f) % 360f),
                 cameraState.pitch,
                 0f,
-                cameraState.radius // new radius
+                cameraState.radius, // new radius
+                cameraState.orthographicCamera
                 );
       }
 
@@ -576,7 +592,8 @@ public class InstancedCubes {
                 cameraState.yaw(),
                 cameraState.pitch,
                 0f,
-                cameraState.radius // new radius
+                cameraState.radius, // new radius
+                cameraState.orthographicCamera
                 );
       }
       /*
@@ -608,7 +625,14 @@ public class InstancedCubes {
         Matrix4f view =
             new Matrix4f().lookAt(cameraPos, cameraState.target(), new Vector3f(0, 1, 0));
 
-        boolean orthographic = cameraState.orthographicCamera;
+        if (cameraState.orthographicCamera) {
+          float aspect = (float) width / height;
+          float halfH = cameraState.radius * (float) Math.tan(Math.toRadians(45.0) / 2.0);
+          float halfW = halfH * aspect;
+          projection = new Matrix4f().setOrtho(-halfW, halfW, -halfH, halfH, 0.1f, 10000.0f);
+        } else {
+          projection = new Matrix4f().perspective((float) toRadians(45.0f), (float) width / height, .1f, 10000.0f);
+        }
 
         projection.get(projBuffer);
         view.get(viewBuffer);
@@ -741,7 +765,8 @@ public class InstancedCubes {
               cameraState.yaw(),
               cameraState.pitch(),
               cameraState.roll(),
-              cameraState.radius());
+              cameraState.radius(),
+              cameraState.orthographicCamera());
       lastChangeTime = glfwGetTime();
     });
   }
@@ -757,7 +782,8 @@ public class InstancedCubes {
               (float) toRadians(yawDeg),
               (float) toRadians(pitchDeg),
               0f,
-              radius);
+              radius,
+              cameraState.orthographicCamera());
       lastChangeTime = glfwGetTime();
     });
   }
@@ -769,7 +795,8 @@ public class InstancedCubes {
             java.lang.Math.min(
                 maxRadius, cameraState.radius() * (float) Math.pow(0.85, factor))); // clamp zoom
     return new CameraState(
-        cameraState.target(), cameraState.yaw(), cameraState.pitch(), 0f, newRadius // new radius
+        cameraState.target(), cameraState.yaw(), cameraState.pitch(), 0f, newRadius, // new radius
+        cameraState.orthographicCamera()
         );
   }
 
