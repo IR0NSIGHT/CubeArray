@@ -308,11 +308,12 @@ public class SchematicPreviewGenerator  {
             Path renderPath = ResourceUtils.getRenderPathForFile(file);
             Files.createDirectories(renderPath.getParent());
 
+            var dim = new Vector3f(setup.max).sub(setup.min);
+            var center = new Vector3f(setup.min).add(setup.max).mul(0.5f);
+            float radius = Math.max(dim.x, Math.max(dim.y, dim.z)) * 2;
+
             List<InstancedCubes.CameraState> effectiveSetups;
             if (cameraSetups != null && !cameraSetups.isEmpty()) {
-              var dim = new Vector3f(setup.max).sub(setup.min);
-              var center = new Vector3f(setup.min).add(setup.max).mul(0.5f);
-              float radius = Math.max(dim.x, Math.max(dim.y, dim.z)) * 2;
               effectiveSetups =
                   cameraSetups.stream()
                       .map(
@@ -321,15 +322,14 @@ public class SchematicPreviewGenerator  {
                                   center, cs.yaw(), cs.pitch(), cs.roll(), radius))
                       .toList();
             } else {
-              effectiveSetups = List.of();
+              effectiveSetups =
+                  List.of(new InstancedCubes.CameraState(center, 0f, 0f, 0f, radius));
             }
             InstancedCubes.renderToFile(setup, renderPath, 640, 640, effectiveSetups);
             try {
-              int angleCount = (cameraSetups != null && !cameraSetups.isEmpty()) ? cameraSetups.size() : 1;
-              for (int i = 0; i < angleCount; i++) {
-                Path anglePath = angleCount > 1
-                    ? renderPath.resolveSibling(insertSuffix(renderPath.getFileName().toString(), "_" + i))
-                    : renderPath;
+              for (int i = 0; i < effectiveSetups.size(); i++) {
+                Path anglePath = renderPath.resolveSibling(
+                    insertSuffix(renderPath.getFileName().toString(), "_" + i));
                 if (anglePath.toFile().exists()) {
                   BufferedImage full = ImageIO.read(anglePath.toFile());
                   BufferedImage thumb = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
@@ -337,29 +337,17 @@ public class SchematicPreviewGenerator  {
                   g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
                   g.drawImage(full, 0, 0, 64, 64, null);
                   g.dispose();
-                  Path thumbPath = angleCount > 1
-                      ? ResourceUtils.getThumbPathForFile(file).resolveSibling(
-                          insertSuffix(ResourceUtils.getThumbPathForFile(file).getFileName().toString(), "_" + i))
-                      : ResourceUtils.getThumbPathForFile(file);
+                  Path thumbPath = ResourceUtils.getThumbPathForFile(file).resolveSibling(
+                      insertSuffix(ResourceUtils.getThumbPathForFile(file).getFileName().toString(), "_" + i));
                   ImageIO.write(thumb, "PNG", thumbPath.toFile());
-                }
-              }
-                if (angleCount > 1) {
-                  Path p0 = renderPath.resolveSibling(
-                      insertSuffix(renderPath.getFileName().toString(), "_0"));
-                  if (p0.toFile().exists()) {
-                    BufferedImage full = ImageIO.read(p0.toFile());
-                    BufferedImage thumb = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
-                    Graphics2D g2 = thumb.createGraphics();
-                    g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                    g2.drawImage(full, 0, 0, 64, 64, null);
-                    g2.dispose();
+                  if (i == 0) {
                     ImageIO.write(thumb, "PNG", ResourceUtils.getThumbPathForFile(file).toFile());
                   }
                 }
-              } catch (Exception e) {
-                logger.log(Level.FINE, "Failed to generate thumbnails for " + file.getName(), e);
               }
+            } catch (Exception e) {
+              logger.log(Level.FINE, "Failed to generate thumbnails for " + file.getName(), e);
+            }
             SwingUtilities.invokeLater(
                 () -> {
                   if (onComplete != null) onComplete.run();
