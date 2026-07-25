@@ -94,10 +94,10 @@ public class SchematicPreviewGenerator  {
     this.cameraSetups =
         List.of(
             new InstancedCubes.CameraState(
-                null, (float) Math.toRadians(210), (float) Math.toRadians(30), 0f, 0f),
-            new InstancedCubes.CameraState(null, (float) Math.toRadians(90), 0f, 0f, 0f),
-            new InstancedCubes.CameraState(null, (float) Math.toRadians(180), 0f, 0f, 0f),
-            new InstancedCubes.CameraState(null, 0f, (float) Math.toRadians(90), 0f, 0f));
+                null, (float) Math.toRadians(210), (float) Math.toRadians(30), 0f, 0f, true),
+            new InstancedCubes.CameraState(null, (float) Math.toRadians(90), 0f, 0f, 0f, true),
+            new InstancedCubes.CameraState(null, (float) Math.toRadians(180), 0f, 0f, 0f, true),
+            new InstancedCubes.CameraState(null, 0f, (float) Math.toRadians(90), 0f, 0f, true));
   }
 
   public void setPendingRenderCountChangedCallback(Consumer<Integer> callback) {
@@ -306,7 +306,7 @@ public class SchematicPreviewGenerator  {
                       .map(
                           cs ->
                               new InstancedCubes.CameraState(
-                                  center, cs.yaw(), cs.pitch(), cs.roll(), radius))
+                                  center, cs.yaw(), cs.pitch(), cs.roll(), radius, cs.orthographicCamera()))
                       .toList();
             } else {
               effectiveSetups =

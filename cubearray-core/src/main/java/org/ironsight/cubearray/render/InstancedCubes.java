@@ -165,6 +165,8 @@ public class InstancedCubes {
 
     cameraState = (cameraOverride != null) ? cameraOverride : initialPos;
 
+    boolean orthographic = cameraState.orthographicCamera;
+
     glViewport(0, 0, width, height);
     projection =
         new Matrix4f()
@@ -605,6 +607,8 @@ public class InstancedCubes {
         cameraPos.add(cameraState.target);
         Matrix4f view =
             new Matrix4f().lookAt(cameraPos, cameraState.target(), new Vector3f(0, 1, 0));
+
+        boolean orthographic = cameraState.orthographicCamera;
 
         projection.get(projBuffer);
         view.get(viewBuffer);
@@ -1189,14 +1193,18 @@ public class InstancedCubes {
       float diff = (end.yaw - start.yaw) % twoPi;
       if (diff > (float) Math.PI) diff -= twoPi;
       if (diff < (float) -Math.PI) diff += twoPi;
-      CameraState adjustedEnd = new CameraState(end.target, start.yaw + diff, end.pitch, end.roll, end.radius);
+      CameraState adjustedEnd = new CameraState(end.target, start.yaw + diff, end.pitch, end.roll, end.radius, end.orthographicCamera);
       return new CameraTransition(start, adjustedEnd, timeStart, timeEnd);
     }
   }
 
   public record FixedYaw(float yaw) {}
 
-  public record CameraState(Vector3f target, float yaw, float pitch, float roll, float radius) {
+  public record CameraState(Vector3f target, float yaw, float pitch, float roll, float radius, boolean orthographicCamera) {
+    public CameraState(Vector3f target, float yaw, float pitch, float roll, float radius) {
+      this(target, yaw, pitch, roll, radius, false);
+    }
+
     /** Component-wise addition with another CameraState */
     public CameraState add(CameraState other) {
       return new CameraState(
@@ -1204,7 +1212,8 @@ public class InstancedCubes {
           this.yaw + other.yaw,
           this.pitch + other.pitch,
         this.roll + other.roll,
-          this.radius + other.radius);
+          this.radius + other.radius,
+          this.orthographicCamera || other.orthographicCamera);
     }
 
     /** Scale all numeric components by a factor */
@@ -1214,14 +1223,15 @@ public class InstancedCubes {
           this.yaw * factor,
           this.pitch * factor,
           this.roll * factor,
-          this.radius * factor);
+          this.radius * factor,
+          this.orthographicCamera);
     }
 
     @Override
     public String toString() {
       return String.format(
-          "CameraState[x=%.2f, y=%.2f, z=%.2f, yaw=%.1f°, pitch=%.1f°, roll=%.1f°, radius=%.2f]",
-          target.x, target.y, target.z, toDegrees(yaw), toDegrees(pitch), toDegrees(roll), radius);
+          "CameraState[x=%.2f, y=%.2f, z=%.2f, yaw=%.1f°, pitch=%.1f°, roll=%.1f°, radius=%.2f, ortho=%s]",
+          target.x, target.y, target.z, toDegrees(yaw), toDegrees(pitch), toDegrees(roll), radius, orthographicCamera);
     }
   }
 }
