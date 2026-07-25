@@ -319,6 +319,11 @@ class FileTableModel extends AbstractTableModel {
     schematicObjects.remove(file);
     errorFiles.remove(file);
     loadingFiles.remove(file);
+    try {
+      ResourceUtils.deleteRenderFiles(file);
+    } catch (IOException e) {
+      logger.log(Level.WARNING, "Failed to delete render files for " + file, e);
+    }
     fireTableRowsUpdated(modelRow, modelRow);
     if (remainingFileCountChangedCallback != null) {
       synchronized (files) {

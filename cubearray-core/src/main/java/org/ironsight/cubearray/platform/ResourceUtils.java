@@ -114,6 +114,28 @@ public class ResourceUtils {
     }
   }
 
+  public static void deleteRenderFiles(File schematicFile) throws IOException {
+    Path renderPath = getRenderPathForFile(schematicFile);
+    Files.deleteIfExists(renderPath);
+    deleteAngleVariants(renderPath);
+
+    Path thumbPath = getThumbPathForFile(schematicFile);
+    Files.deleteIfExists(thumbPath);
+    deleteAngleVariants(thumbPath);
+  }
+
+  private static void deleteAngleVariants(Path basePath) throws IOException {
+    String name = basePath.getFileName().toString();
+    int dot = name.lastIndexOf('.');
+    String prefix = (dot > 0) ? name.substring(0, dot) : name;
+    String ext = name.substring(dot);
+    for (int i = 0; ; i++) {
+      Path variant = basePath.resolveSibling(prefix + "_" + i + ext);
+      if (!Files.exists(variant)) break;
+      Files.deleteIfExists(variant);
+    }
+  }
+
   public static boolean needsNewRender(File schematicFile) {
     Path renderPath = getRenderPathForFile(schematicFile);
     if (!Files.exists(renderPath)) {
