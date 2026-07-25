@@ -340,9 +340,6 @@ public class SchematicPreviewGenerator  {
                   Path thumbPath = ResourceUtils.getThumbPathForFile(file).resolveSibling(
                       insertSuffix(ResourceUtils.getThumbPathForFile(file).getFileName().toString(), "_" + i));
                   ImageIO.write(thumb, "PNG", thumbPath.toFile());
-                  if (i == 0) {
-                    ImageIO.write(thumb, "PNG", ResourceUtils.getThumbPathForFile(file).toFile());
-                  }
                 }
               }
             } catch (Exception e) {

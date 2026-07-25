@@ -128,11 +128,6 @@ public class SchematicPreviewGeneratorTest {
       assertEquals("Thumbnail " + i + " height", 64, thumbImg.getHeight());
     }
 
-    assertTrue("Missing single fallback thumbnail: " + thumbPath, thumbPath.toFile().exists());
-    BufferedImage fallbackImg = ImageIO.read(thumbPath.toFile());
-    assertNotNull("Could not read fallback thumbnail", fallbackImg);
-    assertEquals("Fallback thumb width", 64, fallbackImg.getWidth());
-    assertEquals("Fallback thumb height", 64, fallbackImg.getHeight());
   }
 
   private static void deleteFileTree(Path renderPath, Path thumbPath, int angleCount) throws Exception {
