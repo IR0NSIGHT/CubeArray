@@ -94,7 +94,7 @@ public class SchematicPreviewGenerator  {
     this.cameraSetups =
         List.of(
             new InstancedCubes.CameraState(
-                null, (float) Math.toRadians(210), (float) Math.toRadians(30), 0f, 0f, true),
+                null, (float) Math.toRadians(210), (float) Math.toRadians(30), 0f, 0f, false),
             new InstancedCubes.CameraState(null, (float) Math.toRadians(90), 0f, 0f, 0f, true),
             new InstancedCubes.CameraState(null, (float) Math.toRadians(180), 0f, 0f, 0f, true),
             new InstancedCubes.CameraState(null, 0f, (float) Math.toRadians(90), 0f, 0f, true));
@@ -310,7 +310,7 @@ public class SchematicPreviewGenerator  {
                       .toList();
             } else {
               effectiveSetups =
-                  List.of(new InstancedCubes.CameraState(center, 0f, 0f, 0f, radius));
+                  List.of(new InstancedCubes.CameraState(center, (float) Math.toRadians(180), 0f, 0f, radius));
             }
             InstancedCubes.renderToFile(setup, renderPath, 640, 640, effectiveSetups);
             try {

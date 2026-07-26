@@ -1056,7 +1056,11 @@ public class InstancedCubes {
 
     int lightDirLoc = glGetUniformLocation(shaderProgram, "lightDir");
     int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
-    Vector3f lightDir = new Vector3f(-1, 5, -3).normalize();
+    Vector3f lightDir = new Vector3f(
+        (float) (Math.cos(Math.toRadians(22.5)) * Math.cos(Math.toRadians(70))),
+        (float) Math.sin(Math.toRadians(70)),
+        (float) (Math.sin(Math.toRadians(22.5)) * Math.cos(Math.toRadians(70)))
+    ).normalize();
     glUniform3f(lightDirLoc, lightDir.x, lightDir.y, lightDir.z);
     glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
 
