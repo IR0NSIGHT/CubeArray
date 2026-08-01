@@ -1,28 +1,39 @@
 # CubeArray
-CubeArray is a tool to 3d render minecraft schematic files, like .schem sponge formats.
+CubeArray is a tool to organize your  3d render minecraft schematic files, like .schem sponge formats.
 You can fly through the landscape in FPV or view it from further away.
 
 [Github repository](https://github.com/IR0NSIGHT/CubeArray)  
 [Download latest release](https://github.com/IR0NSIGHT/CubeArray/releases)
 
 [![YouTube Showcase](./images/tumbnail_video.png)](https://youtu.be/3LYkifQ4AOs)
-![](./images/screenshot_CubeArray_Quercus_robur4_1770744307148.png)
+
+Manage your complete schematics library with ease
+![](./images/File%20Renderer%2001.08.2026%2015_36_51.png)
+
+Quickly see what the schematic looks like
+![](./images/CubeArray_showcase_popup.PNG)
+
+Replace blocks on many schematics at once to create a new theme
+![](./images/CubeArray_showcase_replace_blocks.PNG)
+
+Inspect the palette and other metadata
+![](./images/CubeArray_showcase_block_list.PNG)
+
+Use the 3d Renderer to look at your library from all sides
 ![](./images/screenshot_CubeArray_schematics_1770744334677.png)
 ![](./images/screenshot_CubeArray_schematics_1770744275833.png)
 ![](./images/showcase_3pv_01.png)
-![](./images/showcase_fpv_01.png)
-
-*THIS IS A WORK IN PROGRESS*
+![](./images/FPS_%2063%2001.08.2026%2015_44_04.png)
 
 ## What it can do
-This program can take a minecraft schematic file, like myHouse.schem which you previously exported from minecraft using WorldEdit f.e. and then 3d render it in a window where you can look at it, rotate it, zoom, fly and screenshot it.
+With this program, you import all your schematic files, then search through your new schematic database to quickly find the schematic you need. 
 
 ## How to use it
 1. Download the program. Execute `CubeArray.exe` (no Java needed), or if you have Java 17+ installed, run `java -jar CubeArray.jar`. 
-2. Select and load a schematic file.
-3. A window will appear that shows your schematic. 
+2. Import a schematic file or a whole folder.
+3. The schematic now appears in your database table. 
 
-### Keybindings
+### Keybindings of the 3d Renderer
 See list at [KeyBindings.md](./KeyBindings.md)
 
 ## Supported schematic formats
@@ -33,29 +44,28 @@ See list at [KeyBindings.md](./KeyBindings.md)
 5. .schem
 
 ## Requirements
-### OpenGL
-The program uses OpenGL so it will need a graphics card. It was developed using a GTX 1060 and RTX5060-Ti and i strongly assume all nvidia cards will work.
-I have no idea if AMD cards will work.
-
 ### Operating System
-The program was developed on windows 10, thats really all i can tell you.
-Usually the java JVM should shield the program from OS specific quirks, but i really dont have enough experience with cross OS developement to judge if this will hold.
+Developed and test on windows 10 and Linux Mint 22. You will need to build it from source to use on linux, currently only windows releases exist.
+MacOS is untested.
 
 ### Screenshots
 in the install folder, you can find your screenshots:
-f.e. C:\Users\MyWindowsUserName\AppData\Local\CubeArray\screenshots
-
-you can probably use this link: [%USERPROFILE%\AppData\Local\CubeArray\screenshots](%USERPROFILE%\AppData\Local\CubeArray\screenshots) in your file explorer.
+go to settings > open-screenshot folder
 
 ### Texture Packs
-theoretically (untested) you can replace the texture pack in C:\Users\MyWindowsUser\AppData\Local\CubeArray\textures\Faithful_32x_1_21_7\assets . assuming that the assets follow a standard order, and are 32 pixels size, it should work.
+1.26 Vanilla texture pack and block library is used right now, there is no support to place in your own resource pack atm.
 
 ## Limitations
+### amount of schematics in the database
+The program can comfortably handle 5000 schematics on a medium-shitty laptop.
+An improved version to handle up to 100 000 schematics is in the works.
+
 ### entities
-can not display villagers, animals, etc. i think beds work? not sure.
+can not display villagers, animals, etc.
 
 ### non-cubic block
-normal 1x1x1m blocks for very well, but most special blocks like torches, fences, etc blocks will suffer and will not be displayed correctly.
+some blocks like lanters have shifted textures and look a bit wierd. 
+some blocks with special geometry, like levers have shifted parts and look a bit wierd.
 
 ### transparent blocks
 transparency is very bitchy and i really dont care enough to fight 4 weeks to get it to work. sorry.
@@ -73,11 +83,14 @@ its not a schematic editor. its a viewer.
   - Its loading your schematic, but if the schematic is huge and your pc a potatoe, it will take some time. Wait at most 5 minutes.
 
 ## technical details
-- scratch build in java using openGL bindings
+- scratch built in java using openGL bindings
 - uses worldpainter as a library to import schematic files into the program
-- uses textures from Faithful 32x - 1.21.7 resource pack: https://faithfulpack.net/
 - front end is Java Swing
-- 10% vibecoded. expect bugs
+- 20% vibecoded. expect bugs
+
+# everything below this line is AI generated, do not trust it. verify every step yourself
+###########################################
+
 
 ## Using CubeArray Core as a Maven dependency
 
