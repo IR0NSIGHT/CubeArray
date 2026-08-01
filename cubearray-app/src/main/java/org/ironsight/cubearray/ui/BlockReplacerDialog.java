@@ -2,11 +2,9 @@ package org.ironsight.cubearray.ui;
 
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 
-import java.nio.file.*;
 import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -15,11 +13,11 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
-import org.ironsight.cubearray.platform.ResourceUtils;
 import org.ironsight.cubearray.edit.BlockListUtil;
 import org.ironsight.cubearray.edit.BlockListUtil.CategoryEntry;
 import org.ironsight.cubearray.edit.BlockReplacer;
 import org.ironsight.cubearray.edit.NotFoundExc;
+import org.ironsight.cubearray.preview.SchematicPreviewGenerator;
 import pitheguy.schemconvert.converter.Schematic;
 import org.ironsight.cubearray.edit.Replacer;
 
@@ -34,7 +32,6 @@ import org.ironsight.cubearray.edit.Replacer;
  *   <li><b>Details</b> — one row per exact block-state variant. No transplanting.
  * </ul>
  *
- * <p>Use {@link #show(Component, Set, Set)} to open the dialog and retrieve the result.
  */
 public class BlockReplacerDialog extends JDialog {
 
@@ -658,11 +655,11 @@ public class BlockReplacerDialog extends JDialog {
       entry.setLayout(new BoxLayout(entry, BoxLayout.Y_AXIS));
       entry.setOpaque(false);
 
-      JLabel iconLabel = new JLabel(loadFileIcon(file));
+      JLabel iconLabel = new JLabel(getBeforeFileIcon(file));
       iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
       iconLabel.setToolTipText(file.getName());
       iconLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-      Runnable clickAction = isAfter ? () -> showAfterPreview(file) : () -> showFilePreview(file);
+      Runnable clickAction = isAfter ? () -> showAfterPreview(file) : () -> showBeforeFilePreview(file);
       iconLabel.addMouseListener(
           new MouseAdapter() {
             @Override
@@ -693,50 +690,17 @@ public class BlockReplacerDialog extends JDialog {
     JScrollPane scroll = new JScrollPane(column);
     scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
     scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-    scroll.setPreferredSize(new Dimension(88, 1));
-    scroll.setMinimumSize(new Dimension(88, 1));
+    scroll.setPreferredSize(new Dimension(isAfter ? 88 : 256+24, 1));
+    scroll.setMinimumSize(new Dimension(isAfter ? 88 : 256+24, 1));
     return scroll;
   }
 
-  private Icon loadFileIcon(File file) {
-    Path renderPath = ResourceUtils.getRenderPathForFile(file);
-    if (Files.exists(renderPath)) {
-      return new ImageIcon(
-          new ImageIcon(renderPath.toString())
-              .getImage()
-              .getScaledInstance(64, 64, Image.SCALE_SMOOTH));
-    }
-    return generatePlaceholderIcon(file);
+  private Icon getBeforeFileIcon(File file) {
+    return SchematicPreviewGenerator.getInstance().getIcon(file);
   }
 
-  private static Icon generatePlaceholderIcon(File f) {
-    BufferedImage image = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
-    Graphics2D g = image.createGraphics();
-    g.setColor(new Color(0x33, 0x33, 0x33));
-    g.fillRect(0, 0, 64, 64);
-    g.setColor(new Color(0x88, 0x88, 0x88));
-    g.setFont(g.getFont().deriveFont(Font.BOLD, 24f));
-    FontMetrics fm = g.getFontMetrics();
-    String letter = f.getName().substring(0, 1).toUpperCase();
-    int x = (64 - fm.stringWidth(letter)) / 2;
-    int y = (64 - fm.getHeight()) / 2 + fm.getAscent();
-    g.drawString(letter, x, y);
-    g.dispose();
-    return new ImageIcon(image);
-  }
-
-  private void showFilePreview(File file) {
-    Path renderPath = ResourceUtils.getRenderPathForFile(file);
-    if (!Files.exists(renderPath)) {
-      JOptionPane.showMessageDialog(this, "No render available yet.", file.getName(), JOptionPane.PLAIN_MESSAGE);
-      return;
-    }
-    ImageIcon icon =
-        new ImageIcon(
-            new ImageIcon(renderPath.toString())
-                .getImage()
-                .getScaledInstance(640, 640, Image.SCALE_SMOOTH));
-    JOptionPane.showMessageDialog(this, icon, file.getName(), JOptionPane.PLAIN_MESSAGE);
+  private void showBeforeFilePreview(File file) {
+   SchematicPreviewGenerator.getInstance().showPreviewDialog(file,this,0);
   }
 
   private void showAfterPreview(File file) {
@@ -747,8 +711,6 @@ public class BlockReplacerDialog extends JDialog {
     }
     JOptionPane.showMessageDialog(this, fp, file.getName(), JOptionPane.PLAIN_MESSAGE);
   }
-
-  // (preview rendering moved to ReplacerPreview)
 
   @Override
   public void dispose() {
