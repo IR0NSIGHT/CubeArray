@@ -1,5 +1,10 @@
 package org.ironsight.cubearray.edit;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
@@ -7,6 +12,8 @@ import java.util.Random;
 public class BlockGradient {
 
     public record GradientRow(String block, int yPos, int chance) {}
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final List<GradientRow> sortedRows;
     private final Random random = new Random();
@@ -50,5 +57,22 @@ public class BlockGradient {
         if (total == 0) return low.block();
 
         return random.nextFloat() * total < lowWeight ? low.block() : high.block();
+    }
+
+    public static void save(Path path, List<GradientRow> rows) {
+        try {
+            MAPPER.writerWithDefaultPrettyPrinter().writeValue(path.toFile(), rows);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to save gradient to " + path, e);
+        }
+    }
+
+    public static List<GradientRow> load(Path path) {
+        if (!path.toFile().exists()) return List.of();
+        try {
+            return MAPPER.readValue(path.toFile(), new TypeReference<List<GradientRow>>() {});
+        } catch (IOException e) {
+            return List.of();
+        }
     }
 }

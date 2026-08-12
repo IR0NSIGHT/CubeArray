@@ -1,26 +1,35 @@
 package org.ironsight.cubearray.ui;
 
 import org.ironsight.cubearray.edit.BlockGradient;
+import org.ironsight.cubearray.edit.BlockGradient.GradientRow;
 import org.ironsight.cubearray.edit.BlockReplacer;
+import org.ironsight.cubearray.platform.ResourceUtils;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.*;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.function.Function;
-import java.util.function.Predicate;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class BlockTableDialog extends JDialog {
+
+    private static final Path GRADIENT_FILE = ResourceUtils.getInstallPath().resolve("gradient.json");
 
     private final List<TableRow> rows = new ArrayList<>();
     private final List<String> availableBlocks;
     private final BlockIconProvider iconProvider;
     private final BlockIconPanel iconPanel;
     private final BlockTableModel tableModel;
+    private final ScheduledExecutorService saveScheduler = Executors.newSingleThreadScheduledExecutor();
+    private ScheduledFuture<?> pendingSave;
 
     private record TableRow(String block, int yPos, int chance) {
         TableRow withBlock(String b) { return new TableRow(b, yPos, chance); }
@@ -30,20 +39,16 @@ public class BlockTableDialog extends JDialog {
 
     private static class BlockTableModel extends AbstractTableModel {
         private final List<TableRow> rows;
-        private final List<String> availableBlocks;
-        private final BlockIconProvider iconProvider;
-        private final Runnable onChange;
+        private final Runnable onTableChanged;
 
-        BlockTableModel(List<TableRow> rows, List<String> availableBlocks, BlockIconProvider iconProvider, Runnable onChange) {
+        BlockTableModel(List<TableRow> rows, Runnable onTableChanged) {
             this.rows = rows;
-            this.availableBlocks = availableBlocks;
-            this.iconProvider = iconProvider;
-            this.onChange = onChange;
+            this.onTableChanged = onTableChanged;
         }
 
         void fireAllChanged() {
             fireTableDataChanged();
-            if (onChange != null) onChange.run();
+            if (onTableChanged != null) onTableChanged.run();
         }
 
         @Override
@@ -104,16 +109,27 @@ public class BlockTableDialog extends JDialog {
                 }
             }
             fireTableCellUpdated(row, col);
-            if (onChange != null) onChange.run();
+            if (onTableChanged != null) onTableChanged.run();
         }
     }
 
     private void rebuildGradient() {
-        List<BlockGradient.GradientRow> gradientRows = new ArrayList<>();
+        List<GradientRow> gradientRows = new ArrayList<>();
         for (TableRow r : rows) {
-            gradientRows.add(new BlockGradient.GradientRow(r.block(), r.yPos(), r.chance()));
+            gradientRows.add(new GradientRow(r.block(), r.yPos(), r.chance()));
         }
         iconPanel.setGradient(new BlockGradient(gradientRows));
+    }
+
+    private void scheduleSave() {
+        if (pendingSave != null) pendingSave.cancel(false);
+        pendingSave = saveScheduler.schedule(() -> {
+            List<GradientRow> gradientRows = new ArrayList<>();
+            for (TableRow r : rows) {
+                gradientRows.add(new GradientRow(r.block(), r.yPos(), r.chance()));
+            }
+            BlockGradient.save(GRADIENT_FILE, gradientRows);
+        }, 500, TimeUnit.MILLISECONDS);
     }
 
     private BlockTableDialog(Frame owner, List<String> availableBlocks) {
@@ -121,10 +137,18 @@ public class BlockTableDialog extends JDialog {
         this.availableBlocks = new ArrayList<>(availableBlocks);
         this.iconProvider = new BlockIconProvider(32, 20);
 
-        rows.add(new TableRow("minecraft:stone", 0, 100));
+        List<GradientRow> saved = BlockGradient.load(GRADIENT_FILE);
+        if (saved.isEmpty()) {
+            rows.add(new TableRow("minecraft:stone", 0, 100));
+        } else {
+            for (GradientRow r : saved) {
+                rows.add(new TableRow(r.block(), r.yPos(), r.chance()));
+            }
+        }
 
         iconPanel = new BlockIconPanel(iconProvider);
-        tableModel = new BlockTableModel(rows, availableBlocks, iconProvider, this::rebuildGradient);
+        Runnable onChange = () -> { rebuildGradient(); scheduleSave(); };
+        tableModel = new BlockTableModel(rows, onChange);
 
         JTable table = new JTable(tableModel);
         table.setRowHeight(32);
