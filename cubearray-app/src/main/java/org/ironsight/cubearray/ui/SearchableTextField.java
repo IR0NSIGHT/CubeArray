@@ -232,6 +232,7 @@ public class SearchableTextField extends JPanel {
 
   private void showPopup() {
     if (!textField.hasFocus()) return;
+    if (!textField.isShowing()) return;
     int prefWidth = Math.max(suggestionList.getPreferredSize().width + 20, textField.getWidth());
     int rowEstimate = iconProvider != null ? 38 : 22;
     int prefHeight = Math.min(300, Math.max(60, listModel.getSize() * rowEstimate + 5));
