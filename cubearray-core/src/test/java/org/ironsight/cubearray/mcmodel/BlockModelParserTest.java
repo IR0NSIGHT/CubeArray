@@ -1,20 +1,19 @@
 package org.ironsight.cubearray.mcmodel;
-import org.ironsight.cubearray.platform.ResourceUtils;
 
 import static org.junit.Assert.*;
 
 import java.nio.file.Path;
 import java.util.Map;
+import org.ironsight.cubearray.platform.ResourceUtils;
 import org.joml.Vector3f;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
- * Verifies {@link BlockModelParser} against the real block model JSON shipped in the bundled
- * "Pixel Perfection Legacy" resource pack (src/main/resources/textures) - both a
- * self-contained model (acacia_fence_post, no "parent") and a model that only resolves through a
- * multi-level "parent" chain with "#key" texture indirection (cobbled_deepslate -> cube_all ->
- * cube).
+ * Verifies {@link BlockModelParser} against the real block model JSON shipped in the bundled "Pixel
+ * Perfection Legacy" resource pack (src/main/resources/textures) - both a self-contained model
+ * (acacia_fence_post, no "parent") and a model that only resolves through a multi-level "parent"
+ * chain with "#key" texture indirection (cobbled_deepslate -> cube_all -> cube).
  */
 public class BlockModelParserTest {
 
@@ -29,7 +28,8 @@ public class BlockModelParserTest {
     // which lands directly under the extracted "textures/" folder (unlike Faithful, which wraps
     // itself in its own "Faithful_32x_1_21_7/" subfolder - see ResourceUtils.TEXTURE_PACK_ROOT).
     packRoot = ResourceUtils.getInstallPath().resolve(ResourceUtils.TEXTURE_RESOURCES);
-    vanillaPackRoot = ResourceUtils.getInstallPath().resolve(ResourceUtils.VANILLA_ASSETS_RESOURCES);
+    vanillaPackRoot =
+        ResourceUtils.getInstallPath().resolve(ResourceUtils.VANILLA_ASSETS_RESOURCES);
   }
 
   @Test
@@ -90,9 +90,7 @@ public class BlockModelParserTest {
     SubBlock block = model.subBlocks().get(0);
     FaceTexture northFace = block.faces().get(Face.NORTH);
     assertNotNull("expected north face", northFace);
-    assertEquals(
-        "minecraft:block/gray_stained_glass",
-        northFace.texture());
+    assertEquals("minecraft:block/gray_stained_glass", northFace.texture());
   }
 
   @Test

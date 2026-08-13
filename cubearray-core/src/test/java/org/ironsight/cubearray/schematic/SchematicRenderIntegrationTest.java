@@ -1,8 +1,4 @@
 package org.ironsight.cubearray.schematic;
-import org.ironsight.cubearray.render.InstancedCubes;
-import org.ironsight.cubearray.render.CubeSetup;
-import org.ironsight.cubearray.platform.ResourceUtils;
-import org.joml.Vector3f;
 
 import static org.junit.Assert.*;
 
@@ -16,6 +12,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import javax.imageio.ImageIO;
+import org.ironsight.cubearray.platform.ResourceUtils;
+import org.ironsight.cubearray.render.CubeSetup;
+import org.ironsight.cubearray.render.InstancedCubes;
+import org.joml.Vector3f;
 import org.junit.Test;
 
 public class SchematicRenderIntegrationTest {
@@ -89,11 +89,13 @@ public class SchematicRenderIntegrationTest {
     }
     double opaqueFraction = opaque / (double) (w * h);
     assertTrue(
-        "Render for " + name + " is (near) fully transparent (opaqueFraction=" + opaqueFraction
+        "Render for "
+            + name
+            + " is (near) fully transparent (opaqueFraction="
+            + opaqueFraction
             + ") -> blank",
         opaqueFraction > 0.9);
-    assertTrue(
-        "Render for " + name + " is a single flat color -> blank", colors.size() > 1);
+    assertTrue("Render for " + name + " is a single flat color -> blank", colors.size() > 1);
   }
 
   /**
@@ -134,8 +136,7 @@ public class SchematicRenderIntegrationTest {
     renderThread.start();
     renderThread.join(60_000);
 
-    assertNull(
-        "Off-thread render threw: " + (error[0] == null ? "" : error[0]), error[0]);
+    assertNull("Off-thread render threw: " + (error[0] == null ? "" : error[0]), error[0]);
     assertFalse("Off-thread render did not finish in time", renderThread.isAlive());
     assertTrue("Output file missing", outputPath.toFile().exists());
     assertNonBlank(outputPath, schemFile.getName() + " (off-thread)");
@@ -155,19 +156,20 @@ public class SchematicRenderIntegrationTest {
     Files.createDirectories(outputPath.getParent());
 
     CubeSetup setup =
-        SchemReader.prepareData(
-            SchemReader.loadSchematics(List.of(schemFile.toPath()), f -> {}));
+        SchemReader.prepareData(SchemReader.loadSchematics(List.of(schemFile.toPath()), f -> {}));
     assertNotNull("Failed to prepare data", setup);
 
     var dim = new Vector3f(setup.max).sub(setup.min);
     var center = new Vector3f(setup.min).add(setup.max).mul(0.5f);
     float radius = Math.max(dim.x, Math.max(dim.y, dim.z)) * 2;
 
-    List<InstancedCubes.CameraState> cameraSetups = List.of(
-        new InstancedCubes.CameraState(center, (float) Math.toRadians(210), (float) Math.toRadians(30), 0f, radius),
-        new InstancedCubes.CameraState(center, (float) Math.toRadians(90), 0f, 0f, radius),
-        new InstancedCubes.CameraState(center, (float) Math.toRadians(180), 0f, 0f, radius),
-        new InstancedCubes.CameraState(center, 0f, (float) Math.toRadians(90), 0f, radius));
+    List<InstancedCubes.CameraState> cameraSetups =
+        List.of(
+            new InstancedCubes.CameraState(
+                center, (float) Math.toRadians(210), (float) Math.toRadians(30), 0f, radius),
+            new InstancedCubes.CameraState(center, (float) Math.toRadians(90), 0f, 0f, radius),
+            new InstancedCubes.CameraState(center, (float) Math.toRadians(180), 0f, 0f, radius),
+            new InstancedCubes.CameraState(center, 0f, (float) Math.toRadians(90), 0f, radius));
 
     InstancedCubes.renderToFile(setup, outputPath, 640, 640, cameraSetups);
 
@@ -175,9 +177,10 @@ public class SchematicRenderIntegrationTest {
       String suffix = "_" + i;
       String name = outputPath.getFileName().toString();
       int dot = name.lastIndexOf('.');
-      Path p = dot == -1
-          ? outputPath.resolveSibling(name + suffix)
-          : outputPath.resolveSibling(name.substring(0, dot) + suffix + name.substring(dot));
+      Path p =
+          dot == -1
+              ? outputPath.resolveSibling(name + suffix)
+              : outputPath.resolveSibling(name.substring(0, dot) + suffix + name.substring(dot));
       assertTrue("Missing render for angle " + i, p.toFile().exists());
       assertNonBlank(p, schemFile.getName() + " angle " + i);
     }
@@ -198,8 +201,7 @@ public class SchematicRenderIntegrationTest {
 
     CubeSetup setup =
         SchemReader.prepareData(
-            SchemReader.loadSchematics(List.of(schemFile.toPath()), f -> {}),
-            true);
+            SchemReader.loadSchematics(List.of(schemFile.toPath()), f -> {}), true);
 
     assertNotNull("Failed to prepare data with grid", setup);
     assertTrue("useGrid should be true", setup.useGrid);
@@ -218,8 +220,7 @@ public class SchematicRenderIntegrationTest {
     File schemFile = schemFiles[0];
 
     CubeSetup setup =
-        SchemReader.prepareData(
-            SchemReader.loadSchematics(List.of(schemFile.toPath()), f -> {}));
+        SchemReader.prepareData(SchemReader.loadSchematics(List.of(schemFile.toPath()), f -> {}));
     assertNotNull(setup);
 
     Path outputPath =

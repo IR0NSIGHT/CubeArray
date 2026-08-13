@@ -1,7 +1,4 @@
 package org.ironsight.cubearray.schematic;
-import org.ironsight.cubearray.render.InstancedCubes;
-import org.ironsight.cubearray.render.CubeSetup;
-import org.ironsight.cubearray.platform.ResourceUtils;
 
 import static org.junit.Assert.*;
 
@@ -15,7 +12,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import javax.imageio.ImageIO;
-
+import org.ironsight.cubearray.platform.ResourceUtils;
+import org.ironsight.cubearray.render.CubeSetup;
+import org.ironsight.cubearray.render.InstancedCubes;
 import org.junit.Test;
 
 public class RenderToFileBenchmarkTest {
@@ -41,8 +40,7 @@ public class RenderToFileBenchmarkTest {
     System.out.println("Using schematic: " + schemFile.getName());
 
     CubeSetup setup =
-        SchemReader.prepareData(
-            SchemReader.loadSchematics(List.of(schemFile.toPath()), f -> {}));
+        SchemReader.prepareData(SchemReader.loadSchematics(List.of(schemFile.toPath()), f -> {}));
     assertNotNull("Failed to prepare CubeSetup", setup);
 
     int iterations = 100;
@@ -68,7 +66,8 @@ public class RenderToFileBenchmarkTest {
     System.out.println("===== renderToFile Benchmark =====");
     System.out.println("Iterations: " + iterations);
     System.out.println("Total time: " + elapsedMs + " ms");
-    System.out.println("Average:    " + String.format("%.2f", elapsedMs / (double) iterations) + " ms per render");
+    System.out.println(
+        "Average:    " + String.format("%.2f", elapsedMs / (double) iterations) + " ms per render");
     System.out.println("Output dir: " + OUTPUT_DIR.toAbsolutePath());
   }
 
@@ -88,10 +87,12 @@ public class RenderToFileBenchmarkTest {
     }
     double opaqueFraction = opaque / (double) (w * h);
     assertTrue(
-        "Render for " + name + " is (near) fully transparent (opaqueFraction=" + opaqueFraction
+        "Render for "
+            + name
+            + " is (near) fully transparent (opaqueFraction="
+            + opaqueFraction
             + ") -> blank",
         opaqueFraction > 0.9);
-    assertTrue(
-        "Render for " + name + " is a single flat color -> blank", colors.size() > 1);
+    assertTrue("Render for " + name + " is a single flat color -> blank", colors.size() > 1);
   }
 }

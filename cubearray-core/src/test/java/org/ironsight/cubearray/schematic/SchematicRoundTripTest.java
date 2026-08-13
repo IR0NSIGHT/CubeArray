@@ -14,9 +14,9 @@ import pitheguy.schemconvert.converter.Schematic;
 /**
  * Round-trips a schematic through the exact I/O path the app uses: build with a SchemConvert {@link
  * Schematic.Builder}, write it with {@link BlockReplacer#write} (Sponge v3), then read it back with
- * {@link SchemReader#loadSchematics} (WorldPainter). A volume where width, length and height are all
- * different (and height &gt; 1) is used so a swapped axis or wrong multiplier anywhere in that chain
- * produces either an out-of-bounds crash or a block landing at the wrong coordinate.
+ * {@link SchemReader#loadSchematics} (WorldPainter). A volume where width, length and height are
+ * all different (and height &gt; 1) is used so a swapped axis or wrong multiplier anywhere in that
+ * chain produces either an out-of-bounds crash or a block landing at the wrong coordinate.
  *
  * <p>Axis conventions in play: SchemConvert's {@code Builder.setBlockAt} is {@code (x=width,
  * y=height, z=length)}, whereas the loaded {@link WPObject} addresses cells as {@code (x=width,
@@ -33,7 +33,8 @@ public class SchematicRoundTripTest {
     final short length = 9;
     final short height = 3;
 
-    // SchemConvert Builder order is (xSize=width, ySize=height, zSize=length). dataVersion 1343 = MC
+    // SchemConvert Builder order is (xSize=width, ySize=height, zSize=length). dataVersion 1343 =
+    // MC
     // 1.12.2. Cells are addressed as setBlockAt(widthIdx, heightIdx, lengthIdx).
     Schematic.Builder schem = new Schematic.Builder(null, 1343, width, height, length);
 

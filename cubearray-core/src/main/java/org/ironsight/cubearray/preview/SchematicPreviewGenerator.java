@@ -1,11 +1,11 @@
 package org.ironsight.cubearray.preview;
 
 import java.awt.*;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.awt.RenderingHints;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -14,7 +14,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -25,11 +24,11 @@ import org.ironsight.cubearray.platform.ResourceUtils;
 import org.ironsight.cubearray.render.CubeSetup;
 import org.ironsight.cubearray.render.InstancedCubes;
 import org.ironsight.cubearray.render.RendererService;
-import org.joml.Vector3f;
 import org.ironsight.cubearray.schematic.SchemReader;
+import org.joml.Vector3f;
 import org.pepsoft.worldpainter.objects.WPObject;
 
-public class SchematicPreviewGenerator  {
+public class SchematicPreviewGenerator {
   private static final Logger logger = AppLogger.get(SchematicPreviewGenerator.class);
   private static final SchematicPreviewGenerator INSTANCE = new SchematicPreviewGenerator();
 
@@ -130,16 +129,20 @@ public class SchematicPreviewGenerator  {
         file.getAbsolutePath(),
         k -> {
           Path renderPath = ResourceUtils.getRenderPathForFile(file);
-          Path p0 = renderPath.resolveSibling(
-              insertSuffix(renderPath.getFileName().toString(), "_0"));
+          Path p0 =
+              renderPath.resolveSibling(insertSuffix(renderPath.getFileName().toString(), "_0"));
 
           BufferedImage composite = new BufferedImage(256, 64, BufferedImage.TYPE_INT_ARGB);
           Graphics2D g = composite.createGraphics();
 
           if (p0.toFile().exists()) {
             for (int i = 0; i < 4; i++) {
-              Path thumb = ResourceUtils.getThumbPathForFile(file).resolveSibling(
-                  insertSuffix(ResourceUtils.getThumbPathForFile(file).getFileName().toString(), "_" + i));
+              Path thumb =
+                  ResourceUtils.getThumbPathForFile(file)
+                      .resolveSibling(
+                          insertSuffix(
+                              ResourceUtils.getThumbPathForFile(file).getFileName().toString(),
+                              "_" + i));
               if (thumb.toFile().exists()) {
                 try {
                   BufferedImage angle = ImageIO.read(thumb.toFile());
@@ -151,7 +154,8 @@ public class SchematicPreviewGenerator  {
                   logger.log(Level.FINE, "Failed to read thumb " + thumb, e);
                 }
               } else {
-                System.err.println("no thumbnail present for " + file + " at thumbnail file path " + thumb);
+                System.err.println(
+                    "no thumbnail present for " + file + " at thumbnail file path " + thumb);
               }
               g.setColor(new Color(0x33, 0x33, 0x33));
               g.fillRect(i * 64, 0, 64, 64);
@@ -162,9 +166,10 @@ public class SchematicPreviewGenerator  {
             if (thumbPath.toFile().exists()) {
               single = new ImageIcon(thumbPath.toString());
             } else if (renderPath.toFile().exists()) {
-              Image scaled = new ImageIcon(renderPath.toString())
-                  .getImage()
-                  .getScaledInstance(64, 64, Image.SCALE_SMOOTH);
+              Image scaled =
+                  new ImageIcon(renderPath.toString())
+                      .getImage()
+                      .getScaledInstance(64, 64, Image.SCALE_SMOOTH);
               single = new ImageIcon(scaled);
             } else {
               single = generatePlaceholderIcon(file);
@@ -190,8 +195,8 @@ public class SchematicPreviewGenerator  {
 
     int tmp = 0;
     for (int i = 0; i < 10; i++) {
-      Path p = renderPath.resolveSibling(
-          insertSuffix(renderPath.getFileName().toString(), "_" + i));
+      Path p =
+          renderPath.resolveSibling(insertSuffix(renderPath.getFileName().toString(), "_" + i));
       if (p.toFile().exists()) tmp++;
     }
     if (tmp == 0 && renderPath.toFile().exists()) tmp = 1;
@@ -275,7 +280,8 @@ public class SchematicPreviewGenerator  {
     if (!Files.exists(rp)) {
       logger.info("Render needed for " + file.getName() + ": no cached render");
     } else {
-      logger.info("Render needed for " + file.getName() + ": schematic file changed since last render");
+      logger.info(
+          "Render needed for " + file.getName() + ": schematic file changed since last render");
     }
     firePendingRenderCountChanged();
     String absPath = file.getAbsolutePath();
@@ -283,70 +289,86 @@ public class SchematicPreviewGenerator  {
       logger.fine("Render already queued for " + file.getName());
       return;
     }
-    PriorityTask task = new PriorityTask(
-        () -> {
-          try {
-            if (!ResourceUtils.needsNewRender(file)) {
-              logger.fine("Render skipped for " + file.getName() + ": already up to date");
-              return;
-            }
-            ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
-            CubeSetup setup = SchemReader.prepareData(List.of(obj));
-            if (setup == null) return;
-            Path renderPath = ResourceUtils.getRenderPathForFile(file);
-            Files.createDirectories(renderPath.getParent());
-
-            var dim = new Vector3f(setup.max).sub(setup.min);
-            var center = new Vector3f(setup.min).add(setup.max).mul(0.5f);
-            float radius = Math.max(dim.x, Math.max(dim.y, dim.z)) * 2;
-
-            List<InstancedCubes.CameraState> effectiveSetups;
-            if (cameraSetups != null && !cameraSetups.isEmpty()) {
-              effectiveSetups =
-                  cameraSetups.stream()
-                      .map(
-                          cs ->
-                              new InstancedCubes.CameraState(
-                                  center, cs.yaw(), cs.pitch(), cs.roll(), radius, cs.orthographicCamera()))
-                      .toList();
-            } else {
-              effectiveSetups =
-                  List.of(new InstancedCubes.CameraState(center, (float) Math.toRadians(180), 0f, 0f, radius));
-            }
-            InstancedCubes.renderToFile(setup, renderPath, 640, 640, effectiveSetups);
-            try {
-              for (int i = 0; i < effectiveSetups.size(); i++) {
-                Path anglePath = renderPath.resolveSibling(
-                    insertSuffix(renderPath.getFileName().toString(), "_" + i));
-                if (anglePath.toFile().exists()) {
-                  BufferedImage full = ImageIO.read(anglePath.toFile());
-                  BufferedImage thumb = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
-                  Graphics2D g = thumb.createGraphics();
-                  g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                  g.drawImage(full, 0, 0, 64, 64, null);
-                  g.dispose();
-                  Path thumbPath = ResourceUtils.getThumbPathForFile(file).resolveSibling(
-                      insertSuffix(ResourceUtils.getThumbPathForFile(file).getFileName().toString(), "_" + i));
-                  ImageIO.write(thumb, "PNG", thumbPath.toFile());
+    PriorityTask task =
+        new PriorityTask(
+            () -> {
+              try {
+                if (!ResourceUtils.needsNewRender(file)) {
+                  logger.fine("Render skipped for " + file.getName() + ": already up to date");
+                  return;
                 }
+                ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
+                CubeSetup setup = SchemReader.prepareData(List.of(obj));
+                if (setup == null) return;
+                Path renderPath = ResourceUtils.getRenderPathForFile(file);
+                Files.createDirectories(renderPath.getParent());
+
+                var dim = new Vector3f(setup.max).sub(setup.min);
+                var center = new Vector3f(setup.min).add(setup.max).mul(0.5f);
+                float radius = Math.max(dim.x, Math.max(dim.y, dim.z)) * 2;
+
+                List<InstancedCubes.CameraState> effectiveSetups;
+                if (cameraSetups != null && !cameraSetups.isEmpty()) {
+                  effectiveSetups =
+                      cameraSetups.stream()
+                          .map(
+                              cs ->
+                                  new InstancedCubes.CameraState(
+                                      center,
+                                      cs.yaw(),
+                                      cs.pitch(),
+                                      cs.roll(),
+                                      radius,
+                                      cs.orthographicCamera()))
+                          .toList();
+                } else {
+                  effectiveSetups =
+                      List.of(
+                          new InstancedCubes.CameraState(
+                              center, (float) Math.toRadians(180), 0f, 0f, radius));
+                }
+                InstancedCubes.renderToFile(setup, renderPath, 640, 640, effectiveSetups);
+                try {
+                  for (int i = 0; i < effectiveSetups.size(); i++) {
+                    Path anglePath =
+                        renderPath.resolveSibling(
+                            insertSuffix(renderPath.getFileName().toString(), "_" + i));
+                    if (anglePath.toFile().exists()) {
+                      BufferedImage full = ImageIO.read(anglePath.toFile());
+                      BufferedImage thumb = new BufferedImage(64, 64, BufferedImage.TYPE_INT_ARGB);
+                      Graphics2D g = thumb.createGraphics();
+                      g.setRenderingHint(
+                          RenderingHints.KEY_INTERPOLATION,
+                          RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                      g.drawImage(full, 0, 0, 64, 64, null);
+                      g.dispose();
+                      Path thumbPath =
+                          ResourceUtils.getThumbPathForFile(file)
+                              .resolveSibling(
+                                  insertSuffix(
+                                      ResourceUtils.getThumbPathForFile(file)
+                                          .getFileName()
+                                          .toString(),
+                                      "_" + i));
+                      ImageIO.write(thumb, "PNG", thumbPath.toFile());
+                    }
+                  }
+                } catch (Exception e) {
+                  logger.log(Level.FINE, "Failed to generate thumbnails for " + file.getName(), e);
+                }
+                SwingUtilities.invokeLater(
+                    () -> {
+                      if (onComplete != null) onComplete.run();
+                    });
+              } catch (Exception e) {
+                logger.log(Level.WARNING, "Failed to render icon for " + file.getName(), e);
+              } finally {
+                pendingFiles.remove(absPath);
+                SwingUtilities.invokeLater(() -> firePendingRenderCountChanged());
               }
-            } catch (Exception e) {
-              logger.log(Level.FINE, "Failed to generate thumbnails for " + file.getName(), e);
-            }
-            SwingUtilities.invokeLater(
-                () -> {
-                  if (onComplete != null) onComplete.run();
-                });
-          } catch (Exception e) {
-            logger.log(Level.WARNING, "Failed to render icon for " + file.getName(), e);
-          } finally {
-            pendingFiles.remove(absPath);
-            SwingUtilities.invokeLater(
-                () -> firePendingRenderCountChanged());
-          }
-        },
-        file.length(),
-        absPath);
+            },
+            file.length(),
+            absPath);
 
     renderExecutor.execute(task);
   }
@@ -363,8 +385,7 @@ public class SchematicPreviewGenerator  {
               try {
                 ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
                 CubeSetup setup =
-                    SchemReader.prepareData(
-                        SchemReader.loadSchematics(schematicPaths, f -> {}));
+                    SchemReader.prepareData(SchemReader.loadSchematics(schematicPaths, f -> {}));
                 if (setup == null) {
                   SwingUtilities.invokeLater(
                       () ->
@@ -402,8 +423,9 @@ public class SchematicPreviewGenerator  {
 
   private static String insertSuffix(String filename, String suffix) {
     int dot = filename.lastIndexOf('.');
-    return dot == -1 ? filename + suffix
-                     : filename.substring(0, dot) + suffix + filename.substring(dot);
+    return dot == -1
+        ? filename + suffix
+        : filename.substring(0, dot) + suffix + filename.substring(dot);
   }
 
   private static Icon generatePlaceholderIcon(File f) {

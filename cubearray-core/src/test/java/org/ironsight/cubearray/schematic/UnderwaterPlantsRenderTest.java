@@ -1,7 +1,4 @@
 package org.ironsight.cubearray.schematic;
-import org.ironsight.cubearray.render.InstancedCubes;
-import org.ironsight.cubearray.render.CubeSetup;
-import org.ironsight.cubearray.platform.ResourceUtils;
 
 import static org.junit.Assert.*;
 
@@ -10,6 +7,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import org.ironsight.cubearray.edit.BlockReplacer;
+import org.ironsight.cubearray.platform.ResourceUtils;
+import org.ironsight.cubearray.render.CubeSetup;
+import org.ironsight.cubearray.render.InstancedCubes;
 import org.junit.Test;
 import pitheguy.schemconvert.converter.Schematic;
 
@@ -98,8 +98,7 @@ public class UnderwaterPlantsRenderTest {
     assertNotNull("Failed to prepare data for underwater_plants.schem", setup);
     // every placed block expands into at least one render instance (see SchemReader.computePieces)
     assertTrue(
-        "expected at least one instance per placed plant",
-        setup.positions.length >= PLANTS.size());
+        "expected at least one instance per placed plant", setup.positions.length >= PLANTS.size());
 
     Path outputPath = OUTPUT_DIR.resolve("underwater_plants.png");
     Files.createDirectories(outputPath.getParent());

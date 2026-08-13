@@ -5,9 +5,9 @@ import org.joml.Vector3f;
 
 /**
  * One cuboid element of a block model, in the same [0,16] "from"/"to" coordinate space used by
- * vanilla block model JSON (e.g. assets/minecraft/models/block/fence_post.json has an element
- * with "from": [6,0,6], "to": [10,16,10]). {@code faces} mirrors that same element's "faces" map,
- * keyed by {@link Face}; a face missing from the map has no texture assigned (e.g. it's hidden by
+ * vanilla block model JSON (e.g. assets/minecraft/models/block/fence_post.json has an element with
+ * "from": [6,0,6], "to": [10,16,10]). {@code faces} mirrors that same element's "faces" map, keyed
+ * by {@link Face}; a face missing from the map has no texture assigned (e.g. it's hidden by
  * "cullface" in the source model).
  *
  * <p>{@code rotation} is the element's own local rotation (vanilla's {@code "rotation"} block) as
@@ -32,7 +32,11 @@ public record SubBlock(
   }
 
   public SubBlock(
-      Vector3f from, Vector3f to, Map<Face, FaceTexture> faces, Vector3f rotation, Vector3f rescale) {
+      Vector3f from,
+      Vector3f to,
+      Map<Face, FaceTexture> faces,
+      Vector3f rotation,
+      Vector3f rescale) {
     this(from, to, faces, rotation, rescale, new Vector3f(8, 8, 8));
   }
 

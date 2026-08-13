@@ -19,13 +19,13 @@ import java.util.stream.Stream;
  * Parses vanilla-format blockstate JSON (assets/&lt;namespace&gt;/blockstates/*.json) into a form
  * that, given a block's blockstate properties, selects which model(s) to render and with what
  * rotation. This is the file type that maps e.g. {@code oak_stairs[shape=inner_left,half=top]} to
- * "use the block/oak_stairs_inner model, rotated x=180". It has no knowledge of any specific
- * block; every block is handled by the same two generic forms of the format:
+ * "use the block/oak_stairs_inner model, rotated x=180". It has no knowledge of any specific block;
+ * every block is handled by the same two generic forms of the format:
  *
  * <ul>
- *   <li><b>variants</b>: a map of a mutually-exclusive property selector (e.g.
- *       {@code "facing=east,half=bottom,shape=straight"}, or {@code ""} to always match) to a
- *       model + rotation. Exactly one variant applies.
+ *   <li><b>variants</b>: a map of a mutually-exclusive property selector (e.g. {@code
+ *       "facing=east,half=bottom,shape=straight"}, or {@code ""} to always match) to a model +
+ *       rotation. Exactly one variant applies.
  *   <li><b>multipart</b>: a list of parts, each optionally guarded by a {@code when} condition;
  *       every part whose condition matches applies (so a fence emits a post plus one arm per
  *       connected side). Conditions support {@code {"key":"val"}} (AND of keys, value may be an
@@ -100,13 +100,17 @@ public class BlockStateParser {
    */
   private static ModelPlacement toPlacement(JsonNode applyNode) {
     if (applyNode == null) return null;
-    JsonNode apply = applyNode.isArray() ? (applyNode.isEmpty() ? null : applyNode.get(0)) : applyNode;
+    JsonNode apply =
+        applyNode.isArray() ? (applyNode.isEmpty() ? null : applyNode.get(0)) : applyNode;
     if (apply == null) return null;
     String model = apply.path("model").asText(null);
     if (model == null) return null;
     if (model.indexOf(':') < 0) model = DEFAULT_NAMESPACE + ":" + model;
     return new ModelPlacement(
-        model, apply.path("x").asInt(0), apply.path("y").asInt(0), apply.path("uvlock").asBoolean(false));
+        model,
+        apply.path("x").asInt(0),
+        apply.path("y").asInt(0),
+        apply.path("uvlock").asBoolean(false));
   }
 
   /** Matches an actual property value against a spec value, which may be an "a|b" OR-list. */

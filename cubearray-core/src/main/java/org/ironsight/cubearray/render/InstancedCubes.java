@@ -13,14 +13,12 @@ import static org.lwjgl.system.MemoryUtil.NULL;
 
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
-import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
@@ -57,8 +55,11 @@ public class InstancedCubes {
   private int height = 1080;
   private int vao, vbo, ebo, instanceVBO, colorIndexVBO;
   private int shaderProgram;
-  private int colorPaletteTexId, sizePaletteTexId, offsetPaletteTexId,
-              rotationPaletteTexId, uvPaletteTexId;
+  private int colorPaletteTexId,
+      sizePaletteTexId,
+      offsetPaletteTexId,
+      rotationPaletteTexId,
+      uvPaletteTexId;
   private int blockTexId;
   private double lastMouseX, lastMouseY;
   private boolean firstMouse = true;
@@ -102,9 +103,12 @@ public class InstancedCubes {
     publishedCameraState = cameraState;
     transition =
         CameraTransition.create(
-            new CameraState(schematicCenter, fixPos_2.yaw(), initialPos.pitch(), 0f, initialPos.radius()),
-            new CameraState(schematicCenter, fixPos_3.yaw(), initialPos.pitch(), 0f, initialPos.radius()),
-            System.currentTimeMillis(), System.currentTimeMillis() + 1000);
+            new CameraState(
+                schematicCenter, fixPos_2.yaw(), initialPos.pitch(), 0f, initialPos.radius()),
+            new CameraState(
+                schematicCenter, fixPos_3.yaw(), initialPos.pitch(), 0f, initialPos.radius()),
+            System.currentTimeMillis(),
+            System.currentTimeMillis() + 1000);
   }
 
   private void updateFixedPositions() {
@@ -113,8 +117,7 @@ public class InstancedCubes {
     float radius = Math.max(dim.x, Math.max(dim.y, dim.z)) * 2;
     maxRadius = Math.max(radius, Math.max(gridX, Math.max(gridY, gridZ)));
 
-    initialPos =
-        new CameraState(center, (float) toRadians(210), (float) toRadians(30), 0f, radius);
+    initialPos = new CameraState(center, (float) toRadians(210), (float) toRadians(30), 0f, radius);
     schematicCenter = center;
     fixPos_0 = new FixedYaw((float) toRadians(210));
     fixPos_1 = new FixedYaw((float) toRadians(-45));
@@ -248,8 +251,7 @@ public class InstancedCubes {
     } else {
       projection =
           new Matrix4f()
-              .perspective(
-                  (float) toRadians(45.0f), (float) width / height, .1f, 10000.0f);
+              .perspective((float) toRadians(45.0f), (float) width / height, .1f, 10000.0f);
     }
 
     glClearColor(0.53f, 0.81f, 0.92f, 1f);
@@ -259,34 +261,28 @@ public class InstancedCubes {
     FloatBuffer viewBuffer = BufferUtils.createFloatBuffer(16);
 
     float camX =
-        (float)
-            (cameraState.radius * Math.cos(cameraState.pitch) * Math.sin(cameraState.yaw));
+        (float) (cameraState.radius * Math.cos(cameraState.pitch) * Math.sin(cameraState.yaw));
     float camY = (float) (cameraState.radius * Math.sin(cameraState.pitch));
     float camZ =
-        (float)
-            (cameraState.radius * Math.cos(cameraState.pitch) * Math.cos(cameraState.yaw));
+        (float) (cameraState.radius * Math.cos(cameraState.pitch) * Math.cos(cameraState.yaw));
     Vector3f cameraPos = new Vector3f(camX, camY, camZ).add(cameraState.target);
 
-    Matrix4f view =
-        new Matrix4f().lookAt(cameraPos, cameraState.target(), new Vector3f(0, 1, 0));
+    Matrix4f view = new Matrix4f().lookAt(cameraPos, cameraState.target(), new Vector3f(0, 1, 0));
 
     projection.get(projBuffer);
     view.get(viewBuffer);
 
     glUseProgram(shaderProgram);
-    glUniformMatrix4fv(
-        glGetUniformLocation(shaderProgram, "projection"), false, projBuffer);
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), false, projBuffer);
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), false, viewBuffer);
 
     glBindVertexArray(vao);
-    glDrawElementsInstanced(
-        GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, setup.positions.length);
+    glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, setup.positions.length);
     glBindVertexArray(0);
 
     glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolveFbo);
-    glBlitFramebuffer(
-        0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     executePendingTasks();
@@ -316,24 +312,30 @@ public class InstancedCubes {
     GL.createCapabilities();
 
     glViewport(0, 0, width, height);
-    projection = new Matrix4f().perspective((float) toRadians(45.0f), (float) width / height, .1f, 10000.0f);
+    projection =
+        new Matrix4f().perspective((float) toRadians(45.0f), (float) width / height, .1f, 10000.0f);
 
-    glfwSetFramebufferSizeCallback(window, (win, fbWidth, fbHeight) -> {
-        width = fbWidth;
-        height = fbHeight;
-        glViewport(0, 0, fbWidth, fbHeight);
-        projection = new Matrix4f().perspective((float) toRadians(45.0f), (float) fbWidth / fbHeight, .1f, 10000.0f);
-        glBindRenderbuffer(GL_RENDERBUFFER, resolveColorRb);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, fbWidth, fbHeight);
-        lastChangeTime = glfwGetTime();
-    });
+    glfwSetFramebufferSizeCallback(
+        window,
+        (win, fbWidth, fbHeight) -> {
+          width = fbWidth;
+          height = fbHeight;
+          glViewport(0, 0, fbWidth, fbHeight);
+          projection =
+              new Matrix4f()
+                  .perspective((float) toRadians(45.0f), (float) fbWidth / fbHeight, .1f, 10000.0f);
+          glBindRenderbuffer(GL_RENDERBUFFER, resolveColorRb);
+          glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, fbWidth, fbHeight);
+          lastChangeTime = glfwGetTime();
+        });
 
     resolveFbo = glGenFramebuffers();
     glBindFramebuffer(GL_FRAMEBUFFER, resolveFbo);
     resolveColorRb = glGenRenderbuffers();
     glBindRenderbuffer(GL_RENDERBUFFER, resolveColorRb);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, width, height);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, resolveColorRb);
+    glFramebufferRenderbuffer(
+        GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, resolveColorRb);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     setupShaders();
@@ -459,104 +461,168 @@ public class InstancedCubes {
               } else if (key == CAM_FIX_POS_0.key) {
                 CameraState target =
                     new CameraState(
-                        cameraState.target(), fixPos_0.yaw(),
-                        (float) toRadians(30), 0f, cameraState.radius(), cameraState.orthographicCamera());
+                        cameraState.target(),
+                        fixPos_0.yaw(),
+                        (float) toRadians(30),
+                        0f,
+                        cameraState.radius(),
+                        cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
-                        cameraState, target, System.currentTimeMillis(),
+                        cameraState,
+                        target,
+                        System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == CAM_FIX_POS_1.key) {
                 CameraState target =
                     new CameraState(
-                        cameraState.target(), fixPos_1.yaw(),
-                        cameraState.pitch(), 0f, cameraState.radius(), cameraState.orthographicCamera());
+                        cameraState.target(),
+                        fixPos_1.yaw(),
+                        cameraState.pitch(),
+                        0f,
+                        cameraState.radius(),
+                        cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
-                        cameraState, target, System.currentTimeMillis(),
+                        cameraState,
+                        target,
+                        System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == CAM_FIX_POS_2.key) {
                 CameraState target =
                     new CameraState(
-                        cameraState.target(), fixPos_2.yaw(),
-                        cameraState.pitch(), 0f, cameraState.radius(), cameraState.orthographicCamera());
+                        cameraState.target(),
+                        fixPos_2.yaw(),
+                        cameraState.pitch(),
+                        0f,
+                        cameraState.radius(),
+                        cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
-                        cameraState, target, System.currentTimeMillis(),
+                        cameraState,
+                        target,
+                        System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == CAM_FIX_POS_3.key) {
                 CameraState target =
                     new CameraState(
-                        cameraState.target(), fixPos_3.yaw(),
-                        cameraState.pitch(), 0f, cameraState.radius(), cameraState.orthographicCamera());
+                        cameraState.target(),
+                        fixPos_3.yaw(),
+                        cameraState.pitch(),
+                        0f,
+                        cameraState.radius(),
+                        cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
-                        cameraState, target, System.currentTimeMillis(),
+                        cameraState,
+                        target,
+                        System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == CAM_FIX_POS_4.key) {
                 CameraState target =
                     new CameraState(
-                        cameraState.target(), fixPos_4.yaw(),
-                        cameraState.pitch(), 0f, cameraState.radius(), cameraState.orthographicCamera());
+                        cameraState.target(),
+                        fixPos_4.yaw(),
+                        cameraState.pitch(),
+                        0f,
+                        cameraState.radius(),
+                        cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
-                        cameraState, target, System.currentTimeMillis(),
+                        cameraState,
+                        target,
+                        System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == CAM_FIX_POS_5.key) {
                 CameraState target =
                     new CameraState(
-                        schematicCenter, fixPos_5.yaw(),
-                        (float) toRadians(89), 0f, cameraState.radius(), cameraState.orthographicCamera());
+                        schematicCenter,
+                        fixPos_5.yaw(),
+                        (float) toRadians(89),
+                        0f,
+                        cameraState.radius(),
+                        cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
-                        cameraState, target, System.currentTimeMillis(),
+                        cameraState,
+                        target,
+                        System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == CAM_FIX_POS_6.key) {
                 CameraState target =
                     new CameraState(
-                        cameraState.target(), fixPos_6.yaw(),
-                        cameraState.pitch(), 0f, cameraState.radius(), cameraState.orthographicCamera());
+                        cameraState.target(),
+                        fixPos_6.yaw(),
+                        cameraState.pitch(),
+                        0f,
+                        cameraState.radius(),
+                        cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
-                        cameraState, target, System.currentTimeMillis(),
+                        cameraState,
+                        target,
+                        System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == CAM_FIX_POS_7.key) {
                 CameraState target =
                     new CameraState(
-                        cameraState.target(), fixPos_7.yaw(),
-                        cameraState.pitch(), 0f, cameraState.radius(), cameraState.orthographicCamera());
+                        cameraState.target(),
+                        fixPos_7.yaw(),
+                        cameraState.pitch(),
+                        0f,
+                        cameraState.radius(),
+                        cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
-                        cameraState, target, System.currentTimeMillis(),
+                        cameraState,
+                        target,
+                        System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == CAM_FIX_POS_8.key) {
                 CameraState target =
                     new CameraState(
-                        cameraState.target(), fixPos_8.yaw(),
-                        cameraState.pitch(), 0f, cameraState.radius(), cameraState.orthographicCamera());
+                        cameraState.target(),
+                        fixPos_8.yaw(),
+                        cameraState.pitch(),
+                        0f,
+                        cameraState.radius(),
+                        cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
-                        cameraState, target, System.currentTimeMillis(),
+                        cameraState,
+                        target,
+                        System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == CAM_FIX_POS_9.key) {
                 CameraState target =
                     new CameraState(
-                        cameraState.target(), fixPos_9.yaw(),
-                        cameraState.pitch(), 0f, cameraState.radius(), cameraState.orthographicCamera());
+                        cameraState.target(),
+                        fixPos_9.yaw(),
+                        cameraState.pitch(),
+                        0f,
+                        cameraState.radius(),
+                        cameraState.orthographicCamera());
                 transition =
                     CameraTransition.create(
-                        cameraState, target, System.currentTimeMillis(),
+                        cameraState,
+                        target,
+                        System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == ZOOM_IN.key) {
                 CameraState target = zoom(cameraState, 2);
                 transition =
                     CameraTransition.create(
-                        cameraState, target, System.currentTimeMillis(),
+                        cameraState,
+                        target,
+                        System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == ZOOM_OUT.key) {
                 CameraState target = zoom(cameraState, -2);
                 transition =
                     CameraTransition.create(
-                        cameraState, target, System.currentTimeMillis(),
+                        cameraState,
+                        target,
+                        System.currentTimeMillis(),
                         System.currentTimeMillis() + 500);
               } else if (key == SCREENSHOT.key) {
                 saveScreenshot();
@@ -644,9 +710,12 @@ public class InstancedCubes {
         pitch = Math.max(-1.5f, Math.min(1.5f, pitch));
         cameraState =
             new CameraState(
-                cameraState.target(), yaw, pitch, 0f, cameraState.radius, // new radius
-                cameraState.orthographicCamera
-                );
+                cameraState.target(),
+                yaw,
+                pitch,
+                0f,
+                cameraState.radius, // new radius
+                cameraState.orthographicCamera);
 
       } else if (moveCameraByMouse) {
         float sensitivityShift = 25f * deltaTime;
@@ -663,8 +732,7 @@ public class InstancedCubes {
                 cameraState.pitch,
                 0f,
                 cameraState.radius, // new radius
-                cameraState.orthographicCamera
-                );
+                cameraState.orthographicCamera);
       }
 
       // Calculate camera position (orbit style)
@@ -686,8 +754,7 @@ public class InstancedCubes {
                 cameraState.pitch,
                 0f,
                 cameraState.radius, // new radius
-                cameraState.orthographicCamera
-                );
+                cameraState.orthographicCamera);
       }
       /*
       if (movement.length() != 0) {
@@ -727,7 +794,9 @@ public class InstancedCubes {
           float halfW = halfH * aspect;
           projection = new Matrix4f().setOrtho(-halfW, halfW, -halfH, halfH, 0.1f, 10000.0f);
         } else {
-          projection = new Matrix4f().perspective((float) toRadians(45.0f), (float) width / height, .1f, 10000.0f);
+          projection =
+              new Matrix4f()
+                  .perspective((float) toRadians(45.0f), (float) width / height, .1f, 10000.0f);
         }
 
         projection.get(projBuffer);
@@ -741,18 +810,19 @@ public class InstancedCubes {
         glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, setup.positions.length);
         glBindVertexArray(0);
 
-        // TODO: only blit when pendingTasks contains a screenshot request to avoid the per-frame cost
+        // TODO: only blit when pendingTasks contains a screenshot request to avoid the per-frame
+        // cost
         glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolveFbo);
-        glBlitFramebuffer(0, 0, width, height, 0, 0, width, height,
-                          GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        glBlitFramebuffer(
+            0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-         Runnable task;
-         while ((task = priorityTasks.pollFirst()) != null) {
-           task.run();
-         }
-         while ((task = pendingTasks.poll()) != null) {
+        Runnable task;
+        while ((task = priorityTasks.pollFirst()) != null) {
+          task.run();
+        }
+        while ((task = pendingTasks.poll()) != null) {
           task.run();
         }
 
@@ -796,9 +866,7 @@ public class InstancedCubes {
     }
   }
 
-  /**
-   * Captures the current GL read framebuffer and returns it as a BufferedImage.
-   */
+  /** Captures the current GL read framebuffer and returns it as a BufferedImage. */
   public BufferedImage captureScreenshot() {
     ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * 4);
     glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
@@ -818,27 +886,25 @@ public class InstancedCubes {
     return image;
   }
 
-  /**
-   * Safely captures a screenshot from any thread by queuing the readback onto
-   * the render loop.
-   */
+  /** Safely captures a screenshot from any thread by queuing the readback onto the render loop. */
   public CompletableFuture<BufferedImage> requestScreenshot() {
     CompletableFuture<BufferedImage> future = new CompletableFuture<>();
-    pendingTasks.add(() -> {
-      try {
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, resolveFbo);
-        glReadBuffer(GL_COLOR_ATTACHMENT0);
-        future.complete(captureScreenshot());
-      } catch (Throwable t) {
-        future.completeExceptionally(t);
-      }
-    });
+    pendingTasks.add(
+        () -> {
+          try {
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, resolveFbo);
+            glReadBuffer(GL_COLOR_ATTACHMENT0);
+            future.complete(captureScreenshot());
+          } catch (Throwable t) {
+            future.completeExceptionally(t);
+          }
+        });
     return future;
   }
 
   /**
-   * Returns the most recent camera state, published at the end of every render-loop iteration.
-   * Safe to call from any thread.
+   * Returns the most recent camera state, published at the end of every render-loop iteration. Safe
+   * to call from any thread.
    */
   public CameraState getCameraState() {
     return publishedCameraState;
@@ -860,34 +926,34 @@ public class InstancedCubes {
    * Queues a camera target position update onto the render thread. Safe to call from any thread.
    */
   public void setCameraTarget(Vector3f target) {
-    pendingTasks.add(() -> {
-      cameraState =
-          new CameraState(
-              target,
-              cameraState.yaw(),
-              cameraState.pitch(),
-              cameraState.roll(),
-              cameraState.radius(),
-              cameraState.orthographicCamera());
-      lastChangeTime = glfwGetTime();
-    });
+    pendingTasks.add(
+        () -> {
+          cameraState =
+              new CameraState(
+                  target,
+                  cameraState.yaw(),
+                  cameraState.pitch(),
+                  cameraState.roll(),
+                  cameraState.radius(),
+                  cameraState.orthographicCamera());
+          lastChangeTime = glfwGetTime();
+        });
   }
 
-  /**
-   * Queues a camera position update onto the render thread. Safe to call from any thread.
-   */
+  /** Queues a camera position update onto the render thread. Safe to call from any thread. */
   public void setCamera(float yawDeg, float pitchDeg, float radius) {
-    pendingTasks.add(() -> {
-      cameraState =
-          new CameraState(
-              cameraState.target(),
-              (float) toRadians(yawDeg),
-              (float) toRadians(pitchDeg),
-              0f,
-              radius,
-              cameraState.orthographicCamera());
-      lastChangeTime = glfwGetTime();
-    });
+    pendingTasks.add(
+        () -> {
+          cameraState =
+              new CameraState(
+                  cameraState.target(),
+                  (float) toRadians(yawDeg),
+                  (float) toRadians(pitchDeg),
+                  0f,
+                  radius,
+                  cameraState.orthographicCamera());
+          lastChangeTime = glfwGetTime();
+        });
   }
 
   private CameraState zoom(CameraState cameraState, float factor) {
@@ -897,9 +963,12 @@ public class InstancedCubes {
             java.lang.Math.min(
                 maxRadius, cameraState.radius() * (float) Math.pow(0.85, factor))); // clamp zoom
     return new CameraState(
-        cameraState.target(), cameraState.yaw(), cameraState.pitch(), 0f, newRadius, // new radius
-        cameraState.orthographicCamera()
-        );
+        cameraState.target(),
+        cameraState.yaw(),
+        cameraState.pitch(),
+        0f,
+        newRadius, // new radius
+        cameraState.orthographicCamera());
   }
 
   private void cleanup() {
@@ -922,8 +991,8 @@ public class InstancedCubes {
     glfwDestroyWindow(window);
   }
 
-  public static void renderToFile(
-      CubeSetup setup, Path outputPath, int width, int height) throws Exception {
+  public static void renderToFile(CubeSetup setup, Path outputPath, int width, int height)
+      throws Exception {
     renderToFile(setup, outputPath, width, height, List.of());
   }
 
@@ -934,12 +1003,15 @@ public class InstancedCubes {
     if (parent != null) Files.createDirectories(parent);
     RendererService service = RendererService.getInstance();
     if (cameraSetups.isEmpty()) {
-      BufferedImage image = service.renderScreenshot(setup, width, height, null).get(30, TimeUnit.SECONDS);
+      BufferedImage image =
+          service.renderScreenshot(setup, width, height, null).get(30, TimeUnit.SECONDS);
       ImageIO.write(image, "png", outputPath.toFile());
     } else {
       for (int i = 0; i < cameraSetups.size(); i++) {
         BufferedImage image =
-            service.renderScreenshot(setup, width, height, cameraSetups.get(i)).get(30, TimeUnit.SECONDS);
+            service
+                .renderScreenshot(setup, width, height, cameraSetups.get(i))
+                .get(30, TimeUnit.SECONDS);
         ImageIO.write(image, "png", withSuffix(outputPath, "_" + i).toFile());
       }
     }
@@ -1017,13 +1089,9 @@ public class InstancedCubes {
       if (i % floatsPerVertex < 3) cubeVertices[i] -= 0.5f;
     }
     int[] cubeIndices = {
-      2, 1, 0,
-      0, 3, 2, 5, 6, 7,
-      7, 4, 5, 8 + 1, 8 + 5, 8 + 4,
-      8 + 4, 8 + 0, 8 + 1, 8 + 3, 8 + 7, 8 + 6,
-      8 + 6, 8 + 2, 8 + 3, 16 + 0, 16 + 4, 16 + 7,
-      16 + 7, 16 + 3, 16 + 0, 16 + 2, 16 + 6, 16 + 5,
-      16 + 5, 16 + 1, 16 + 2
+      2, 1, 0, 0, 3, 2, 5, 6, 7, 7, 4, 5, 8 + 1, 8 + 5, 8 + 4, 8 + 4, 8 + 0, 8 + 1, 8 + 3, 8 + 7,
+      8 + 6, 8 + 6, 8 + 2, 8 + 3, 16 + 0, 16 + 4, 16 + 7, 16 + 7, 16 + 3, 16 + 0, 16 + 2, 16 + 6,
+      16 + 5, 16 + 5, 16 + 1, 16 + 2
     };
 
     vao = glGenVertexArrays();
@@ -1075,11 +1143,12 @@ public class InstancedCubes {
 
     int lightDirLoc = glGetUniformLocation(shaderProgram, "lightDir");
     int lightColorLoc = glGetUniformLocation(shaderProgram, "lightColor");
-    Vector3f lightDir = new Vector3f(
-        (float) (Math.cos(Math.toRadians(22.5)) * Math.cos(Math.toRadians(70))),
-        (float) Math.sin(Math.toRadians(70)),
-        (float) (Math.sin(Math.toRadians(22.5)) * Math.cos(Math.toRadians(70)))
-    ).normalize();
+    Vector3f lightDir =
+        new Vector3f(
+                (float) (Math.cos(Math.toRadians(22.5)) * Math.cos(Math.toRadians(70))),
+                (float) Math.sin(Math.toRadians(70)),
+                (float) (Math.sin(Math.toRadians(22.5)) * Math.cos(Math.toRadians(70))))
+            .normalize();
     glUniform3f(lightDirLoc, lightDir.x, lightDir.y, lightDir.z);
     glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
 
@@ -1091,7 +1160,8 @@ public class InstancedCubes {
       FloatBuffer buf = BufferUtils.createFloatBuffer(setup.colorPalette.length * 3);
       for (Vector3f c : setup.colorPalette) buf.put(c.x).put(c.y).put(c.z);
       buf.flip();
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, setup.colorPalette.length, 1, 0, GL_RGB, GL_FLOAT, buf);
+      glTexImage2D(
+          GL_TEXTURE_2D, 0, GL_RGB32F, setup.colorPalette.length, 1, 0, GL_RGB, GL_FLOAT, buf);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -1107,7 +1177,8 @@ public class InstancedCubes {
       FloatBuffer buf = BufferUtils.createFloatBuffer(setup.sizePalette.length * 3);
       for (Vector3f c : setup.sizePalette) buf.put(c.x).put(c.y).put(c.z);
       buf.flip();
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, setup.sizePalette.length, 1, 0, GL_RGB, GL_FLOAT, buf);
+      glTexImage2D(
+          GL_TEXTURE_2D, 0, GL_RGB32F, setup.sizePalette.length, 1, 0, GL_RGB, GL_FLOAT, buf);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -1123,7 +1194,8 @@ public class InstancedCubes {
       FloatBuffer buf = BufferUtils.createFloatBuffer(setup.offsetPalette.length * 3);
       for (Vector3f c : setup.offsetPalette) buf.put(c.x).put(c.y).put(c.z);
       buf.flip();
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, setup.offsetPalette.length, 1, 0, GL_RGB, GL_FLOAT, buf);
+      glTexImage2D(
+          GL_TEXTURE_2D, 0, GL_RGB32F, setup.offsetPalette.length, 1, 0, GL_RGB, GL_FLOAT, buf);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -1139,7 +1211,8 @@ public class InstancedCubes {
       FloatBuffer buf = BufferUtils.createFloatBuffer(setup.rotationPalette.length * 3);
       for (Vector3f c : setup.rotationPalette) buf.put(c.x).put(c.y).put(c.z);
       buf.flip();
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, setup.rotationPalette.length, 1, 0, GL_RGB, GL_FLOAT, buf);
+      glTexImage2D(
+          GL_TEXTURE_2D, 0, GL_RGB32F, setup.rotationPalette.length, 1, 0, GL_RGB, GL_FLOAT, buf);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -1155,7 +1228,16 @@ public class InstancedCubes {
       FloatBuffer buf = BufferUtils.createFloatBuffer(setup.uvCoordsPalette.length * 4);
       for (Vector4f c : setup.uvCoordsPalette) buf.put(c.x).put(c.y).put(c.z).put(c.w);
       buf.flip();
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, setup.offsetPalette.length, Face.values().length, 0, GL_RGBA, GL_FLOAT, buf);
+      glTexImage2D(
+          GL_TEXTURE_2D,
+          0,
+          GL_RGBA32F,
+          setup.offsetPalette.length,
+          Face.values().length,
+          0,
+          GL_RGBA,
+          GL_FLOAT,
+          buf);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -1238,19 +1320,33 @@ public class InstancedCubes {
       return start.multiply(1 - delta).add(end.multiply(delta));
     }
 
-    static CameraTransition create(CameraState start, CameraState end, long timeStart, long timeEnd) {
+    static CameraTransition create(
+        CameraState start, CameraState end, long timeStart, long timeEnd) {
       float twoPi = (float) (2 * Math.PI);
       float diff = (end.yaw - start.yaw) % twoPi;
       if (diff > (float) Math.PI) diff -= twoPi;
       if (diff < (float) -Math.PI) diff += twoPi;
-      CameraState adjustedEnd = new CameraState(end.target, start.yaw + diff, end.pitch, end.roll, end.radius, end.orthographicCamera);
+      CameraState adjustedEnd =
+          new CameraState(
+              end.target,
+              start.yaw + diff,
+              end.pitch,
+              end.roll,
+              end.radius,
+              end.orthographicCamera);
       return new CameraTransition(start, adjustedEnd, timeStart, timeEnd);
     }
   }
 
   public record FixedYaw(float yaw) {}
 
-  public record CameraState(Vector3f target, float yaw, float pitch, float roll, float radius, boolean orthographicCamera) {
+  public record CameraState(
+      Vector3f target,
+      float yaw,
+      float pitch,
+      float roll,
+      float radius,
+      boolean orthographicCamera) {
     public CameraState(Vector3f target, float yaw, float pitch, float roll, float radius) {
       this(target, yaw, pitch, roll, radius, false);
     }
@@ -1261,7 +1357,7 @@ public class InstancedCubes {
           new Vector3f(this.target).add(other.target), // create new Vector3f to keep immutability
           this.yaw + other.yaw,
           this.pitch + other.pitch,
-        this.roll + other.roll,
+          this.roll + other.roll,
           this.radius + other.radius,
           this.orthographicCamera || other.orthographicCamera);
     }
@@ -1281,7 +1377,14 @@ public class InstancedCubes {
     public String toString() {
       return String.format(
           "CameraState[x=%.2f, y=%.2f, z=%.2f, yaw=%.1f°, pitch=%.1f°, roll=%.1f°, radius=%.2f, ortho=%s]",
-          target.x, target.y, target.z, toDegrees(yaw), toDegrees(pitch), toDegrees(roll), radius, orthographicCamera);
+          target.x,
+          target.y,
+          target.z,
+          toDegrees(yaw),
+          toDegrees(pitch),
+          toDegrees(roll),
+          radius,
+          orthographicCamera);
     }
   }
 }

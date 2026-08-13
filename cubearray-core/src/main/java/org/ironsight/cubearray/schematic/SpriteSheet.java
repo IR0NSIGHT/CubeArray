@@ -35,9 +35,7 @@ public class SpriteSheet {
   //   1 = foliage (oak-leaf ~#77AB2F)
   //   2 = dry foliage (brown ~#8B6B4D)
   private static final int[] HARDCODED_TINTS = {
-    0xFF91BD59,
-    0xFF77AB2F,
-    0xFF8B6B4D,
+    0xFF91BD59, 0xFF77AB2F, 0xFF8B6B4D,
   };
 
   private static final String[] EXTENSIONS = {
@@ -231,7 +229,9 @@ public class SpriteSheet {
     return textureAtlas;
   }
 
-  /** The atlas rect for a material's sprite, or (0,0,0,0) if it has no cell (renders flat colour). */
+  /**
+   * The atlas rect for a material's sprite, or (0,0,0,0) if it has no cell (renders flat colour).
+   */
   public Vector4f uvFor(Material mat, String sprite) {
     return rects.getOrDefault(mat, Map.of()).getOrDefault(sprite, NO_TEXTURE);
   }

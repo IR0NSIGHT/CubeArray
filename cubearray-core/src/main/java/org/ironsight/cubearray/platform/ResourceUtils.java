@@ -18,7 +18,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipFile;
 import org.apache.commons.io.FilenameUtils;
 
@@ -74,8 +73,7 @@ public class ResourceUtils {
 
   public static Path getRenderPathForFile(File file) {
     String hash =
-        Integer.toHexString(
-            file.toPath().toAbsolutePath().normalize().toString().hashCode());
+        Integer.toHexString(file.toPath().toAbsolutePath().normalize().toString().hashCode());
     String name = file.getName();
     int dot = name.lastIndexOf('.');
     String baseName = (dot > 0) ? name.substring(0, dot) : name;
@@ -152,7 +150,8 @@ public class ResourceUtils {
         Path thumb = getThumbPathForFile(schematicFile);
         String tName = thumb.getFileName().toString();
         int tDot = tName.lastIndexOf('.');
-        Path angleThumb = thumb.resolveSibling(tName.substring(0, tDot) + "_" + i + tName.substring(tDot));
+        Path angleThumb =
+            thumb.resolveSibling(tName.substring(0, tDot) + "_" + i + tName.substring(tDot));
         if (!Files.exists(angleThumb)) return true;
       }
       return false;
@@ -450,7 +449,6 @@ public class ResourceUtils {
       return 0;
     }
          */
-
 
   }
 

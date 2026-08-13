@@ -94,8 +94,7 @@ public class ChipSearchManager {
     gbc.gridx = 1;
     panel.add(searchTextLabel, gbc);
 
-    JComboBox<CaColumn> columnCombo =
-        new JComboBox<>(SEARCHABLE_COLUMNS.toArray(new CaColumn[0]));
+    JComboBox<CaColumn> columnCombo = new JComboBox<>(SEARCHABLE_COLUMNS.toArray(new CaColumn[0]));
     columnCombo.setRenderer(
         new DefaultListCellRenderer() {
           @Override

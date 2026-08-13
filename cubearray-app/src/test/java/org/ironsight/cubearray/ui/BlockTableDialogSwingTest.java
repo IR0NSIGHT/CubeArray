@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.assertj.swing.fixture.DialogFixture;
-import org.junit.Test;
 import org.ironsight.cubearray.edit.BlockGradient;
+import org.junit.Test;
 
 public class BlockTableDialogSwingTest extends SwingTestSupport {
   @Test
@@ -39,8 +39,7 @@ public class BlockTableDialogSwingTest extends SwingTestSupport {
     Optional<BlockGradient> gradient =
         showDialog(
             () ->
-                BlockTableDialog.show(
-                    null, List.of("minecraft:stone"), List.<File>of(), Set.of()),
+                BlockTableDialog.show(null, List.of("minecraft:stone"), List.<File>of(), Set.of()),
             "Block Gradient",
             dialog -> dialog.button("cancelButton").click());
 

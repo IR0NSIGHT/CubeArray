@@ -4,7 +4,6 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
 import java.io.IOException;
-
 import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -12,14 +11,13 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-
 import org.ironsight.cubearray.edit.BlockListUtil;
 import org.ironsight.cubearray.edit.BlockListUtil.CategoryEntry;
 import org.ironsight.cubearray.edit.BlockReplacer;
 import org.ironsight.cubearray.edit.NotFoundExc;
+import org.ironsight.cubearray.edit.Replacer;
 import org.ironsight.cubearray.preview.SchematicPreviewGenerator;
 import pitheguy.schemconvert.converter.Schematic;
-import org.ironsight.cubearray.edit.Replacer;
 
 /**
  * Modal dialog that lets the user map each block in a palette to a replacement.
@@ -31,7 +29,6 @@ import org.ironsight.cubearray.edit.Replacer;
  *       automatically via {@link BlockListUtil#toLegalBlockState}.
  *   <li><b>Details</b> — one row per exact block-state variant. No transplanting.
  * </ul>
- *
  */
 public class BlockReplacerDialog extends JDialog {
 
@@ -117,7 +114,8 @@ public class BlockReplacerDialog extends JDialog {
   // Constructor
   // -------------------------------------------------------------------------
 
-  private BlockReplacerDialog(Frame owner, Set<String> palette, Set<String> availableBlocks, Map<File, Schematic> loaded) {
+  private BlockReplacerDialog(
+      Frame owner, Set<String> palette, Set<String> availableBlocks, Map<File, Schematic> loaded) {
     super(owner, "Replace blocks", true);
     this.palette = palette;
     this.availableBlocks = availableBlocks;
@@ -350,10 +348,11 @@ public class BlockReplacerDialog extends JDialog {
                     .count();
             yield (int) (matchingGroups + visibleCats);
           }
-          case DETAILS -> (int)
-              variants.stream()
-                  .filter(v -> searchText.isEmpty() || v.toLowerCase().contains(searchText))
-                  .count();
+          case DETAILS ->
+              (int)
+                  variants.stream()
+                      .filter(v -> searchText.isEmpty() || v.toLowerCase().contains(searchText))
+                      .count();
         };
     JScrollPane scroll = new JScrollPane(rows);
     scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
@@ -435,8 +434,7 @@ public class BlockReplacerDialog extends JDialog {
           addCategorySeparator(rows, srcC);
           destC.gridy = srcC.gridy;
 
-          SearchableTextField catField =
-              new SearchableTextField(Arrays.asList(categoryChoices));
+          SearchableTextField catField = new SearchableTextField(Arrays.asList(categoryChoices));
           catField.setSuggestionRenderer(createCategoryRenderer());
           catField.setSyntaxValidator(BlockReplacer::isValidCategorySyntax);
           catField.addCommitListener(
@@ -505,8 +503,7 @@ public class BlockReplacerDialog extends JDialog {
       String variant = variants.get(vi);
       if (filtering && !variant.toLowerCase().contains(searchText)) continue;
 
-      JLabel srcLabel =
-          new JLabel(variant, iconProvider.getIcon(variant), JLabel.LEADING);
+      JLabel srcLabel = new JLabel(variant, iconProvider.getIcon(variant), JLabel.LEADING);
       srcLabel.setIconTextGap(6);
       rows.add(srcLabel, srcC);
 
@@ -523,21 +520,24 @@ public class BlockReplacerDialog extends JDialog {
     for (int i = 0; i < detailsCombos.size(); i++) {
       SearchableTextField combo = detailsCombos.get(i);
       String srcKey = detailsSourceKeys.get(i);
-      combo.setOnTextChangedCallback(() -> {
-        boolean allValid = detailsCombos.stream()
-            .allMatch(stf -> BlockReplacer.isValidBlockSyntax(stf.getTextField().getText()));
-        if (!allValid) return;
-        for (int j = 0; j < detailsCombos.size(); j++) {
-          String val = detailsCombos.get(j).getTextField().getText();
-          String src = detailsSourceKeys.get(j);
-          if (val.equals(src)) {
-            overrides.remove(src);
-          } else {
-            overrides.put(src, val);
-          }
-        }
-        preview.flagRerender();
-      });
+      combo.setOnTextChangedCallback(
+          () -> {
+            boolean allValid =
+                detailsCombos.stream()
+                    .allMatch(
+                        stf -> BlockReplacer.isValidBlockSyntax(stf.getTextField().getText()));
+            if (!allValid) return;
+            for (int j = 0; j < detailsCombos.size(); j++) {
+              String val = detailsCombos.get(j).getTextField().getText();
+              String src = detailsSourceKeys.get(j);
+              if (val.equals(src)) {
+                overrides.remove(src);
+              } else {
+                overrides.put(src, val);
+              }
+            }
+            preview.flagRerender();
+          });
     }
     this.comboToVariant = variantIndexMapping.stream().mapToInt(Integer::intValue).toArray();
   }
@@ -669,7 +669,8 @@ public class BlockReplacerDialog extends JDialog {
       iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
       iconLabel.setToolTipText(file.getName());
       iconLabel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-      Runnable clickAction = isAfter ? () -> showAfterPreview(file) : () -> showBeforeFilePreview(file);
+      Runnable clickAction =
+          isAfter ? () -> showAfterPreview(file) : () -> showBeforeFilePreview(file);
       iconLabel.addMouseListener(
           new MouseAdapter() {
             @Override
@@ -700,8 +701,8 @@ public class BlockReplacerDialog extends JDialog {
     JScrollPane scroll = new JScrollPane(column);
     scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
     scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-    scroll.setPreferredSize(new Dimension(isAfter ? 88 : 256+24, 1));
-    scroll.setMinimumSize(new Dimension(isAfter ? 88 : 256+24, 1));
+    scroll.setPreferredSize(new Dimension(isAfter ? 88 : 256 + 24, 1));
+    scroll.setMinimumSize(new Dimension(isAfter ? 88 : 256 + 24, 1));
     return scroll;
   }
 
@@ -710,13 +711,14 @@ public class BlockReplacerDialog extends JDialog {
   }
 
   private void showBeforeFilePreview(File file) {
-   SchematicPreviewGenerator.getInstance().showPreviewDialog(file,this,0);
+    SchematicPreviewGenerator.getInstance().showPreviewDialog(file, this, 0);
   }
 
   private void showAfterPreview(File file) {
     ImageIcon fp = this.preview.getFullPreview(file);
     if (fp == null) {
-      JOptionPane.showMessageDialog(this, "Preview not yet available.", file.getName(), JOptionPane.PLAIN_MESSAGE);
+      JOptionPane.showMessageDialog(
+          this, "Preview not yet available.", file.getName(), JOptionPane.PLAIN_MESSAGE);
       return;
     }
     JOptionPane.showMessageDialog(this, fp, file.getName(), JOptionPane.PLAIN_MESSAGE);
@@ -848,7 +850,10 @@ public class BlockReplacerDialog extends JDialog {
   // -------------------------------------------------------------------------
 
   public static Optional<ReplaceResult> show(
-      Component parent, Set<String> palette, Set<String> availableBlocks, Map<File, Schematic> loaded) {
+      Component parent,
+      Set<String> palette,
+      Set<String> availableBlocks,
+      Map<File, Schematic> loaded) {
 
     Frame owner =
         parent == null

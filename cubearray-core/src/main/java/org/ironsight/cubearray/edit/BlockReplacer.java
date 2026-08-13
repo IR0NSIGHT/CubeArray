@@ -116,8 +116,8 @@ public class BlockReplacer {
 
   /**
    * Checks whether the given string is a syntactically valid Minecraft block ID.
-   * <p>
-   * Accepted format: {@code [namespace:]block_id[key=value,...]} where the namespace and
+   *
+   * <p>Accepted format: {@code [namespace:]block_id[key=value,...]} where the namespace and
    * blockstate properties are optional.
    */
   public static boolean isValidBlockSyntax(String block) {

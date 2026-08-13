@@ -2,13 +2,13 @@ package org.ironsight.cubearray.ui;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.function.Function;
-import java.util.function.Predicate;
 
 public class SearchableTextField extends JPanel {
 
@@ -180,8 +180,7 @@ public class SearchableTextField extends JPanel {
           JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus) {
         JLabel label =
             (JLabel)
-                super.getListCellRendererComponent(
-                    list, value, index, isSelected, cellHasFocus);
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
         if (value instanceof String s) {
           if (iconProvider != null) {
             Icon icon = iconProvider.apply(s);
@@ -267,8 +266,16 @@ public class SearchableTextField extends JPanel {
   public static void main(String[] args) {
     List<String> options =
         List.of(
-            "Apple", "Banana", "Cherry", "Date", "Elderberry",
-            "Fig", "Grape", "Honeydew", "Kiwi", "Lemon");
+            "Apple",
+            "Banana",
+            "Cherry",
+            "Date",
+            "Elderberry",
+            "Fig",
+            "Grape",
+            "Honeydew",
+            "Kiwi",
+            "Lemon");
 
     SwingUtilities.invokeLater(
         () -> {

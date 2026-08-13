@@ -32,7 +32,7 @@ public class SchematicPreviewGeneratorTest {
   public void priorityTaskEqualityByFilePath() {
     PriorityTask a1 = new PriorityTask(() -> {}, 1, "/path/file.schem");
     PriorityTask a2 = new PriorityTask(() -> {}, 2, "/path/file.schem");
-    PriorityTask b  = new PriorityTask(() -> {}, 1, "/path/other.schem");
+    PriorityTask b = new PriorityTask(() -> {}, 1, "/path/other.schem");
 
     assertEquals(a1, a2);
     assertEquals(a1.hashCode(), a2.hashCode());
@@ -42,9 +42,9 @@ public class SchematicPreviewGeneratorTest {
 
   @Test
   public void priorityTaskEqualityNullFilePath() {
-    PriorityTask withNull  = new PriorityTask(() -> {}, 1);
-    PriorityTask alsoNull  = new PriorityTask(() -> {}, 2, null);
-    PriorityTask withPath  = new PriorityTask(() -> {}, 1, "/path/file.schem");
+    PriorityTask withNull = new PriorityTask(() -> {}, 1);
+    PriorityTask alsoNull = new PriorityTask(() -> {}, 2, null);
+    PriorityTask withPath = new PriorityTask(() -> {}, 1, "/path/file.schem");
 
     assertNotNull(withNull);
     assertNotEquals(withNull, alsoNull);
@@ -81,7 +81,8 @@ public class SchematicPreviewGeneratorTest {
     gen.queueRender(schemFile, obj, () -> {});
     int afterSecond = gen.getPendingRenderCount();
 
-    assertTrue("Expected at most 1 pending render after first queue, got " + afterFirst, afterFirst <= 1);
+    assertTrue(
+        "Expected at most 1 pending render after first queue, got " + afterFirst, afterFirst <= 1);
     assertEquals("Second queueRender should not increase pending count", afterFirst, afterSecond);
   }
 
@@ -105,12 +106,11 @@ public class SchematicPreviewGeneratorTest {
     CountDownLatch latch = new CountDownLatch(1);
     gen.queueRender(schemFile, obj, latch::countDown);
 
-    assertTrue("Render did not complete in 120 seconds",
-        latch.await(120, TimeUnit.SECONDS));
+    assertTrue("Render did not complete in 120 seconds", latch.await(120, TimeUnit.SECONDS));
 
     for (int i = 0; i < 4; i++) {
-      Path anglePath = renderPath.resolveSibling(
-          insertSuffix(renderPath.getFileName().toString(), "_" + i));
+      Path anglePath =
+          renderPath.resolveSibling(insertSuffix(renderPath.getFileName().toString(), "_" + i));
       assertTrue("Missing render for angle " + i + ": " + anglePath, anglePath.toFile().exists());
       BufferedImage renderImg = ImageIO.read(anglePath.toFile());
       assertNotNull("Could not read render for angle " + i, renderImg);
@@ -119,31 +119,34 @@ public class SchematicPreviewGeneratorTest {
     }
 
     for (int i = 0; i < 4; i++) {
-      Path thumbAnglePath = thumbPath.resolveSibling(
-          insertSuffix(thumbPath.getFileName().toString(), "_" + i));
-      assertTrue("Missing thumbnail for angle " + i + ": " + thumbAnglePath, thumbAnglePath.toFile().exists());
+      Path thumbAnglePath =
+          thumbPath.resolveSibling(insertSuffix(thumbPath.getFileName().toString(), "_" + i));
+      assertTrue(
+          "Missing thumbnail for angle " + i + ": " + thumbAnglePath,
+          thumbAnglePath.toFile().exists());
       BufferedImage thumbImg = ImageIO.read(thumbAnglePath.toFile());
       assertNotNull("Could not read thumbnail for angle " + i, thumbImg);
       assertEquals("Thumbnail " + i + " width", 64, thumbImg.getWidth());
       assertEquals("Thumbnail " + i + " height", 64, thumbImg.getHeight());
     }
-
   }
 
-  private static void deleteFileTree(Path renderPath, Path thumbPath, int angleCount) throws Exception {
+  private static void deleteFileTree(Path renderPath, Path thumbPath, int angleCount)
+      throws Exception {
     Files.deleteIfExists(renderPath);
     Files.deleteIfExists(thumbPath);
     for (int i = 0; i < angleCount; i++) {
-      Files.deleteIfExists(renderPath.resolveSibling(
-          insertSuffix(renderPath.getFileName().toString(), "_" + i)));
-      Files.deleteIfExists(thumbPath.resolveSibling(
-          insertSuffix(thumbPath.getFileName().toString(), "_" + i)));
+      Files.deleteIfExists(
+          renderPath.resolveSibling(insertSuffix(renderPath.getFileName().toString(), "_" + i)));
+      Files.deleteIfExists(
+          thumbPath.resolveSibling(insertSuffix(thumbPath.getFileName().toString(), "_" + i)));
     }
   }
 
   private static String insertSuffix(String filename, String suffix) {
     int dot = filename.lastIndexOf('.');
-    return dot == -1 ? filename + suffix
-                     : filename.substring(0, dot) + suffix + filename.substring(dot);
+    return dot == -1
+        ? filename + suffix
+        : filename.substring(0, dot) + suffix + filename.substring(dot);
   }
 }

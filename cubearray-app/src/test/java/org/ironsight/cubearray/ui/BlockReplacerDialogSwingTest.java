@@ -2,12 +2,11 @@ package org.ironsight.cubearray.ui;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.File;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import org.assertj.swing.edt.GuiActionRunner;
 import javax.swing.JButton;
+import org.assertj.swing.edt.GuiActionRunner;
 import org.junit.Test;
 
 public class BlockReplacerDialogSwingTest extends SwingTestSupport {

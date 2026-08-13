@@ -9,8 +9,8 @@ import java.util.logging.Logger;
 
 public class PeriodicChecker {
   /**
-   * The single application-wide checker. Lives here (not on the app entry class) so the UI and other
-   * consumers depend on {@code platform}, not on the root {@code CubeArrayMain}.
+   * The single application-wide checker. Lives here (not on the app entry class) so the UI and
+   * other consumers depend on {@code platform}, not on the root {@code CubeArrayMain}.
    */
   public static final PeriodicChecker INSTANCE = new PeriodicChecker();
 

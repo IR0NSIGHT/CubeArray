@@ -4,8 +4,8 @@ import static org.junit.Assert.assertEquals;
 
 import java.io.File;
 import java.util.List;
-import org.junit.Test;
 import org.ironsight.cubearray.preview.SchematicPreviewGenerator;
+import org.junit.Test;
 
 public class FileTableModelTest {
 

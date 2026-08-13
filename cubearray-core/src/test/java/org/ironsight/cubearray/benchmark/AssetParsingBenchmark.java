@@ -28,21 +28,21 @@ import org.openjdk.jmh.annotations.Warmup;
 @Fork(1)
 public class AssetParsingBenchmark {
 
-    private Path vanillaRoot;
+  private Path vanillaRoot;
 
-    @Setup(Level.Trial)
-    public void setUp() throws IOException {
-        ResourceUtils.copyResourcesToFile(ResourceUtils.VANILLA_ASSETS_RESOURCES);
-        vanillaRoot = ResourceUtils.getInstallPath().resolve(ResourceUtils.VANILLA_ASSETS_RESOURCES);
-    }
+  @Setup(Level.Trial)
+  public void setUp() throws IOException {
+    ResourceUtils.copyResourcesToFile(ResourceUtils.VANILLA_ASSETS_RESOURCES);
+    vanillaRoot = ResourceUtils.getInstallPath().resolve(ResourceUtils.VANILLA_ASSETS_RESOURCES);
+  }
 
-    @Benchmark
-    public Map<String, BlockModel> parseModels() throws IOException {
-        return BlockModelParser.parseAll(vanillaRoot);
-    }
+  @Benchmark
+  public Map<String, BlockModel> parseModels() throws IOException {
+    return BlockModelParser.parseAll(vanillaRoot);
+  }
 
-    @Benchmark
-    public Map<String, BlockStateParser.BlockState> parseStates() throws IOException {
-        return BlockStateParser.parseAll(vanillaRoot);
-    }
+  @Benchmark
+  public Map<String, BlockStateParser.BlockState> parseStates() throws IOException {
+    return BlockStateParser.parseAll(vanillaRoot);
+  }
 }

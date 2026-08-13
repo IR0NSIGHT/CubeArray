@@ -7,36 +7,35 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
 import javax.swing.SwingUtilities;
+import org.ironsight.cubearray.edit.BlockReplacer;
+import org.ironsight.cubearray.platform.ResourceUtils;
 import org.ironsight.cubearray.render.CubeSetup;
 import org.ironsight.cubearray.render.InstancedCubes;
 import org.ironsight.cubearray.render.RendererService;
-import org.ironsight.cubearray.platform.ResourceUtils;
 import org.ironsight.cubearray.schematic.SchemReader;
-import org.ironsight.cubearray.edit.BlockReplacer;
 import org.pepsoft.worldpainter.DefaultCustomObjectProvider;
-import org.pepsoft.worldpainter.objects.WPObject;
 import org.pepsoft.worldpainter.objects.WPObject;
 import pitheguy.schemconvert.converter.Schematic;
 
 public class ReplacerPreview {
 
   public interface Callback {
-    //runs on the swing gui thread
+    // runs on the swing gui thread
     void onPreviewReady(File file);
   }
 
@@ -50,8 +49,8 @@ public class ReplacerPreview {
           r -> {
             Thread t = new Thread(r, "preview-renderer");
             t.setDaemon(true);
-           return t;
-         });
+            return t;
+          });
   private final ScheduledExecutorService interactiveScheduleExecutor =
       Executors.newSingleThreadScheduledExecutor(
           r -> {
@@ -95,8 +94,7 @@ public class ReplacerPreview {
   public ImageIcon getIconPreview(File file) {
     ImageIcon full = afterPreviews.get(file);
     if (full == null) return null;
-    return new ImageIcon(
-        full.getImage().getScaledInstance(iconSize, iconSize, Image.SCALE_SMOOTH));
+    return new ImageIcon(full.getImage().getScaledInstance(iconSize, iconSize, Image.SCALE_SMOOTH));
   }
 
   public void clearCache() {
@@ -109,7 +107,6 @@ public class ReplacerPreview {
     pendingRender =
         interactiveScheduleExecutor.schedule(() -> renderAll(generation), 1, TimeUnit.SECONDS);
     System.out.println("FLAGGED RE RENDER");
-
   }
 
   private void renderAll(long generation) {
@@ -125,10 +122,15 @@ public class ReplacerPreview {
             renderExecutor.execute(() -> renderThumbnails(snapshot, generation));
           }
         });
-    System.out.println(replacements.entrySet().stream()
-            .map(e -> BlockReplacer.stripBlockId(e.getKey()) + " -> " +BlockReplacer.stripBlockId(e.getValue()) )
+    System.out.println(
+        replacements.entrySet().stream()
+            .map(
+                e ->
+                    BlockReplacer.stripBlockId(e.getKey())
+                        + " -> "
+                        + BlockReplacer.stripBlockId(e.getValue()))
             .distinct()
-            .toList())            ;
+            .toList());
   }
 
   private boolean updateInteractivePreview(Map<String, String> replacements, long generation) {
@@ -227,10 +229,11 @@ public class ReplacerPreview {
           BufferedImage img = ImageIO.read(tmpRender.toFile());
           afterPreviews.put(file, new ImageIcon(img));
           if (callback != null) {
-            SwingUtilities.invokeLater(() -> {
-              System.out.println("PREVIEW READY FOR " + file.getName());
-              callback.onPreviewReady(file);
-            });
+            SwingUtilities.invokeLater(
+                () -> {
+                  System.out.println("PREVIEW READY FOR " + file.getName());
+                  callback.onPreviewReady(file);
+                });
           }
         } finally {
           Files.deleteIfExists(tmpRender);

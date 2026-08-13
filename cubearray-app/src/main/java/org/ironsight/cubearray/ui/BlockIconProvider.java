@@ -69,7 +69,8 @@ public class BlockIconProvider {
     if (url == null) return null;
     Icon icon =
         new ImageIcon(
-            new ImageIcon(url).getImage()
+            new ImageIcon(url)
+                .getImage()
                 .getScaledInstance(defaultSize, defaultSize, Image.SCALE_SMOOTH));
     cache.put("__unknown__", icon);
     return icon;
@@ -82,7 +83,8 @@ public class BlockIconProvider {
     if (url == null) return null;
     Icon icon =
         new ImageIcon(
-            new ImageIcon(url).getImage()
+            new ImageIcon(url)
+                .getImage()
                 .getScaledInstance(smallSize, smallSize, Image.SCALE_SMOOTH));
     cache.put("__unknown_small__", icon);
     return icon;

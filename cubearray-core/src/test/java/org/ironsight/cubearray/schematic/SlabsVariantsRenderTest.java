@@ -1,7 +1,4 @@
 package org.ironsight.cubearray.schematic;
-import org.ironsight.cubearray.render.InstancedCubes;
-import org.ironsight.cubearray.render.CubeSetup;
-import org.ironsight.cubearray.platform.ResourceUtils;
 
 import static org.junit.Assert.*;
 
@@ -10,6 +7,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import org.ironsight.cubearray.edit.BlockReplacer;
+import org.ironsight.cubearray.platform.ResourceUtils;
+import org.ironsight.cubearray.render.CubeSetup;
+import org.ironsight.cubearray.render.InstancedCubes;
 import org.junit.Test;
 import pitheguy.schemconvert.converter.Schematic;
 

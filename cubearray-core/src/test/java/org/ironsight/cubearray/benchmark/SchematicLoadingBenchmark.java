@@ -1,7 +1,5 @@
 package org.ironsight.cubearray.benchmark;
 
-import java.io.File;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -30,32 +28,32 @@ import org.pepsoft.worldpainter.objects.WPObject;
 @Fork(1)
 public class SchematicLoadingBenchmark {
 
-    @Param({
-        "src/test/resources/schematics/Dannypan/house_1.schem",
-        "src/test/resources/schematics/Dannypan/smithy.schem",
-        "src/test/resources/schematics/Ir0nsight/jerusalem_wall_arch_gates.schem"
-    })
-    public String schematicPath;
+  @Param({
+    "src/test/resources/schematics/Dannypan/house_1.schem",
+    "src/test/resources/schematics/Dannypan/smithy.schem",
+    "src/test/resources/schematics/Ir0nsight/jerusalem_wall_arch_gates.schem"
+  })
+  public String schematicPath;
 
-    private List<WPObject> wpObjects;
-    private boolean setupDone = false;
+  private List<WPObject> wpObjects;
+  private boolean setupDone = false;
 
-    @Setup(Level.Trial)
-    public void setUp() throws Exception {
-        ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
-        ResourceUtils.copyResourcesToFile(ResourceUtils.VANILLA_ASSETS_RESOURCES);
+  @Setup(Level.Trial)
+  public void setUp() throws Exception {
+    ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
+    ResourceUtils.copyResourcesToFile(ResourceUtils.VANILLA_ASSETS_RESOURCES);
 
-        List<Path> pathList = List.of(Path.of(schematicPath));
-        wpObjects = SchemReader.loadSchematics(pathList, f -> {});
+    List<Path> pathList = List.of(Path.of(schematicPath));
+    wpObjects = SchemReader.loadSchematics(pathList, f -> {});
 
-        SchemReader.prepareData(wpObjects);
-        setupDone = true;
-    }
+    SchemReader.prepareData(wpObjects);
+    setupDone = true;
+  }
 
-    @Benchmark
-    public CubeSetup loadAndPrepare() throws Exception {
-        List<Path> pathList = List.of(Path.of(schematicPath));
-        List<WPObject> objects = SchemReader.loadSchematics(pathList, f -> {});
-        return SchemReader.prepareData(objects);
-    }
+  @Benchmark
+  public CubeSetup loadAndPrepare() throws Exception {
+    List<Path> pathList = List.of(Path.of(schematicPath));
+    List<WPObject> objects = SchemReader.loadSchematics(pathList, f -> {});
+    return SchemReader.prepareData(objects);
+  }
 }

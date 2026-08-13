@@ -133,12 +133,14 @@ public class ResourceUtilsTest {
     Files.writeString(thumbPath, "stale thumb");
     createdFiles.add(thumbPath);
 
-    assertFalse("needsNewRender should be false before delete (render + thumb exist)",
+    assertFalse(
+        "needsNewRender should be false before delete (render + thumb exist)",
         ResourceUtils.needsNewRender(tempSchemFile));
 
     ResourceUtils.deleteRenderFiles(tempSchemFile);
 
-    assertTrue("needsNewRender should be true after delete (render gone)",
+    assertTrue(
+        "needsNewRender should be true after delete (render gone)",
         ResourceUtils.needsNewRender(tempSchemFile));
   }
 }

@@ -1,5 +1,4 @@
 package org.ironsight.cubearray.mcmodel;
-import org.ironsight.cubearray.platform.ResourceUtils;
 
 import static org.junit.Assert.*;
 
@@ -10,13 +9,14 @@ import java.util.Map;
 import java.util.function.Function;
 import org.ironsight.cubearray.mcmodel.BlockStateParser.BlockState;
 import org.ironsight.cubearray.mcmodel.BlockStateParser.ModelPlacement;
+import org.ironsight.cubearray.platform.ResourceUtils;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 /**
- * Verifies {@link BlockStateParser} selection against the real bundled vanilla blockstates:
- * stairs (variants, incl. the inner/outer-L shapes and upside-down x-rotation), fences (multipart
- * with per-side rotation), slabs (variants), and redstone wire (multipart with an OR condition).
+ * Verifies {@link BlockStateParser} selection against the real bundled vanilla blockstates: stairs
+ * (variants, incl. the inner/outer-L shapes and upside-down x-rotation), fences (multipart with
+ * per-side rotation), slabs (variants), and redstone wire (multipart with an OR condition).
  */
 public class BlockStateParserTest {
 
@@ -43,7 +43,8 @@ public class BlockStateParserTest {
 
   private static ModelPlacement only(BlockState state, String propsKv) {
     List<ModelPlacement> placements = state.select(props(propsKv));
-    assertEquals("expected exactly one variant placement for [" + propsKv + "]", 1, placements.size());
+    assertEquals(
+        "expected exactly one variant placement for [" + propsKv + "]", 1, placements.size());
     return placements.get(0);
   }
 
@@ -98,8 +99,7 @@ public class BlockStateParserTest {
     assertNotNull("oak_fence blockstate missing", fence);
 
     // post always present; a side (rotated per direction) per connected side
-    List<ModelPlacement> ne =
-        fence.select(props("north=true,east=true,south=false,west=false"));
+    List<ModelPlacement> ne = fence.select(props("north=true,east=true,south=false,west=false"));
     assertTrue(
         "post should always apply",
         ne.stream().anyMatch(p -> p.model().equals("minecraft:block/oak_fence_post")));
@@ -115,8 +115,7 @@ public class BlockStateParserTest {
     assertEquals(3, ne.size());
 
     // no connections -> post only
-    assertEquals(
-        1, fence.select(props("north=false,east=false,south=false,west=false")).size());
+    assertEquals(1, fence.select(props("north=false,east=false,south=false,west=false")).size());
   }
 
   @Test

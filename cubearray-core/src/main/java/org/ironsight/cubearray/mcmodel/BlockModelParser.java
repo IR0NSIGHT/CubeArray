@@ -26,9 +26,9 @@ import org.joml.Vector4f;
  * knowledge of any specific resource pack's contents, only of that layout.
  *
  * <p>Handles the two indirections the format relies on: {@code "parent"} model inheritance
- * (textures maps are merged root-to-leaf, "elements" is inherited wholesale unless a model
- * defines its own) and {@code "#key"} texture references (resolved against the merged textures
- * map, chasing further "#" indirections until a literal sprite path is found).
+ * (textures maps are merged root-to-leaf, "elements" is inherited wholesale unless a model defines
+ * its own) and {@code "#key"} texture references (resolved against the merged textures map, chasing
+ * further "#" indirections until a literal sprite path is found).
  */
 public class BlockModelParser {
   private static final Logger logger = Logger.getLogger(BlockModelParser.class.getName());
@@ -45,8 +45,7 @@ public class BlockModelParser {
    * @param resourcePackRoot directory containing the pack's {@code assets/} folder (i.e. an
    *     already-extracted resource pack, not a zip)
    * @return fully-qualified model id (e.g. {@code "minecraft:block/acacia_fence_post"}) to parsed
-   *     model. Models that fail to parse are logged and omitted rather than failing the whole
-   *     pack.
+   *     model. Models that fail to parse are logged and omitted rather than failing the whole pack.
    */
   public static Map<String, BlockModel> parseAll(Path resourcePackRoot) throws IOException {
     Resolver resolver = new Resolver(resourcePackRoot);
@@ -86,8 +85,7 @@ public class BlockModelParser {
               .filter(p -> p.toString().toLowerCase(Locale.ROOT).endsWith(".json"))
               .forEach(
                   file -> {
-                    String relative =
-                        blockModelsDir.relativize(file).toString().replace('\\', '/');
+                    String relative = blockModelsDir.relativize(file).toString().replace('\\', '/');
                     String modelPath =
                         "block/" + relative.substring(0, relative.length() - ".json".length());
                     ids.add(namespace + ":" + modelPath);
@@ -117,14 +115,12 @@ public class BlockModelParser {
   }
 
   private static Vector3f toVector3(float[] xyz) {
-    return xyz != null && xyz.length == 3
-        ? new Vector3f(xyz[0], xyz[1], xyz[2])
-        : new Vector3f();
+    return xyz != null && xyz.length == 3 ? new Vector3f(xyz[0], xyz[1], xyz[2]) : new Vector3f();
   }
 
   /**
-   * Extracts a texture sprite path from a raw JSON value. May be a plain string or an object with
-   * a {@code "sprite"} field (the new format introduced in MC 26.1 Snapshot 7 / RP version 81).
+   * Extracts a texture sprite path from a raw JSON value. May be a plain string or an object with a
+   * {@code "sprite"} field (the new format introduced in MC 26.1 Snapshot 7 / RP version 81).
    */
   private static String extractTextureRef(Object value) {
     if (value instanceof String s) return s;
@@ -252,8 +248,8 @@ public class BlockModelParser {
     }
 
     /**
-     * An element's {@code "rotation"} as Euler angles (radians). Vanilla element rotation is about a
-     * single named axis; all three axes are folded into the render piece by {@code
+     * An element's {@code "rotation"} as Euler angles (radians). Vanilla element rotation is about
+     * a single named axis; all three axes are folded into the render piece by {@code
      * SchemReader.computePieces} (a Z-axis tilt, e.g. a wall torch, is re-expressed there for the
      * renderer's X/Y-only rotation).
      */
@@ -281,8 +277,9 @@ public class BlockModelParser {
      * scales the two axes perpendicular to the rotation axis by {@code 1/cos(angle)} so the rotated
      * element still reaches the block faces (e.g. the {@code block/cross} quads span corner to
      * corner). Because that scale is isotropic in the plane perpendicular to the rotation axis, it
-     * commutes with the rotation and can be applied to the element's size before rotating - which is
-     * exactly how {@code SchemReader.computePieces} consumes it. Unit (no-op) when rescale is off.
+     * commutes with the rotation and can be applied to the element's size before rotating - which
+     * is exactly how {@code SchemReader.computePieces} consumes it. Unit (no-op) when rescale is
+     * off.
      */
     private static Vector3f elementRescale(RotationJson rot) {
       if (!rot.rescale) return new Vector3f(1f, 1f, 1f);

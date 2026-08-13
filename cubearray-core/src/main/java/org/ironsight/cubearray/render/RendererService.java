@@ -32,7 +32,9 @@ public final class RendererService {
     return submit(setup, () -> renderer.showSharedWindow(setup));
   }
 
-  /** Shows the shared window if hidden, otherwise replaces its data without resetting the camera. */
+  /**
+   * Shows the shared window if hidden, otherwise replaces its data without resetting the camera.
+   */
   public CompletableFuture<Void> showOrReplace(CubeSetup setup) {
     if (setup == null) {
       return CompletableFuture.failedFuture(new IllegalArgumentException("setup cannot be null"));

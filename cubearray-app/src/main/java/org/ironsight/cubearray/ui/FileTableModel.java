@@ -1,7 +1,5 @@
 package org.ironsight.cubearray.ui;
 
-import org.ironsight.cubearray.preview.SchematicPreviewGenerator;
-
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
@@ -22,6 +20,7 @@ import javax.swing.table.DefaultTableCellRenderer;
 import org.ironsight.cubearray.platform.AppLogger;
 import org.ironsight.cubearray.platform.PeriodicChecker;
 import org.ironsight.cubearray.platform.ResourceUtils;
+import org.ironsight.cubearray.preview.SchematicPreviewGenerator;
 import org.ironsight.cubearray.schematic.SchemReader;
 import org.joml.Vector3f;
 import org.pepsoft.worldpainter.layers.bo2.Schem;
@@ -129,7 +128,8 @@ class FileTableModel extends AbstractTableModel {
           boolean hasHighlights = highlights != null && !highlights.isEmpty();
 
           Graphics2D g2 = (Graphics2D) g.create();
-          g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+          g2.setRenderingHint(
+              RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
           Insets insets = getInsets();
           FontMetrics fm = g2.getFontMetrics();
           int x = insets.left + 2;
@@ -147,8 +147,7 @@ class FileTableModel extends AbstractTableModel {
             int moreWidth = moreText != null ? fm.stringWidth(moreText) : 0;
             boolean fits =
                 i == 0
-                    || x + iconWidth + textWidth + moreWidth + 6
-                        <= getWidth() - insets.right - 2;
+                    || x + iconWidth + textWidth + moreWidth + 6 <= getWidth() - insets.right - 2;
             if (fits) {
               if (icon != null) {
                 int iconY = (getHeight() - icon.getIconHeight()) / 2;

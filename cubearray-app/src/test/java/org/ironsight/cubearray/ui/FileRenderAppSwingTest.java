@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.awt.Rectangle;
 import java.io.File;
 import java.util.HashMap;
-import org.assertj.swing.fixture.FrameFixture;
 import org.assertj.swing.edt.GuiActionRunner;
+import org.assertj.swing.fixture.FrameFixture;
 import org.junit.After;
 import org.junit.Test;
 

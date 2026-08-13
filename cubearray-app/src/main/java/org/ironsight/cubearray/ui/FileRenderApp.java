@@ -24,12 +24,12 @@ import javax.swing.filechooser.FileFilter;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 import javax.swing.table.TableRowSorter;
-import org.ironsight.cubearray.platform.AppLogger;
-import org.ironsight.cubearray.platform.PeriodicChecker;
-import org.ironsight.cubearray.platform.ResourceUtils;
 import org.ironsight.cubearray.edit.BatchConverter;
 import org.ironsight.cubearray.edit.BlockGradient;
 import org.ironsight.cubearray.edit.BlockReplacer;
+import org.ironsight.cubearray.platform.AppLogger;
+import org.ironsight.cubearray.platform.PeriodicChecker;
+import org.ironsight.cubearray.platform.ResourceUtils;
 import org.ironsight.cubearray.preview.SchematicPreviewGenerator;
 import org.pepsoft.worldpainter.objects.WPObject;
 
@@ -50,7 +50,6 @@ public class FileRenderApp {
   private boolean contextDirtyFlag;
   private final HashMap<CaColumn, TableColumn> columToTableColumn = new HashMap<>();
   private final HashMap<CaColumn, TableColumn> folderColumToTableColumn = new HashMap<>();
-
 
   private void flagContextDirty(AppContext context) {
     this.context = context;
@@ -97,8 +96,7 @@ public class FileRenderApp {
       JProgressBar searchSpinner,
       List<SearchFilter> searchFilters,
       Map<String, ChipSearchFilter> chipFilters,
-      DebouncedDocumentListener debouncer
-  ) {}
+      DebouncedDocumentListener debouncer) {}
 
   public FileRenderApp(final AppContext initialContext) {
     this.context = initialContext;
@@ -122,7 +120,8 @@ public class FileRenderApp {
     PeriodicChecker.INSTANCE.addCallback(this::checkLoadingThreads);
     PeriodicChecker.INSTANCE.addCallback(this::autoRefreshFolderView);
 
-    this.tableModel = new FileTableModel(PeriodicChecker.INSTANCE, SchematicPreviewGenerator.getInstance());
+    this.tableModel =
+        new FileTableModel(PeriodicChecker.INSTANCE, SchematicPreviewGenerator.getInstance());
     FileTableModel.blockIconProvider = blockIconProvider;
     tableModel.setFileQueueSizeChangedCallback(
         count -> {
@@ -130,11 +129,12 @@ public class FileRenderApp {
           else this.setTextRemainingFiles("Loading " + count + " file(s)");
         });
     tableModel.setOnSchematicLoadedCallback(this::onSchematicLoaded);
-    SchematicPreviewGenerator.getInstance().setPendingRenderCountChangedCallback(
-        count -> {
-          if (count == 0) this.setTextRenderingSchematics("");
-          else this.setTextRenderingSchematics("Rendering " + count + " schematic(s)");
-        });
+    SchematicPreviewGenerator.getInstance()
+        .setPendingRenderCountChangedCallback(
+            count -> {
+              if (count == 0) this.setTextRenderingSchematics("");
+              else this.setTextRenderingSchematics("Rendering " + count + " schematic(s)");
+            });
 
     String ver = getClass().getPackage().getImplementationVersion();
     frame = new JFrame("CubeArray" + (ver != null ? " " + ver : ""));
@@ -232,7 +232,9 @@ public class FileRenderApp {
     tabbedPane.setName("mainTabs");
     tabbedPane.addTab(null, Icons.get("folder"), globalPanel.panel());
     tabbedPane.addTab(null, Icons.get("tree"), folderViewPanel);
-    tabbedPane.addTab(null, Icons.get("settings"),
+    tabbedPane.addTab(
+        null,
+        Icons.get("settings"),
         getSettingsComponent(context.columnContext().displayedColumns()));
     JPanel topStatusBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
     topStatusBar.add(topInfoLabel);
@@ -244,70 +246,72 @@ public class FileRenderApp {
 
     initDisplayedColumns(context);
 
-    rowSorter.addRowSorterListener(e -> {
-      if (e.getType() != RowSorterEvent.Type.SORT_ORDER_CHANGED) return;
-      List<? extends RowSorter.SortKey> sortKeys = rowSorter.getSortKeys();
-      var oldColumnContext = context.columnContext();
-      ColumnContext newColumnContext;
-      if (!sortKeys.isEmpty()) {
-        RowSorter.SortKey key = sortKeys.get(0);
-        int modelColumn = key.getColumn();
-        SortOrder order = key.getSortOrder();
-        newColumnContext =
-            new ColumnContext(
-                oldColumnContext.displayedColumns(),
-                oldColumnContext.columnWidths(),
-                tableModel.getColumn(modelColumn),
-                SortOrder.ASCENDING.equals(order));
-      } else {
-        newColumnContext =
-            new ColumnContext(
-                oldColumnContext.displayedColumns(),
-                oldColumnContext.columnWidths(),
-                null,
-                false);
-      }
-      flagContextDirty(
-          new AppContext(
-              context.filesAndTimestamps(),
-              context.lastSearchPath(),
-              context.guiBounds(),
-              context.neverBeforeUsed(),
-              newColumnContext,
-              context.folderViewPath()));
-    });
-    folderRowSorter.addRowSorterListener(e -> {
-      if (e.getType() != RowSorterEvent.Type.SORT_ORDER_CHANGED) return;
-      List<? extends RowSorter.SortKey> sortKeys = folderRowSorter.getSortKeys();
-      var oldColumnContext = context.columnContext();
-      ColumnContext newColumnContext;
-      if (!sortKeys.isEmpty()) {
-        RowSorter.SortKey key = sortKeys.get(0);
-        int modelColumn = key.getColumn();
-        SortOrder order = key.getSortOrder();
-        newColumnContext =
-            new ColumnContext(
-                oldColumnContext.displayedColumns(),
-                oldColumnContext.columnWidths(),
-                tableModel.getColumn(modelColumn),
-                SortOrder.ASCENDING.equals(order));
-      } else {
-        newColumnContext =
-            new ColumnContext(
-                oldColumnContext.displayedColumns(),
-                oldColumnContext.columnWidths(),
-                null,
-                false);
-      }
-      flagContextDirty(
-          new AppContext(
-              context.filesAndTimestamps(),
-              context.lastSearchPath(),
-              context.guiBounds(),
-              context.neverBeforeUsed(),
-              newColumnContext,
-              context.folderViewPath()));
-    });
+    rowSorter.addRowSorterListener(
+        e -> {
+          if (e.getType() != RowSorterEvent.Type.SORT_ORDER_CHANGED) return;
+          List<? extends RowSorter.SortKey> sortKeys = rowSorter.getSortKeys();
+          var oldColumnContext = context.columnContext();
+          ColumnContext newColumnContext;
+          if (!sortKeys.isEmpty()) {
+            RowSorter.SortKey key = sortKeys.get(0);
+            int modelColumn = key.getColumn();
+            SortOrder order = key.getSortOrder();
+            newColumnContext =
+                new ColumnContext(
+                    oldColumnContext.displayedColumns(),
+                    oldColumnContext.columnWidths(),
+                    tableModel.getColumn(modelColumn),
+                    SortOrder.ASCENDING.equals(order));
+          } else {
+            newColumnContext =
+                new ColumnContext(
+                    oldColumnContext.displayedColumns(),
+                    oldColumnContext.columnWidths(),
+                    null,
+                    false);
+          }
+          flagContextDirty(
+              new AppContext(
+                  context.filesAndTimestamps(),
+                  context.lastSearchPath(),
+                  context.guiBounds(),
+                  context.neverBeforeUsed(),
+                  newColumnContext,
+                  context.folderViewPath()));
+        });
+    folderRowSorter.addRowSorterListener(
+        e -> {
+          if (e.getType() != RowSorterEvent.Type.SORT_ORDER_CHANGED) return;
+          List<? extends RowSorter.SortKey> sortKeys = folderRowSorter.getSortKeys();
+          var oldColumnContext = context.columnContext();
+          ColumnContext newColumnContext;
+          if (!sortKeys.isEmpty()) {
+            RowSorter.SortKey key = sortKeys.get(0);
+            int modelColumn = key.getColumn();
+            SortOrder order = key.getSortOrder();
+            newColumnContext =
+                new ColumnContext(
+                    oldColumnContext.displayedColumns(),
+                    oldColumnContext.columnWidths(),
+                    tableModel.getColumn(modelColumn),
+                    SortOrder.ASCENDING.equals(order));
+          } else {
+            newColumnContext =
+                new ColumnContext(
+                    oldColumnContext.displayedColumns(),
+                    oldColumnContext.columnWidths(),
+                    null,
+                    false);
+          }
+          flagContextDirty(
+              new AppContext(
+                  context.filesAndTimestamps(),
+                  context.lastSearchPath(),
+                  context.guiBounds(),
+                  context.neverBeforeUsed(),
+                  newColumnContext,
+                  context.folderViewPath()));
+        });
 
     frame.setVisible(true);
   }
@@ -421,7 +425,8 @@ public class FileRenderApp {
               } else if (object instanceof Map<?, ?> map) {
                 content =
                     map.entrySet().stream()
-                        .map(entry -> entry.getKey().toString() + ": " + entry.getValue().toString())
+                        .map(
+                            entry -> entry.getKey().toString() + ": " + entry.getValue().toString())
                         .collect(Collectors.joining("\n"));
               } else if (object instanceof String s) {
                 content = s;
@@ -479,28 +484,36 @@ public class FileRenderApp {
     table.setRowSorter(sorter);
     table.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
 
-    Function<CaColumn, List<String>> highlightFn = col -> {
-      synchronized (searchFilters) {
-        List<String> result = new ArrayList<>();
-        for (SearchFilter f : searchFilters) {
-          String s = f.getHighlightString(col);
-          if (s != null && !s.isEmpty()) result.add(s.toLowerCase());
-        }
-        return result;
-      }
-    };
+    Function<CaColumn, List<String>> highlightFn =
+        col -> {
+          synchronized (searchFilters) {
+            List<String> result = new ArrayList<>();
+            for (SearchFilter f : searchFilters) {
+              String s = f.getHighlightString(col);
+              if (s != null && !s.isEmpty()) result.add(s.toLowerCase());
+            }
+            return result;
+          }
+        };
     for (CaColumn c : CaColumn.values()) {
       FileTableModel.StringConverter base = c.renderer;
-      FileTableModel.StringConverter wrapper = new FileTableModel.StringConverter() {
-        @Override
-        public Component getTableCellRendererComponent(
-            JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-          this.currentColumn = column;
-          base.setHighlightLookup(highlightFn);
-          base.currentColumn = column;
-          return base.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-        }
-      };
+      FileTableModel.StringConverter wrapper =
+          new FileTableModel.StringConverter() {
+            @Override
+            public Component getTableCellRendererComponent(
+                JTable table,
+                Object value,
+                boolean isSelected,
+                boolean hasFocus,
+                int row,
+                int column) {
+              this.currentColumn = column;
+              base.setHighlightLookup(highlightFn);
+              base.currentColumn = column;
+              return base.getTableCellRendererComponent(
+                  table, value, isSelected, hasFocus, row, column);
+            }
+          };
       table.getColumnModel().getColumn(c.ordinal()).setCellRenderer(wrapper);
     }
     table.setRowHeight(64);
@@ -583,9 +596,7 @@ public class FileRenderApp {
         }
 
         addBtn.addActionListener(
-            e ->
-                SwingUtilities.invokeLater(
-                    () -> filesMenu.show(addBtn, 0, addBtn.getHeight())));
+            e -> SwingUtilities.invokeLater(() -> filesMenu.show(addBtn, 0, addBtn.getHeight())));
         searchRow.add(addBtn);
         searchRow.add(searchField);
         searchRow.add(addConditionBtn);
@@ -604,8 +615,16 @@ public class FileRenderApp {
     panel.add(bottomPanel, BorderLayout.SOUTH);
 
     return new FileListPanel(
-        panel, table, sorter, searchField, chipManager, chipRow, searchSpinner,
-        searchFilters, chipFilters, debouncer);
+        panel,
+        table,
+        sorter,
+        searchField,
+        chipManager,
+        chipRow,
+        searchSpinner,
+        searchFilters,
+        chipFilters,
+        debouncer);
   }
 
   private JPopupMenu createTableContextMenu(JTable table) {
@@ -631,11 +650,12 @@ public class FileRenderApp {
     JButton renderFilesBtn = new JButton("Render");
     renderFilesBtn.addActionListener(
         a -> {
-          List<File> files = Arrays.stream(table.getSelectedRows())
-              .map(table::convertRowIndexToModel)
-              .filter(m -> !tableModel.isDirectoryRow(m))
-              .mapToObj(tableModel::getFileAt)
-              .toList();
+          List<File> files =
+              Arrays.stream(table.getSelectedRows())
+                  .map(table::convertRowIndexToModel)
+                  .filter(m -> !tableModel.isDirectoryRow(m))
+                  .mapToObj(tableModel::getFileAt)
+                  .toList();
           if (!files.isEmpty()) renderFiles(files);
         });
     rightMenu.add(renderFilesBtn);
@@ -643,11 +663,12 @@ public class FileRenderApp {
     JButton removeFilesBtn = new JButton("Remove");
     removeFilesBtn.addActionListener(
         a -> {
-          File[] files = Arrays.stream(table.getSelectedRows())
-              .map(table::convertRowIndexToModel)
-              .filter(m -> !tableModel.isDirectoryRow(m))
-              .mapToObj(tableModel::getFileAt)
-              .toArray(File[]::new);
+          File[] files =
+              Arrays.stream(table.getSelectedRows())
+                  .map(table::convertRowIndexToModel)
+                  .filter(m -> !tableModel.isDirectoryRow(m))
+                  .mapToObj(tableModel::getFileAt)
+                  .toArray(File[]::new);
           tableModel.removeFile(files);
           var newFilesAndTimestamps = new HashMap<>(context.filesAndTimestamps());
           for (File file : files) {
@@ -672,13 +693,15 @@ public class FileRenderApp {
     JButton deleteFilesBtn = new JButton("Delete from disk");
     deleteFilesBtn.addActionListener(
         a -> {
-          File[] selected = Arrays.stream(table.getSelectedRows())
-              .map(table::convertRowIndexToModel)
-              .filter(m -> !tableModel.isDirectoryRow(m))
-              .mapToObj(tableModel::getFileAt)
-              .toArray(File[]::new);
+          File[] selected =
+              Arrays.stream(table.getSelectedRows())
+                  .map(table::convertRowIndexToModel)
+                  .filter(m -> !tableModel.isDirectoryRow(m))
+                  .mapToObj(tableModel::getFileAt)
+                  .toArray(File[]::new);
           if (selected.length == 0) return;
-          String fileList = Arrays.stream(selected).map(File::getName).collect(Collectors.joining("\n"));
+          String fileList =
+              Arrays.stream(selected).map(File::getName).collect(Collectors.joining("\n"));
           int reply =
               JOptionPane.showConfirmDialog(
                   frame,
@@ -716,7 +739,8 @@ public class FileRenderApp {
           if (!failed.isEmpty()) {
             JOptionPane.showMessageDialog(
                 frame,
-                "Could not delete:\n" + failed.stream().map(File::getName).collect(Collectors.joining("\n")),
+                "Could not delete:\n"
+                    + failed.stream().map(File::getName).collect(Collectors.joining("\n")),
                 "Delete from disk",
                 JOptionPane.ERROR_MESSAGE);
           }
@@ -726,10 +750,11 @@ public class FileRenderApp {
     JButton openFolderBtn = new JButton("Open folder");
     openFolderBtn.addActionListener(
         a -> {
-          File[] files = Arrays.stream(table.getSelectedRows())
-              .map(table::convertRowIndexToModel)
-              .mapToObj(tableModel::getFileAt)
-              .toArray(File[]::new);
+          File[] files =
+              Arrays.stream(table.getSelectedRows())
+                  .map(table::convertRowIndexToModel)
+                  .mapToObj(tableModel::getFileAt)
+                  .toArray(File[]::new);
           Desktop desktop = Desktop.getDesktop();
           if (desktop == null) return;
           List<File> folders =
@@ -742,7 +767,9 @@ public class FileRenderApp {
             int reply2 =
                 JOptionPane.showConfirmDialog(
                     frame,
-                    "You are trying to open " + folders.size() + " folders at once. Do you want to continue?",
+                    "You are trying to open "
+                        + folders.size()
+                        + " folders at once. Do you want to continue?",
                     "Open folders",
                     JOptionPane.YES_NO_OPTION);
             if (reply2 != JOptionPane.YES_OPTION) return;
@@ -774,11 +801,12 @@ public class FileRenderApp {
   }
 
   private void convertSelectedToSponge3(JTable table) {
-    List<File> selected = Arrays.stream(table.getSelectedRows())
-        .map(table::convertRowIndexToModel)
-        .filter(m -> !tableModel.isDirectoryRow(m))
-        .mapToObj(tableModel::getFileAt)
-        .toList();
+    List<File> selected =
+        Arrays.stream(table.getSelectedRows())
+            .map(table::convertRowIndexToModel)
+            .filter(m -> !tableModel.isDirectoryRow(m))
+            .mapToObj(tableModel::getFileAt)
+            .toList();
     if (selected.isEmpty()) {
       JOptionPane.showMessageDialog(
           frame, "No files selected.", "Convert to Sponge3", JOptionPane.WARNING_MESSAGE);
@@ -834,8 +862,12 @@ public class FileRenderApp {
                           failed.stream().map(File::getName).collect(Collectors.joining("\n"));
                       JOptionPane.showMessageDialog(
                           frame,
-                          "Converted " + result.convertedFiles().size() + " of " + selected.size()
-                              + " file(s).\n\nFailed:\n" + failedNames,
+                          "Converted "
+                              + result.convertedFiles().size()
+                              + " of "
+                              + selected.size()
+                              + " file(s).\n\nFailed:\n"
+                              + failedNames,
                           "Convert to Sponge3",
                           JOptionPane.WARNING_MESSAGE);
                     }
@@ -846,11 +878,12 @@ public class FileRenderApp {
   }
 
   private void replaceSandstoneWithCobblestone(JTable table) {
-    File[] selected = Arrays.stream(table.getSelectedRows())
-        .map(table::convertRowIndexToModel)
-        .filter(m -> !tableModel.isDirectoryRow(m))
-        .mapToObj(tableModel::getFileAt)
-        .toArray(File[]::new);
+    File[] selected =
+        Arrays.stream(table.getSelectedRows())
+            .map(table::convertRowIndexToModel)
+            .filter(m -> !tableModel.isDirectoryRow(m))
+            .mapToObj(tableModel::getFileAt)
+            .toArray(File[]::new);
     if (selected.length == 0) {
       JOptionPane.showMessageDialog(
           frame, "No files selected.", "Replace blocks", JOptionPane.WARNING_MESSAGE);
@@ -928,11 +961,12 @@ public class FileRenderApp {
   }
 
   private void applyGradientToSelected(JTable table) {
-    File[] selected = Arrays.stream(table.getSelectedRows())
-        .map(table::convertRowIndexToModel)
-        .filter(m -> !tableModel.isDirectoryRow(m))
-        .mapToObj(tableModel::getFileAt)
-        .toArray(File[]::new);
+    File[] selected =
+        Arrays.stream(table.getSelectedRows())
+            .map(table::convertRowIndexToModel)
+            .filter(m -> !tableModel.isDirectoryRow(m))
+            .mapToObj(tableModel::getFileAt)
+            .toArray(File[]::new);
     if (selected.length == 0) {
       JOptionPane.showMessageDialog(
           frame, "No files selected.", "Apply gradient", JOptionPane.WARNING_MESSAGE);
@@ -963,11 +997,12 @@ public class FileRenderApp {
           JOptionPane.ERROR_MESSAGE);
       return;
     }
-    var opt = BlockTableDialog.show(
-        frame,
-        new ArrayList<>(availableBlocks),
-        new ArrayList<>(loaded.keySet()),
-        Set.of("minecraft:stone_bricks"));
+    var opt =
+        BlockTableDialog.show(
+            frame,
+            new ArrayList<>(availableBlocks),
+            new ArrayList<>(loaded.keySet()),
+            Set.of("minecraft:stone_bricks"));
     if (opt.isEmpty()) return;
     BlockGradient gradient = opt.get();
     File firstFile = loaded.keySet().iterator().next();
@@ -980,7 +1015,8 @@ public class FileRenderApp {
     for (var entry : loaded.entrySet()) {
       File file = entry.getKey();
       try {
-        var modified = GradientSchematicApplier.applyGradient(entry.getValue(), gradient, targetBlocks);
+        var modified =
+            GradientSchematicApplier.applyGradient(entry.getValue(), gradient, targetBlocks);
         File output = options.outputFileFor(file);
         if (output.getParentFile() != null) output.getParentFile().mkdirs();
         BlockReplacer.write(modified, output);
@@ -1104,7 +1140,8 @@ public class FileRenderApp {
     updateFolderErrorIcon();
   }
 
-  private boolean folderRowFilter(RowFilter.Entry<? extends FileTableModel, ? extends Integer> entry) {
+  private boolean folderRowFilter(
+      RowFilter.Entry<? extends FileTableModel, ? extends Integer> entry) {
     if (folderViewPath == null) return false;
     int row = (int) entry.getIdentifier();
     File file = tableModel.getFileAt(row);
@@ -1217,15 +1254,18 @@ public class FileRenderApp {
     JFileChooser chooser = getFileChooser(true);
     if (chooser.showOpenDialog(frame) != JFileChooser.APPROVE_OPTION) return;
     File[] folders = chooser.getSelectedFiles();
-    new Thread(() -> {
-      for (File f : folders) updateFolder(f.toPath(), true);
-    }, "folder-importer").start();
+    new Thread(
+            () -> {
+              for (File f : folders) updateFolder(f.toPath(), true);
+            },
+            "folder-importer")
+        .start();
   }
 
   /**
    * Recursively collects all files in a folder and its subfolders.
    *
-   * @param folder   the root folder to start from
+   * @param folder the root folder to start from
    * @param maxDepth maximum recursion depth
    * @return list of files found
    * @throws IOException if an I/O error occurs
@@ -1300,9 +1340,7 @@ public class FileRenderApp {
       File f = tableModel.getFileAt(i);
       if (f == null) continue;
       boolean matches =
-          recursive
-              ? f.toPath().startsWith(folder)
-              : folderFile.equals(f.getParentFile());
+          recursive ? f.toPath().startsWith(folder) : folderFile.equals(f.getParentFile());
       if (matches) {
         underFolder.add(f);
       }
@@ -1353,29 +1391,30 @@ public class FileRenderApp {
     for (File f : toReload) newTimestamps.put(f, f.lastModified());
     for (File f : toAdd) newTimestamps.putIfAbsent(f, f.lastModified());
 
-    SwingUtilities.invokeLater(() -> {
-      if (!toRemove.isEmpty()) {
-        tableModel.removeFile(toRemove.toArray(File[]::new));
-        try {
-          ResourceUtils.cleanOrphanedRenders(tableModel.getAllFiles());
-        } catch (IOException e) {
-          logger.log(Level.WARNING, "Failed to clean orphaned renders", e);
-        }
-      }
-      for (File f : toReload) {
-        int row = tableModel.indexOfFile(f);
-        if (row >= 0) tableModel.flagReloadFile(row);
-      }
-      if (!toAdd.isEmpty()) tableModel.addFiles(toAdd);
-      flagContextDirty(
-          new AppContext(
-              newTimestamps,
-              context.lastSearchPath(),
-              context.guiBounds(),
-              context.neverBeforeUsed(),
-              context.columnContext(),
-              context.folderViewPath()));
-    });
+    SwingUtilities.invokeLater(
+        () -> {
+          if (!toRemove.isEmpty()) {
+            tableModel.removeFile(toRemove.toArray(File[]::new));
+            try {
+              ResourceUtils.cleanOrphanedRenders(tableModel.getAllFiles());
+            } catch (IOException e) {
+              logger.log(Level.WARNING, "Failed to clean orphaned renders", e);
+            }
+          }
+          for (File f : toReload) {
+            int row = tableModel.indexOfFile(f);
+            if (row >= 0) tableModel.flagReloadFile(row);
+          }
+          if (!toAdd.isEmpty()) tableModel.addFiles(toAdd);
+          flagContextDirty(
+              new AppContext(
+                  newTimestamps,
+                  context.lastSearchPath(),
+                  context.guiBounds(),
+                  context.neverBeforeUsed(),
+                  context.columnContext(),
+                  context.folderViewPath()));
+        });
   }
 
   public static void startApp(final AppContext context) {
@@ -1535,17 +1574,9 @@ public class FileRenderApp {
 
     // display only columns from saved context on both tables
     updateDisplayColumns(
-        displayed,
-        widths,
-        new HashSet<>(),
-        fileTable.getColumnModel(),
-        columToTableColumn);
+        displayed, widths, new HashSet<>(), fileTable.getColumnModel(), columToTableColumn);
     updateDisplayColumns(
-        displayed,
-        widths,
-        new HashSet<>(),
-        folderTable.getColumnModel(),
-        folderColumToTableColumn);
+        displayed, widths, new HashSet<>(), folderTable.getColumnModel(), folderColumToTableColumn);
 
     // apply sorting to the global table (folder table uses default PATH sort)
     if (contextClone.orderedColumn() != null) {
@@ -1671,7 +1702,6 @@ public class FileRenderApp {
     SwingUtilities.invokeLater(() -> menu.show(e.getComponent(), e.getX(), e.getY()));
   }
 
-
   private void renderFiles(List<File> selectedFiles) {
     logger.info("Rendering files:");
     for (File f : selectedFiles) {
@@ -1690,14 +1720,15 @@ public class FileRenderApp {
     if (file == null) return;
     WPObject obj = tableModel.getSchematicFor(file);
     if (obj == null) return;
-    SchematicPreviewGenerator.getInstance().queueRender(
-        file,
-        obj,
-        () -> {
-          tableModel.invalidateIconCache(file);
-          int idx = tableModel.indexOfFile(file);
-          if (idx >= 0) tableModel.fireTableRowsUpdated(idx, idx);
-        });
+    SchematicPreviewGenerator.getInstance()
+        .queueRender(
+            file,
+            obj,
+            () -> {
+              tableModel.invalidateIconCache(file);
+              int idx = tableModel.indexOfFile(file);
+              if (idx >= 0) tableModel.fireTableRowsUpdated(idx, idx);
+            });
   }
 
   private void onSchematicLoaded(File file) {
@@ -1717,8 +1748,6 @@ public class FileRenderApp {
     }
     queueRenderSchematicIcon(file);
   }
-
-
 
   private JFileChooser getFileChooser(boolean folder) {
     JFileChooser chooser = new JFileChooser();

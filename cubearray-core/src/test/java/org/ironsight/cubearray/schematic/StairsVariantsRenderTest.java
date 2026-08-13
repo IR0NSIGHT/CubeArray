@@ -1,8 +1,4 @@
 package org.ironsight.cubearray.schematic;
-import org.ironsight.cubearray.render.InstancedCubes;
-import org.ironsight.cubearray.render.CubeSetup;
-import org.ironsight.cubearray.mcmodel.BlockModelParser;
-import org.ironsight.cubearray.platform.ResourceUtils;
 
 import static org.junit.Assert.*;
 
@@ -13,10 +9,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import org.ironsight.cubearray.edit.BlockReplacer;
+import org.ironsight.cubearray.mcmodel.BlockModelParser;
 import org.ironsight.cubearray.mcmodel.BlockStateParser;
 import org.ironsight.cubearray.mcmodel.BlockStateParser.BlockState;
 import org.ironsight.cubearray.mcmodel.BlockStateParser.ModelPlacement;
-import org.ironsight.cubearray.edit.BlockReplacer;
+import org.ironsight.cubearray.platform.ResourceUtils;
+import org.ironsight.cubearray.render.CubeSetup;
+import org.ironsight.cubearray.render.InstancedCubes;
 import org.junit.Test;
 import pitheguy.schemconvert.converter.Schematic;
 
@@ -36,9 +36,9 @@ public class StairsVariantsRenderTest {
   };
 
   /**
-   * Mirrors {@link org.ironsight.cubearray.schematic.SchemReader}'s piece computation: number of render
-   * instances a block+state expands into = sum over its selected model placements of that model's
-   * element count (a full-cube fallback when nothing resolves).
+   * Mirrors {@link org.ironsight.cubearray.schematic.SchemReader}'s piece computation: number of
+   * render instances a block+state expands into = sum over its selected model placements of that
+   * model's element count (a full-cube fallback when nothing resolves).
    */
   private static int pieceCount(
       Path root, Map<String, BlockState> states, String block, String propsKv) throws IOException {

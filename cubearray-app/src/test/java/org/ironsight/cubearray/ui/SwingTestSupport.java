@@ -3,10 +3,10 @@ package org.ironsight.cubearray.ui;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
-import org.assertj.swing.fixture.DialogFixture;
-import org.assertj.swing.finder.WindowFinder;
 import org.assertj.swing.core.BasicRobot;
 import org.assertj.swing.core.Robot;
+import org.assertj.swing.finder.WindowFinder;
+import org.assertj.swing.fixture.DialogFixture;
 import org.junit.After;
 import org.junit.Before;
 
@@ -30,8 +30,7 @@ abstract class SwingTestSupport {
   }
 
   protected <T> Optional<T> showDialog(
-      Supplier<Optional<T>> show, String title, DialogFixtureConsumer<T> test)
-      throws Exception {
+      Supplier<Optional<T>> show, String title, DialogFixtureConsumer<T> test) throws Exception {
     AtomicReference<Optional<T>> result = new AtomicReference<>();
     Thread dialogThread = new Thread(() -> result.set(show.get()), "swing-dialog-test");
     dialogThread.start();

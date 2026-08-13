@@ -40,12 +40,16 @@ public class GlassPaneRenderTest {
 
     // gray_stained_glass_pane with all connections (post + 4 sides)
     schem.setBlockAt(
-        3, 0, 3,
+        3,
+        0,
+        3,
         "minecraft:gray_stained_glass_pane[north=true,east=true,south=true,west=true,waterlogged=false]");
 
     // gray_stained_glass_pane with no connections (post + 4 noside models)
     schem.setBlockAt(
-        3 + cell, 0, 3,
+        3 + cell,
+        0,
+        3,
         "minecraft:gray_stained_glass_pane[north=false,east=false,south=false,west=false,waterlogged=false]");
 
     // gray_stained_glass block as a solid-glass reference
@@ -53,7 +57,9 @@ public class GlassPaneRenderTest {
 
     // plain glass pane with all connections
     schem.setBlockAt(
-        3, 0, 3 + cell,
+        3,
+        0,
+        3 + cell,
         "minecraft:glass_pane[north=true,east=true,south=true,west=true,waterlogged=false]");
 
     // stone block as solid reference

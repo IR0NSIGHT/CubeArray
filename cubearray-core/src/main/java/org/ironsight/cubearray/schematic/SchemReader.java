@@ -3,7 +3,6 @@ package org.ironsight.cubearray.schematic;
 import static org.pepsoft.minecraft.Material.*;
 
 import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -108,8 +107,7 @@ public class SchemReader {
       if (!placements.isEmpty()) return placements;
     }
     return List.of(
-        new BlockStateParser.ModelPlacement(
-            blockId.replaceFirst(":", ":block/"), 0, 0, false));
+        new BlockStateParser.ModelPlacement(blockId.replaceFirst(":", ":block/"), 0, 0, false));
   }
 
   /** Render pieces a material expands into: one per element of each selected model placement. */
@@ -153,9 +151,10 @@ public class SchemReader {
    * Builds a render piece for an element whose rotation includes a Z-axis tilt (e.g. a wall torch
    * leaning off its wall), which the renderer's {@code Ry * Rx} rotation cannot express directly -
    * without any shader change. It computes the true target orientation {@code Rblock * Relem}, then
-   * re-expresses it as the {@code (rx, ry)} whose {@code Ry * Rx} reproduces the same long axis (the
-   * leftover twist about that axis is invisible on the near-square, uniformly side-textured torch),
-   * and pre-rotates the offset so the cuboid still lands where the model's rotation origin puts it.
+   * re-expresses it as the {@code (rx, ry)} whose {@code Ry * Rx} reproduces the same long axis
+   * (the leftover twist about that axis is invisible on the near-square, uniformly side-textured
+   * torch), and pre-rotates the offset so the cuboid still lands where the model's rotation origin
+   * puts it.
    */
   private static Piece tiltedPiece(Vector3f blockRotation, SubBlock sub, Vector3f size) {
     // orientation the renderer applies for this blockstate, in the shader's own (angle-negating)
@@ -185,10 +184,10 @@ public class SchemReader {
   }
 
   /**
-   * The exact orientation the vertex shader produces for stored palette angles {@code (ax, ay)}. The
-   * shader's rotationX/rotationY (see {@link VertexShaderSource}) are built so they rotate by the
-   * negative of their argument, i.e. {@code Ry(-ay) * Rx(-ax)} in standard terms; matching that here
-   * lets {@link #tiltedPiece} invert it exactly.
+   * The exact orientation the vertex shader produces for stored palette angles {@code (ax, ay)}.
+   * The shader's rotationX/rotationY (see {@link VertexShaderSource}) are built so they rotate by
+   * the negative of their argument, i.e. {@code Ry(-ay) * Rx(-ax)} in standard terms; matching that
+   * here lets {@link #tiltedPiece} invert it exactly.
    */
   private static Matrix3f shaderRotation(float ax, float ay) {
     return new Matrix3f().rotateY(-ay).rotateX(-ax);
@@ -314,7 +313,12 @@ public class SchemReader {
               if (mat.is(WATERLOGGED) || mat.watery) {
                 maxColorIdx =
                     addPieces(
-                        WATER, pos, positions, blockTypeIndicesList, mat_to_palette_idx, maxColorIdx);
+                        WATER,
+                        pos,
+                        positions,
+                        blockTypeIndicesList,
+                        mat_to_palette_idx,
+                        maxColorIdx);
               }
             }
           }
@@ -331,8 +335,15 @@ public class SchemReader {
       Material markerX = WOOL_WHITE.withProperty("cubearray_axis", "x");
       Material markerY = WOOL_WHITE.withProperty("cubearray_axis", "y");
       Material markerZ = WOOL_WHITE.withProperty("cubearray_axis", "z");
-      for (Material m : new Material[]{markerX, markerY, markerZ}) {
-        maxColorIdx = addInstance(m, new Vector3f(0, 0, 0), positions, blockTypeIndicesList, mat_to_palette_idx, maxColorIdx);
+      for (Material m : new Material[] {markerX, markerY, markerZ}) {
+        maxColorIdx =
+            addInstance(
+                m,
+                new Vector3f(0, 0, 0),
+                positions,
+                blockTypeIndicesList,
+                mat_to_palette_idx,
+                maxColorIdx);
       }
       xIdx = mat_to_palette_idx.get(markerX);
       yIdx = mat_to_palette_idx.get(markerY);
@@ -351,7 +362,8 @@ public class SchemReader {
     Vector3f[] rotationPalette = new Vector3f[mat_to_palette_idx.size()];
     Arrays.fill(rotationPalette, new Vector3f(0, 0, 0));
 
-    // the render piece each palette entry resolves to; reused below to build the per-face uv palette
+    // the render piece each palette entry resolves to; reused below to build the per-face uv
+    // palette
     Piece[] pieceByIdx = new Piece[mat_to_palette_idx.size()];
     // per material, the sprite names its faces reference -> tintindex (-1 = no tint)
     Map<Material, Map<String, Integer>> materialSprites = new HashMap<>();
@@ -487,11 +499,11 @@ public class SchemReader {
   }
 
   /**
-   * Emits one render instance per {@link Piece} the material expands into (see {@link
-   * #piecesFor}). A single-piece material is emitted untagged, so identical blocks dedup to one
-   * palette entry and textures resolve by simple name; a multi-piece material tags each instance
-   * with its piece index via {@link #PIECE_PROPERTY} so the palette loop can give each piece its
-   * own size/offset/rotation.
+   * Emits one render instance per {@link Piece} the material expands into (see {@link #piecesFor}).
+   * A single-piece material is emitted untagged, so identical blocks dedup to one palette entry and
+   * textures resolve by simple name; a multi-piece material tags each instance with its piece index
+   * via {@link #PIECE_PROPERTY} so the palette loop can give each piece its own
+   * size/offset/rotation.
    */
   private static int addPieces(
       Material mat,

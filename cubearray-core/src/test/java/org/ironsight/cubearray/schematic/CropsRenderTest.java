@@ -1,7 +1,4 @@
 package org.ironsight.cubearray.schematic;
-import org.ironsight.cubearray.render.InstancedCubes;
-import org.ironsight.cubearray.render.CubeSetup;
-import org.ironsight.cubearray.platform.ResourceUtils;
 
 import static org.junit.Assert.*;
 
@@ -11,6 +8,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import org.ironsight.cubearray.edit.BlockReplacer;
+import org.ironsight.cubearray.platform.ResourceUtils;
+import org.ironsight.cubearray.render.CubeSetup;
+import org.ironsight.cubearray.render.InstancedCubes;
 import org.junit.Test;
 import pitheguy.schemconvert.converter.Schematic;
 
@@ -84,7 +84,8 @@ public class CropsRenderTest {
 
     CubeSetup setup =
         SchemReader.prepareData(
-            SchemReader.loadSchematics(List.of(schemPath), f -> fail("load error: " + f.getName())));
+            SchemReader.loadSchematics(
+                List.of(schemPath), f -> fail("load error: " + f.getName())));
 
     assertNotNull("Failed to prepare data for crops.schem", setup);
     assertTrue("no cubes were generated for the crops schematic", setup.positions.length > 0);

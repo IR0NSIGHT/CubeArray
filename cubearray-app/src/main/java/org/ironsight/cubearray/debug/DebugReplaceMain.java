@@ -5,8 +5,8 @@ import java.util.List;
 import org.ironsight.cubearray.platform.ResourceUtils;
 import org.ironsight.cubearray.render.CubeSetup;
 import org.ironsight.cubearray.render.InstancedCubes;
-import org.joml.Vector3f;
 import org.ironsight.cubearray.schematic.SchemReader;
+import org.joml.Vector3f;
 
 public class DebugReplaceMain {
 
@@ -18,12 +18,8 @@ public class DebugReplaceMain {
     Path pathA = schemDir.resolve("Dannypan/house_4.schem");
     Path pathB = schemDir.resolve("Paleozoey/Abies_alba4.schem");
 
-    CubeSetup setupA =
-        SchemReader.prepareData(
-            SchemReader.loadSchematics(List.of(pathA), f -> {}));
-    CubeSetup setupB =
-        SchemReader.prepareData(
-            SchemReader.loadSchematics(List.of(pathB), f -> {}));
+    CubeSetup setupA = SchemReader.prepareData(SchemReader.loadSchematics(List.of(pathA), f -> {}));
+    CubeSetup setupB = SchemReader.prepareData(SchemReader.loadSchematics(List.of(pathB), f -> {}));
 
     InstancedCubes renderer = new InstancedCubes(setupA);
     new Thread(
