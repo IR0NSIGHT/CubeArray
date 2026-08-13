@@ -51,7 +51,7 @@ public class GradientSchematicApplier {
         }
     }
 
-    private static Schematic applyGradient(Schematic source, BlockGradient gradient, Set<String> targetBlocks) {
+    static Schematic applyGradient(Schematic source, BlockGradient gradient, Set<String> targetBlocks) {
         int[] size = source.getSize();
         int xSize = size[0];
         int ySize = size[1];

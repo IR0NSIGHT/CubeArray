@@ -28,6 +28,7 @@ import org.ironsight.cubearray.platform.AppLogger;
 import org.ironsight.cubearray.platform.PeriodicChecker;
 import org.ironsight.cubearray.platform.ResourceUtils;
 import org.ironsight.cubearray.edit.BatchConverter;
+import org.ironsight.cubearray.edit.BlockGradient;
 import org.ironsight.cubearray.edit.BlockReplacer;
 import org.ironsight.cubearray.preview.SchematicPreviewGenerator;
 import org.pepsoft.worldpainter.objects.WPObject;
@@ -762,6 +763,10 @@ public class FileRenderApp {
     replaceSandstoneBtn.addActionListener(a -> replaceSandstoneWithCobblestone(table));
     rightMenu.add(replaceSandstoneBtn);
 
+    JButton applyGradientBtn = new JButton("Apply gradient");
+    applyGradientBtn.addActionListener(a -> applyGradientToSelected(table));
+    rightMenu.add(applyGradientBtn);
+
     return rightMenu;
   }
 
@@ -916,6 +921,87 @@ public class FileRenderApp {
         frame,
         msg,
         "Replace blocks",
+        failed.isEmpty() ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.WARNING_MESSAGE);
+  }
+
+  private void applyGradientToSelected(JTable table) {
+    File[] selected = Arrays.stream(table.getSelectedRows())
+        .map(table::convertRowIndexToModel)
+        .filter(m -> !tableModel.isDirectoryRow(m))
+        .mapToObj(tableModel::getFileAt)
+        .toArray(File[]::new);
+    if (selected.length == 0) {
+      JOptionPane.showMessageDialog(
+          frame, "No files selected.", "Apply gradient", JOptionPane.WARNING_MESSAGE);
+      return;
+    }
+    Map<File, pitheguy.schemconvert.converter.Schematic> loaded = new LinkedHashMap<>();
+    for (File file : selected) {
+      try {
+        var schematic = BlockReplacer.load(file);
+        loaded.put(file, schematic);
+      } catch (IOException e) {
+        JOptionPane.showMessageDialog(
+            frame,
+            "Could not load: " + file.getName() + "\n" + e.getMessage(),
+            "Apply gradient",
+            JOptionPane.ERROR_MESSAGE);
+        return;
+      }
+    }
+    Set<String> availableBlocks;
+    try {
+      availableBlocks = BlockReplacer.loadDefaultPalette();
+    } catch (IOException e) {
+      JOptionPane.showMessageDialog(
+          frame,
+          "Could not load block list: " + e.getMessage(),
+          "Apply gradient",
+          JOptionPane.ERROR_MESSAGE);
+      return;
+    }
+    var opt = BlockTableDialog.show(frame, new ArrayList<>(availableBlocks), null);
+    if (opt.isEmpty()) return;
+    BlockGradient gradient = opt.get();
+    File firstFile = loaded.keySet().iterator().next();
+    var outputOptions = OutputOptionsDialog.show(frame, firstFile);
+    if (outputOptions.isEmpty()) return;
+    var options = outputOptions.get();
+    Set<String> targetBlocks = Set.of("minecraft:stone_bricks");
+    List<File> failed = new ArrayList<>();
+    List<File> written = new ArrayList<>();
+    for (var entry : loaded.entrySet()) {
+      File file = entry.getKey();
+      try {
+        var modified = GradientSchematicApplier.applyGradient(entry.getValue(), gradient, targetBlocks);
+        File output = options.outputFileFor(file);
+        if (output.getParentFile() != null) output.getParentFile().mkdirs();
+        BlockReplacer.write(modified, output);
+        written.add(output);
+        tableModel.addFile(output);
+      } catch (IOException e) {
+        failed.add(file);
+      }
+    }
+    var newFilesAndTimestamps = new HashMap<>(context.filesAndTimestamps());
+    for (File output : written) {
+      newFilesAndTimestamps.put(output, System.currentTimeMillis());
+    }
+    flagContextDirty(
+        new AppContext(
+            newFilesAndTimestamps,
+            context.lastSearchPath(),
+            context.guiBounds(),
+            context.neverBeforeUsed(),
+            context.columnContext(),
+            context.folderViewPath()));
+    String msg = written.size() + " file(s) written.";
+    if (!failed.isEmpty())
+      msg += "\nFailed: " + failed.stream().map(File::getName).collect(Collectors.joining(", "));
+    JOptionPane.showMessageDialog(
+        frame,
+        msg,
+        "Apply gradient",
         failed.isEmpty() ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.WARNING_MESSAGE);
   }
 

@@ -19,6 +19,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -49,6 +50,7 @@ public class BlockTableDialog extends JDialog {
     private final InstancedCubes renderer;
     private final ScheduledExecutorService saveScheduler = Executors.newSingleThreadScheduledExecutor();
     private ScheduledFuture<?> pendingSave;
+    private boolean confirmed = false;
 
     private record TableRow(String block, int yPos, int chance) {
         TableRow withBlock(String b) { return new TableRow(b, yPos, chance); }
@@ -152,6 +154,7 @@ public class BlockTableDialog extends JDialog {
     }
 
     private void applyGradientToSchematics() {
+        if (renderer == null) return;
         List<GradientRow> gradientRows = rows.stream()
             .map(r -> new GradientRow(r.block(), r.yPos(), r.chance()))
             .toList();
@@ -178,7 +181,7 @@ public class BlockTableDialog extends JDialog {
     }
 
     private BlockTableDialog(Frame owner, List<String> availableBlocks, InstancedCubes renderer) {
-        super(owner, "Block Table Debug", false);
+        super(owner, "Block Gradient", true);
         this.availableBlocks = new ArrayList<>(availableBlocks);
         this.iconProvider = new BlockIconProvider(32, 20);
         this.renderer = renderer;
@@ -257,7 +260,7 @@ public class BlockTableDialog extends JDialog {
         panel.setBorder(new EmptyBorder(8, 8, 8, 8));
         JButton okBtn = new JButton("OK");
         JButton cancelBtn = new JButton("Cancel");
-        okBtn.addActionListener(e -> { dispose(); });
+        okBtn.addActionListener(e -> { confirmed = true; dispose(); });
         cancelBtn.addActionListener(e -> { dispose(); });
         getRootPane().setDefaultButton(okBtn);
         panel.add(okBtn);
@@ -265,10 +268,15 @@ public class BlockTableDialog extends JDialog {
         return panel;
     }
 
-    public static void show(Component parent, List<String> availableBlocks, InstancedCubes renderer) {
+    public static Optional<BlockGradient> show(Component parent, List<String> availableBlocks, InstancedCubes renderer) {
         Frame owner = parent == null ? null : (parent instanceof Frame f ? f : (Frame) SwingUtilities.getAncestorOfClass(Frame.class, parent));
         var dialog = new BlockTableDialog(owner, availableBlocks, renderer);
         dialog.setVisible(true);
+        if (!dialog.confirmed) return Optional.empty();
+        List<GradientRow> rows = dialog.rows.stream()
+            .map(r -> new GradientRow(r.block(), r.yPos(), r.chance()))
+            .toList();
+        return rows.isEmpty() ? Optional.empty() : Optional.of(new BlockGradient(rows));
     }
 
     public static void main(String[] args) {
