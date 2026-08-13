@@ -12,6 +12,7 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.io.File;
 import java.nio.file.Path;
@@ -202,6 +203,11 @@ public class BlockTableDialog extends JDialog {
         table.getColumnModel().getColumn(0).setPreferredWidth(200);
         table.getColumnModel().getColumn(1).setPreferredWidth(80);
         table.getColumnModel().getColumn(2).setPreferredWidth(80);
+
+        TableRowSorter<BlockTableModel> sorter = new TableRowSorter<>(tableModel);
+        table.setRowSorter(sorter);
+        sorter.setSortsOnUpdates(true);
+        sorter.setSortKeys(List.of(new javax.swing.RowSorter.SortKey(1, javax.swing.SortOrder.ASCENDING)));
 
         rebuildGradient();
 
