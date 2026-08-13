@@ -186,6 +186,14 @@ public class InstancedCubes {
     glfwShowWindow(window);
   }
 
+  void showOrReplaceSharedWindow(CubeSetup newSetup) {
+    if (sharedVisible) {
+      replaceData(newSetup);
+    } else {
+      showSharedWindow(newSetup);
+    }
+  }
+
   void hideSharedWindow() {
     if (!sharedService) return;
     sharedVisible = false;

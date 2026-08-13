@@ -960,7 +960,11 @@ public class FileRenderApp {
           JOptionPane.ERROR_MESSAGE);
       return;
     }
-    var opt = BlockTableDialog.show(frame, new ArrayList<>(availableBlocks), null);
+    var opt = BlockTableDialog.show(
+        frame,
+        new ArrayList<>(availableBlocks),
+        new ArrayList<>(loaded.keySet()),
+        Set.of("minecraft:stone_bricks"));
     if (opt.isEmpty()) return;
     BlockGradient gradient = opt.get();
     File firstFile = loaded.keySet().iterator().next();

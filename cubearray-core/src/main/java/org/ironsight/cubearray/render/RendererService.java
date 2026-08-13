@@ -3,7 +3,6 @@ package org.ironsight.cubearray.render;
 import java.awt.image.BufferedImage;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Supplier;
 
 /**
  * Thread-safe access to the application's single OpenGL renderer.
@@ -31,6 +30,14 @@ public final class RendererService {
       return CompletableFuture.failedFuture(new IllegalArgumentException("setup cannot be null"));
     }
     return submit(setup, () -> renderer.showSharedWindow(setup));
+  }
+
+  /** Shows the shared window if hidden, otherwise replaces its data without resetting the camera. */
+  public CompletableFuture<Void> showOrReplace(CubeSetup setup) {
+    if (setup == null) {
+      return CompletableFuture.failedFuture(new IllegalArgumentException("setup cannot be null"));
+    }
+    return submit(setup, () -> renderer.showOrReplaceSharedWindow(setup));
   }
 
   /** Replaces the displayed data on the next renderer iteration. Safe from any thread. */
@@ -88,22 +95,6 @@ public final class RendererService {
           try {
             command.run();
             result.complete(null);
-          } catch (Throwable t) {
-            result.completeExceptionally(t);
-          }
-        });
-    return result;
-  }
-
-  private <T> CompletableFuture<T> submitResult(CubeSetup initialSetup, Supplier<T> command) {
-    ensureStarted(initialSetup);
-    Throwable failure = startupFailure;
-    if (failure != null) return CompletableFuture.failedFuture(failure);
-    CompletableFuture<T> result = new CompletableFuture<>();
-    renderer.enqueueSharedCommand(
-        () -> {
-          try {
-            result.complete(command.get());
           } catch (Throwable t) {
             result.completeExceptionally(t);
           }

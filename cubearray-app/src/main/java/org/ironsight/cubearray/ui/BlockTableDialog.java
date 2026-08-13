@@ -6,7 +6,7 @@ import org.ironsight.cubearray.edit.BlockReplacer;
 import org.ironsight.cubearray.platform.AppLogger;
 import org.ironsight.cubearray.platform.ResourceUtils;
 import org.ironsight.cubearray.render.CubeSetup;
-import org.ironsight.cubearray.render.InstancedCubes;
+import org.ironsight.cubearray.render.RendererService;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -25,6 +25,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -47,8 +49,16 @@ public class BlockTableDialog extends JDialog {
     private final BlockIconProvider iconProvider;
     private final BlockIconPanel iconPanel;
     private final BlockTableModel tableModel;
-    private final InstancedCubes renderer;
+    private final RendererService renderer = RendererService.getInstance();
+    private final List<File> previewFiles;
+    private final Set<String> targetBlocks;
     private final ScheduledExecutorService saveScheduler = Executors.newSingleThreadScheduledExecutor();
+    private final ExecutorService previewExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread thread = new Thread(r, "gradient-preview");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final AtomicLong previewGeneration = new AtomicLong();
     private ScheduledFuture<?> pendingSave;
     private boolean confirmed = false;
 
@@ -154,37 +164,40 @@ public class BlockTableDialog extends JDialog {
     }
 
     private void applyGradientToSchematics() {
-        if (renderer == null) return;
+        long generation = previewGeneration.incrementAndGet();
         List<GradientRow> gradientRows = rows.stream()
             .map(r -> new GradientRow(r.block(), r.yPos(), r.chance()))
             .toList();
         BlockGradient gradient = new BlockGradient(gradientRows);
 
-        List<File> existing = Arrays.stream(DEBUG_SCHEM_FILES)
-            .filter(File::exists)
-            .toList();
-        if (existing.isEmpty()) {
-            logger.warning("No debug schematic files found");
+        if (previewFiles.isEmpty()) {
+            logger.warning("No schematic files available for gradient preview");
             return;
         }
 
-        new Thread(() -> {
+        previewExecutor.execute(() -> {
             try {
-                CubeSetup setup = GradientSchematicApplier.apply(existing, gradient, TARGET_BLOCKS);
-                if (setup != null && renderer != null) {
-                    renderer.replaceData(setup);
+                CubeSetup setup = GradientSchematicApplier.apply(previewFiles, gradient, targetBlocks);
+                if (setup != null && generation == previewGeneration.get()) {
+                    renderer.showOrReplace(setup)
+                        .exceptionally(error -> {
+                            logger.log(Level.WARNING, "Failed to update gradient preview", error);
+                            return null;
+                        });
                 }
             } catch (Exception e) {
                 logger.log(Level.WARNING, "Failed to apply gradient", e);
             }
-        }, "gradient-applier").start();
+        });
     }
 
-    private BlockTableDialog(Frame owner, List<String> availableBlocks, InstancedCubes renderer) {
+    private BlockTableDialog(
+        Frame owner, List<String> availableBlocks, List<File> previewFiles, Set<String> targetBlocks) {
         super(owner, "Block Gradient", true);
         this.availableBlocks = new ArrayList<>(availableBlocks);
+        this.previewFiles = List.copyOf(previewFiles);
+        this.targetBlocks = Set.copyOf(targetBlocks);
         this.iconProvider = new BlockIconProvider(32, 20);
-        this.renderer = renderer;
 
         List<GradientRow> saved = BlockGradient.load(GRADIENT_FILE);
         if (saved.isEmpty()) {
@@ -253,6 +266,7 @@ public class BlockTableDialog extends JDialog {
         pack();
         setMinimumSize(new Dimension(800, 500));
         setLocationRelativeTo(owner);
+        applyGradientToSchematics();
     }
 
     private JPanel buildButtonPanel() {
@@ -268,9 +282,10 @@ public class BlockTableDialog extends JDialog {
         return panel;
     }
 
-    public static Optional<BlockGradient> show(Component parent, List<String> availableBlocks, InstancedCubes renderer) {
+    public static Optional<BlockGradient> show(
+        Component parent, List<String> availableBlocks, List<File> previewFiles, Set<String> targetBlocks) {
         Frame owner = parent == null ? null : (parent instanceof Frame f ? f : (Frame) SwingUtilities.getAncestorOfClass(Frame.class, parent));
-        var dialog = new BlockTableDialog(owner, availableBlocks, renderer);
+        var dialog = new BlockTableDialog(owner, availableBlocks, previewFiles, targetBlocks);
         dialog.setVisible(true);
         if (!dialog.confirmed) return Optional.empty();
         List<GradientRow> rows = dialog.rows.stream()
@@ -287,40 +302,14 @@ public class BlockTableDialog extends JDialog {
             );
             FileTableModel.blockIconProvider = new BlockIconProvider(32, 16);
 
-            List<GradientRow> saved = BlockGradient.load(GRADIENT_FILE);
-            if (saved.isEmpty()) {
-                saved = List.of(new GradientRow("minecraft:stone", 0, 100));
-            }
-            BlockGradient initialGradient = new BlockGradient(saved);
-
             List<File> debugFiles = Arrays.stream(DEBUG_SCHEM_FILES)
                 .filter(File::exists)
                 .toList();
 
-            CubeSetup initialSetup = GradientSchematicApplier.apply(debugFiles, initialGradient, TARGET_BLOCKS);
-            if (initialSetup == null) {
-                logger.severe("Failed to create initial CubeSetup");
-                return;
-            }
-
-            InstancedCubes renderer = new InstancedCubes(initialSetup);
-
-            Thread renderThread = new Thread(() -> {
-                try {
-                    renderer.run();
-                } catch (Exception e) {
-                    logger.log(Level.SEVERE, "Render thread failed", e);
-                }
-            }, "render-worker");
-            renderThread.setDaemon(true);
-            renderThread.start();
-
-            Thread.sleep(500);
-
             SwingUtilities.invokeLater(() -> {
                 try {
                     List<String> allBlocks = BlockReplacer.loadDefaultPalette().stream().sorted().toList();
-                    var dialog = new BlockTableDialog(null, allBlocks, renderer);
+                    var dialog = new BlockTableDialog(null, allBlocks, debugFiles, TARGET_BLOCKS);
                     dialog.setVisible(true);
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -329,6 +318,14 @@ public class BlockTableDialog extends JDialog {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    @Override
+    public void dispose() {
+        previewGeneration.incrementAndGet();
+        previewExecutor.shutdownNow();
+        saveScheduler.shutdownNow();
+        super.dispose();
     }
 
     private static class BlockCellRenderer extends DefaultTableCellRenderer {
