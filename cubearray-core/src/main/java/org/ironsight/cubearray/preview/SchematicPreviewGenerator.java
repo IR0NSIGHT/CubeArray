@@ -24,6 +24,7 @@ import org.ironsight.cubearray.platform.AppLogger;
 import org.ironsight.cubearray.platform.ResourceUtils;
 import org.ironsight.cubearray.render.CubeSetup;
 import org.ironsight.cubearray.render.InstancedCubes;
+import org.ironsight.cubearray.render.RendererService;
 import org.joml.Vector3f;
 import org.ironsight.cubearray.schematic.SchemReader;
 import org.pepsoft.worldpainter.objects.WPObject;
@@ -374,7 +375,7 @@ public class SchematicPreviewGenerator  {
                               JOptionPane.ERROR_MESSAGE));
                   return;
                 }
-                InstancedCubes.runInteractive(setup);
+                RendererService.getInstance().show(setup).get();
               } catch (Exception e) {
                 logger.log(Level.WARNING, "Interactive render failed", e);
                 SwingUtilities.invokeLater(
