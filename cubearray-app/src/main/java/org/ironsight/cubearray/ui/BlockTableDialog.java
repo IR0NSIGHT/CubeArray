@@ -3,31 +3,49 @@ package org.ironsight.cubearray.ui;
 import org.ironsight.cubearray.edit.BlockGradient;
 import org.ironsight.cubearray.edit.BlockGradient.GradientRow;
 import org.ironsight.cubearray.edit.BlockReplacer;
+import org.ironsight.cubearray.platform.AppLogger;
 import org.ironsight.cubearray.platform.ResourceUtils;
+import org.ironsight.cubearray.render.CubeSetup;
+import org.ironsight.cubearray.render.InstancedCubes;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.*;
+import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class BlockTableDialog extends JDialog {
 
+    private static final Logger logger = AppLogger.get(BlockTableDialog.class);
     private static final Path GRADIENT_FILE = ResourceUtils.getInstallPath().resolve("gradient.json");
+
+    private static final File[] DEBUG_SCHEM_FILES = {
+        new File("D:\\Repos\\worldpainter_related\\CastlePacks\\Poland\\xl_wall_1.schem"),
+        new File("D:\\Repos\\worldpainter_related\\CastlePacks\\Poland\\xl_wall_2_gate.schem"),
+        new File("D:\\Repos\\worldpainter_related\\CastlePacks\\Poland\\xl_wall_3_stairs.schem"),
+        new File("D:\\Repos\\worldpainter_related\\CastlePacks\\Poland\\poland_tower_round_large_1.schem"),
+        new File("D:\\Repos\\worldpainter_related\\CastlePacks\\Poland\\wall_1_tower_square.schem")
+    };
+    private static final Set<String> TARGET_BLOCKS = Set.of("minecraft:stone_bricks");
 
     private final List<TableRow> rows = new ArrayList<>();
     private final List<String> availableBlocks;
     private final BlockIconProvider iconProvider;
     private final BlockIconPanel iconPanel;
     private final BlockTableModel tableModel;
+    private final InstancedCubes renderer;
     private final ScheduledExecutorService saveScheduler = Executors.newSingleThreadScheduledExecutor();
     private ScheduledFuture<?> pendingSave;
 
@@ -132,10 +150,37 @@ public class BlockTableDialog extends JDialog {
         }, 500, TimeUnit.MILLISECONDS);
     }
 
-    private BlockTableDialog(Frame owner, List<String> availableBlocks) {
-        super(owner, "Block Table Debug", true);
+    private void applyGradientToSchematics() {
+        List<GradientRow> gradientRows = rows.stream()
+            .map(r -> new GradientRow(r.block(), r.yPos(), r.chance()))
+            .toList();
+        BlockGradient gradient = new BlockGradient(gradientRows);
+
+        List<File> existing = Arrays.stream(DEBUG_SCHEM_FILES)
+            .filter(File::exists)
+            .toList();
+        if (existing.isEmpty()) {
+            logger.warning("No debug schematic files found");
+            return;
+        }
+
+        new Thread(() -> {
+            try {
+                CubeSetup setup = GradientSchematicApplier.apply(existing, gradient, TARGET_BLOCKS);
+                if (setup != null && renderer != null) {
+                    renderer.replaceData(setup);
+                }
+            } catch (Exception e) {
+                logger.log(Level.WARNING, "Failed to apply gradient", e);
+            }
+        }, "gradient-applier").start();
+    }
+
+    private BlockTableDialog(Frame owner, List<String> availableBlocks, InstancedCubes renderer) {
+        super(owner, "Block Table Debug", false);
         this.availableBlocks = new ArrayList<>(availableBlocks);
         this.iconProvider = new BlockIconProvider(32, 20);
+        this.renderer = renderer;
 
         List<GradientRow> saved = BlockGradient.load(GRADIENT_FILE);
         if (saved.isEmpty()) {
@@ -147,7 +192,7 @@ public class BlockTableDialog extends JDialog {
         }
 
         iconPanel = new BlockIconPanel(iconProvider);
-        Runnable onChange = () -> { rebuildGradient(); scheduleSave(); };
+        Runnable onChange = () -> { rebuildGradient(); scheduleSave(); applyGradientToSchematics(); };
         tableModel = new BlockTableModel(rows, onChange);
 
         JTable table = new JTable(tableModel);
@@ -214,27 +259,62 @@ public class BlockTableDialog extends JDialog {
         return panel;
     }
 
-    public static void show(Component parent, List<String> availableBlocks) {
+    public static void show(Component parent, List<String> availableBlocks, InstancedCubes renderer) {
         Frame owner = parent == null ? null : (parent instanceof Frame f ? f : (Frame) SwingUtilities.getAncestorOfClass(Frame.class, parent));
-        var dialog = new BlockTableDialog(owner, availableBlocks);
+        var dialog = new BlockTableDialog(owner, availableBlocks, renderer);
         dialog.setVisible(true);
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            try {
-                org.ironsight.cubearray.platform.ResourceUtils.copyResourcesToFile(
-                    org.ironsight.cubearray.platform.ResourceUtils.TEXTURE_RESOURCES,
-                    org.ironsight.cubearray.platform.ResourceUtils.VANILLA_ASSETS_RESOURCES
-                );
-                FileTableModel.blockIconProvider = new BlockIconProvider(32, 16);
-                List<String> allBlocks = BlockReplacer.loadDefaultPalette().stream().sorted().toList();
-                var dialog = new BlockTableDialog(null, allBlocks);
-                dialog.setVisible(true);
-            } catch (Exception e) {
-                e.printStackTrace();
+        try {
+            ResourceUtils.copyResourcesToFile(
+                ResourceUtils.TEXTURE_RESOURCES,
+                ResourceUtils.VANILLA_ASSETS_RESOURCES
+            );
+            FileTableModel.blockIconProvider = new BlockIconProvider(32, 16);
+
+            List<GradientRow> saved = BlockGradient.load(GRADIENT_FILE);
+            if (saved.isEmpty()) {
+                saved = List.of(new GradientRow("minecraft:stone", 0, 100));
             }
-        });
+            BlockGradient initialGradient = new BlockGradient(saved);
+
+            List<File> debugFiles = Arrays.stream(DEBUG_SCHEM_FILES)
+                .filter(File::exists)
+                .toList();
+
+            CubeSetup initialSetup = GradientSchematicApplier.apply(debugFiles, initialGradient, TARGET_BLOCKS);
+            if (initialSetup == null) {
+                logger.severe("Failed to create initial CubeSetup");
+                return;
+            }
+
+            InstancedCubes renderer = new InstancedCubes(initialSetup);
+
+            Thread renderThread = new Thread(() -> {
+                try {
+                    renderer.run();
+                } catch (Exception e) {
+                    logger.log(Level.SEVERE, "Render thread failed", e);
+                }
+            }, "render-worker");
+            renderThread.setDaemon(true);
+            renderThread.start();
+
+            Thread.sleep(500);
+
+            SwingUtilities.invokeLater(() -> {
+                try {
+                    List<String> allBlocks = BlockReplacer.loadDefaultPalette().stream().sorted().toList();
+                    var dialog = new BlockTableDialog(null, allBlocks, renderer);
+                    dialog.setVisible(true);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private static class BlockCellRenderer extends DefaultTableCellRenderer {
