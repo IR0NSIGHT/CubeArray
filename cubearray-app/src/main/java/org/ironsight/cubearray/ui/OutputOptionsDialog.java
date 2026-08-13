@@ -65,6 +65,11 @@ public class OutputOptionsDialog extends JDialog {
     super(owner, "Output options", true);
     this.firstFile = firstFile;
 
+    postfixField.setName("postfixField");
+    toggleBtn.setName("affixModeButton");
+    exampleLabel.setName("exampleLabel");
+    folderCheckBox.setName("folderCheckBox");
+
     setLayout(new BorderLayout(8, 8));
     getRootPane().setBorder(new EmptyBorder(12, 12, 12, 12));
 
@@ -184,6 +189,8 @@ public class OutputOptionsDialog extends JDialog {
   private JPanel buildButtonPanel() {
     JButton okBtn = new JButton("OK");
     JButton cancelBtn = new JButton("Cancel");
+    okBtn.setName("okButton");
+    cancelBtn.setName("cancelButton");
 
     okBtn.addActionListener(
         e -> {

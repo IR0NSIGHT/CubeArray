@@ -225,8 +225,10 @@ public class BlockReplacerDialog extends JDialog {
 
   private JPanel buildTopBar() {
     modeBtn.addActionListener(e -> toggleMode());
+    modeBtn.setName("modeButton");
 
     JTextField searchField = new JTextField();
+    searchField.setName("searchField");
     searchField.putClientProperty("JTextField.placeholderText", "Search blocks…");
     searchField.setPreferredSize(new Dimension(200, searchField.getPreferredSize().height));
     searchField
@@ -730,6 +732,9 @@ public class BlockReplacerDialog extends JDialog {
     JButton open3dBtn = new JButton("Open 3D");
     JButton okBtn = new JButton("OK");
     JButton cancelBtn = new JButton("Cancel");
+    open3dBtn.setName("open3dButton");
+    okBtn.setName("okButton");
+    cancelBtn.setName("cancelButton");
 
     open3dBtn.addActionListener(
         e ->

@@ -229,6 +229,7 @@ public class FileRenderApp {
     folderViewPanel.add(folderPanel.panel(), BorderLayout.CENTER);
 
     JTabbedPane tabbedPane = new JTabbedPane(SwingConstants.LEFT);
+    tabbedPane.setName("mainTabs");
     tabbedPane.addTab(null, Icons.get("folder"), globalPanel.panel());
     tabbedPane.addTab(null, Icons.get("tree"), folderViewPanel);
     tabbedPane.addTab(null, Icons.get("settings"),
@@ -340,6 +341,7 @@ public class FileRenderApp {
       JFrame parentFrame,
       Consumer<File> onDirDoubleClick) {
     JTable table = new JTable(model);
+    table.setName(extraFilter == null ? "fileTable" : "folderTable");
     TableRowSorter<FileTableModel> sorter = new TableRowSorter<>(model);
     sorter.setComparator(CaColumn.ICON.ordinal(), (a, b) -> 0);
 
@@ -504,6 +506,7 @@ public class FileRenderApp {
     table.setRowHeight(64);
 
     JTextField searchField = new JTextField(40);
+    searchField.setName(extraFilter == null ? "fileSearchField" : "folderSearchField");
     searchField.setText("Search");
     searchField.putClientProperty("JTextField.placeholderText", "Search...");
 

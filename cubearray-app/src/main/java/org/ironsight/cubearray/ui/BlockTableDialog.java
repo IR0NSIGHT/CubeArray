@@ -213,6 +213,7 @@ public class BlockTableDialog extends JDialog {
         tableModel = new BlockTableModel(rows, onChange);
 
         JTable table = new JTable(tableModel);
+        table.setName("gradientTable");
         table.setRowHeight(32);
         table.getColumnModel().getColumn(0).setCellRenderer(new BlockCellRenderer(iconProvider));
         table.getColumnModel().getColumn(0).setCellEditor(new SearchableBlockCellEditor(availableBlocks, iconProvider));
@@ -228,12 +229,14 @@ public class BlockTableDialog extends JDialog {
         rebuildGradient();
 
         JButton addRowBtn = new JButton("Add Row");
+        addRowBtn.setName("addRowButton");
         addRowBtn.addActionListener(e -> {
             rows.add(new TableRow(availableBlocks.isEmpty() ? "minecraft:stone" : availableBlocks.get(0), 0, 100));
             tableModel.fireAllChanged();
         });
 
         JButton removeRowBtn = new JButton("Remove Row");
+        removeRowBtn.setName("removeRowButton");
         removeRowBtn.addActionListener(e -> {
             int[] selected = table.getSelectedRows();
             if (selected.length == 0) return;
@@ -274,6 +277,8 @@ public class BlockTableDialog extends JDialog {
         panel.setBorder(new EmptyBorder(8, 8, 8, 8));
         JButton okBtn = new JButton("OK");
         JButton cancelBtn = new JButton("Cancel");
+        okBtn.setName("okButton");
+        cancelBtn.setName("cancelButton");
         okBtn.addActionListener(e -> { confirmed = true; dispose(); });
         cancelBtn.addActionListener(e -> { dispose(); });
         getRootPane().setDefaultButton(okBtn);
