@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import javax.imageio.ImageIO;
@@ -84,6 +85,7 @@ public class InstancedCubes {
   private CameraTransition transition;
   public boolean headless;
   private final BlockingQueue<Runnable> pendingTasks = new LinkedBlockingQueue<>();
+  private final ConcurrentLinkedDeque<Runnable> priorityTasks = new ConcurrentLinkedDeque<>();
   private volatile CameraState publishedCameraState;
   private final BlockingQueue<Runnable> deferredSharedTasks = new LinkedBlockingQueue<>();
   private int resolveFbo;
@@ -157,6 +159,10 @@ public class InstancedCubes {
 
   void enqueueSharedCommand(Runnable command) {
     pendingTasks.add(command);
+  }
+
+  void enqueueSharedPriorityCommand(Runnable command) {
+    priorityTasks.addLast(command);
   }
 
   void enqueueSharedScreenshot(Runnable command) {
@@ -702,7 +708,10 @@ public class InstancedCubes {
         lastChangeTime = glfwGetTime();
       }
 
-      boolean needsRedraw = (glfwGetTime() - lastChangeTime) < 0.5 || !pendingTasks.isEmpty();
+      boolean needsRedraw =
+          (glfwGetTime() - lastChangeTime) < 0.5
+              || !priorityTasks.isEmpty()
+              || !pendingTasks.isEmpty();
 
       if (needsRedraw) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -739,8 +748,11 @@ public class InstancedCubes {
                           GL_COLOR_BUFFER_BIT, GL_NEAREST);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        Runnable task;
-        while ((task = pendingTasks.poll()) != null) {
+         Runnable task;
+         while ((task = priorityTasks.pollFirst()) != null) {
+           task.run();
+         }
+         while ((task = pendingTasks.poll()) != null) {
           task.run();
         }
 
@@ -835,6 +847,9 @@ public class InstancedCubes {
   /** Drains and executes all queued render-thread tasks. Package-private for testing. */
   void executePendingTasks() {
     Runnable task;
+    while ((task = priorityTasks.pollFirst()) != null) {
+      task.run();
+    }
     while ((task = pendingTasks.poll()) != null) {
       task.run();
     }

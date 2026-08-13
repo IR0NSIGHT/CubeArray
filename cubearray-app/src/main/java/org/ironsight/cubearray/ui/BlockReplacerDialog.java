@@ -612,17 +612,17 @@ public class BlockReplacerDialog extends JDialog {
     SearchableTextField stf = new SearchableTextField(Arrays.asList(choices));
     stf.getTextField().setText(sourceKey);
     stf.setIconProvider(iconProvider::getIcon);
+    stf.setOnTextChangedCallback(
+        () -> {
+          if (updateOverride(sourceKey, stf.getTextField().getText())) {
+            preview.flagRerender();
+          }
+        });
     stf.addCommitListener(
         () -> {
-          String sel = stf.getTextField().getText();
-          if (sel != null) {
-            if (sel.equals(sourceKey)) {
-              overrides.remove(sourceKey);
-            } else {
-              overrides.put(sourceKey, sel);
-            }
+          if (updateOverride(sourceKey, stf.getTextField().getText())) {
+            preview.flagRerender();
           }
-          preview.flagRerender();
         });
     // Restore any previously stored override
     String saved = overrides.get(sourceKey);
@@ -631,6 +631,14 @@ public class BlockReplacerDialog extends JDialog {
     }
     combos.add(stf);
     return stf;
+  }
+
+  private boolean updateOverride(String sourceKey, String value) {
+    if (value == null || value.isEmpty() || value.equals(sourceKey)) {
+      return overrides.remove(sourceKey) != null;
+    }
+    if (!BlockReplacer.isValidBlockSyntax(value)) return false;
+    return !Objects.equals(overrides.put(sourceKey, value), value);
   }
 
   // -------------------------------------------------------------------------
@@ -719,8 +727,25 @@ public class BlockReplacerDialog extends JDialog {
   }
 
   private JPanel buildButtonPanel() {
+    JButton open3dBtn = new JButton("Open 3D");
     JButton okBtn = new JButton("OK");
     JButton cancelBtn = new JButton("Cancel");
+
+    open3dBtn.addActionListener(
+        e ->
+            preview
+                .openInteractive()
+                .exceptionally(
+                    error -> {
+                      SwingUtilities.invokeLater(
+                          () ->
+                              JOptionPane.showMessageDialog(
+                                  this,
+                                  error.getMessage(),
+                                  "3D Preview",
+                                  JOptionPane.INFORMATION_MESSAGE));
+                      return null;
+                    }));
 
     okBtn.addActionListener(
         e -> {
@@ -732,6 +757,7 @@ public class BlockReplacerDialog extends JDialog {
     getRootPane().setDefaultButton(okBtn);
 
     JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+    panel.add(open3dBtn);
     panel.add(okBtn);
     panel.add(cancelBtn);
     return panel;

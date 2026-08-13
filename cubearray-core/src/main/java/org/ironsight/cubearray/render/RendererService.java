@@ -43,7 +43,7 @@ public final class RendererService {
   /** Replaces the displayed data on the next renderer iteration. Safe from any thread. */
   public CompletableFuture<Void> replaceData(CubeSetup setup) {
     if (setup == null) return CompletableFuture.completedFuture(null);
-    return submit(setup, () -> renderer.replaceData(setup));
+    return submitPriority(setup, () -> renderer.replaceData(setup));
   }
 
   /** Hides the shared window without destroying its OpenGL resources. Safe from any thread. */
@@ -91,6 +91,23 @@ public final class RendererService {
     if (failure != null) return CompletableFuture.failedFuture(failure);
     CompletableFuture<Void> result = new CompletableFuture<>();
     renderer.enqueueSharedCommand(
+        () -> {
+          try {
+            command.run();
+            result.complete(null);
+          } catch (Throwable t) {
+            result.completeExceptionally(t);
+          }
+        });
+    return result;
+  }
+
+  private CompletableFuture<Void> submitPriority(CubeSetup initialSetup, Runnable command) {
+    ensureStarted(initialSetup);
+    Throwable failure = startupFailure;
+    if (failure != null) return CompletableFuture.failedFuture(failure);
+    CompletableFuture<Void> result = new CompletableFuture<>();
+    renderer.enqueueSharedPriorityCommand(
         () -> {
           try {
             command.run();
