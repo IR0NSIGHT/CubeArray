@@ -38,8 +38,16 @@ public class ModernTable extends JTable {
     if (row == hoveredRow) return;
     int old = hoveredRow;
     hoveredRow = row;
-    if (old >= 0) repaint(getCellRect(old, 0, true));
-    if (row >= 0) repaint(getCellRect(row, 0, true));
+    repaintRow(old);
+    repaintRow(row);
+  }
+
+  private void repaintRow(int row) {
+    if (row < 0 || row >= getRowCount()) return;
+    Rectangle bounds = getCellRect(row, 0, true);
+    bounds.x = 0;
+    bounds.width = getWidth();
+    repaint(bounds);
   }
 
   @Override
