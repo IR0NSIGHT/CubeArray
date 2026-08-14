@@ -444,9 +444,8 @@ public class FileRenderApp {
               int columns = (int) Math.ceil(pxWidth);
               textArea.setColumns(Math.max(Math.min(100, columns + 5), 20));
               textArea.setRows(Math.max(7, Math.min(30, content.split("\n").length)));
-              textArea.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
-              JScrollPane scrollPane = new JScrollPane(textArea);
-              menu.add(new JLabel(model.getColumn(modelCol).displayName));
+              JScrollPane scrollPane = Ui.scroll(textArea);
+              menu.add(Ui.label(model.getColumn(modelCol).displayName, "muted"));
               menu.add(scrollPane);
               SwingUtilities.invokeLater(() -> menu.show(e.getComponent(), e.getX(), e.getY()));
             }
@@ -549,7 +548,7 @@ public class FileRenderApp {
         DebouncedDocumentListener.PROP_SEARCHING,
         e -> searchSpinner.setVisible((boolean) e.getNewValue()));
 
-    JPanel chipRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
+    JPanel chipRow = new JPanel(new FlowLayout(FlowLayout.LEFT, Ui.px(Ui.XS), Ui.px(Ui.XS)));
     chipRow.setVisible(false);
 
     ChipSearchManager[] chipManagerRef = new ChipSearchManager[1];
@@ -571,6 +570,7 @@ public class FileRenderApp {
       JPanel searchRow = new JPanel(new FlowLayout(FlowLayout.LEFT));
       {
         JButton addBtn = new JButton(Icons.get("menu"));
+        Ui.style(addBtn, "ghost");
         final JPopupMenu filesMenu =
             new JPopupMenu() {
               @Override
@@ -582,19 +582,19 @@ public class FileRenderApp {
             };
         filesMenu.setLayout(new GridLayout(0, 1));
         {
-          JButton importSingleFile = new JButton("Import file");
+          JButton importSingleFile = Ui.button("Import file", "ghost");
           importSingleFile.addActionListener(a -> this.importFile());
           filesMenu.add(importSingleFile);
 
-          JButton importFolder = new JButton("Import folder");
+          JButton importFolder = Ui.button("Import folder", "ghost");
           importFolder.addActionListener(a -> this.importFolder());
           filesMenu.add(importFolder);
 
-          JButton reloadAll = new JButton("Reload all");
+          JButton reloadAll = Ui.button("Reload all", "ghost");
           reloadAll.addActionListener(a -> this.reloadAllFiles());
           filesMenu.add(reloadAll);
 
-          JButton removeAll = new JButton("Remove all");
+          JButton removeAll = Ui.button("Remove all", "danger");
           removeAll.addActionListener(a -> this.removeAllFiles());
           filesMenu.add(removeAll);
         }
@@ -635,10 +635,10 @@ public class FileRenderApp {
     JPopupMenu rightMenu = new JPopupMenu();
     rightMenu.setLayout(new GridLayout(0, 1));
 
-    JLabel menuTitleLbl = new JLabel("");
+    JLabel menuTitleLbl = Ui.label("", "muted");
     rightMenu.add(menuTitleLbl);
 
-    JButton reloadFileBtn = new JButton("Reload");
+    JButton reloadFileBtn = Ui.button("Reload", "ghost");
     reloadFileBtn.addActionListener(
         a -> {
           for (int viewRow : table.getSelectedRows()) {
@@ -651,7 +651,7 @@ public class FileRenderApp {
         });
     rightMenu.add(reloadFileBtn);
 
-    JButton renderFilesBtn = new JButton("Render");
+    JButton renderFilesBtn = Ui.button("Render", "primary");
     renderFilesBtn.addActionListener(
         a -> {
           List<File> files =
@@ -664,7 +664,7 @@ public class FileRenderApp {
         });
     rightMenu.add(renderFilesBtn);
 
-    JButton removeFilesBtn = new JButton("Remove");
+    JButton removeFilesBtn = Ui.button("Remove", "ghost");
     removeFilesBtn.addActionListener(
         a -> {
           File[] files =
@@ -694,7 +694,7 @@ public class FileRenderApp {
         });
     rightMenu.add(removeFilesBtn);
 
-    JButton deleteFilesBtn = new JButton("Delete from disk");
+    JButton deleteFilesBtn = Ui.button("Delete from disk", "danger");
     deleteFilesBtn.addActionListener(
         a -> {
           File[] selected =
@@ -751,7 +751,7 @@ public class FileRenderApp {
         });
     rightMenu.add(deleteFilesBtn);
 
-    JButton openFolderBtn = new JButton("Open folder");
+    JButton openFolderBtn = Ui.button("Open folder", "ghost");
     openFolderBtn.addActionListener(
         a -> {
           File[] files =
@@ -789,15 +789,15 @@ public class FileRenderApp {
         });
     rightMenu.add(openFolderBtn);
 
-    JButton convertToSponge3Btn = new JButton("Convert to Sponge3");
+    JButton convertToSponge3Btn = Ui.button("Convert to Sponge3", "ghost");
     convertToSponge3Btn.addActionListener(a -> convertSelectedToSponge3(table));
     rightMenu.add(convertToSponge3Btn);
 
-    JButton replaceSandstoneBtn = new JButton("Replace blocks");
+    JButton replaceSandstoneBtn = Ui.button("Replace blocks", "ghost");
     replaceSandstoneBtn.addActionListener(a -> replaceSandstoneWithCobblestone(table));
     rightMenu.add(replaceSandstoneBtn);
 
-    JButton applyGradientBtn = new JButton("Apply gradient");
+    JButton applyGradientBtn = Ui.button("Apply gradient", "primary");
     applyGradientBtn.addActionListener(a -> applyGradientToSelected(table));
     rightMenu.add(applyGradientBtn);
 
@@ -1502,6 +1502,14 @@ public class FileRenderApp {
       themeMode.addActionListener(
           e -> ThemeManager.setMode((ThemeManager.Mode) themeMode.getSelectedItem()));
       appPanel.add(themeMode);
+      appPanel.add(new JLabel("Font size:"));
+      JComboBox<String> fontSize = new JComboBox<>(new String[] {"Small", "Default", "Large"});
+      float scale = ThemeManager.fontScale();
+      fontSize.setSelectedIndex(scale < 0.95f ? 0 : scale > 1.05f ? 2 : 1);
+      fontSize.addActionListener(
+          e ->
+              ThemeManager.setFontScale(new float[] {0.9f, 1f, 1.1f}[fontSize.getSelectedIndex()]));
+      appPanel.add(fontSize);
       JButton openInstallPathBtn = new JButton("Open install folder");
       openInstallPathBtn.addActionListener(
           e -> {

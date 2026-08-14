@@ -264,7 +264,7 @@ public class BlockTableDialog extends JDialog {
 
     rebuildGradient();
 
-    JButton addRowBtn = new JButton("Add Row");
+    JButton addRowBtn = Ui.button("Add Row", "primary");
     addRowBtn.setName("addRowButton");
     addRowBtn.addActionListener(
         e -> {
@@ -274,7 +274,7 @@ public class BlockTableDialog extends JDialog {
           tableModel.fireAllChanged();
         });
 
-    JButton removeRowBtn = new JButton("Remove Row");
+    JButton removeRowBtn = Ui.button("Remove Row", "danger");
     removeRowBtn.setName("removeRowButton");
     removeRowBtn.addActionListener(
         e -> {
@@ -296,10 +296,10 @@ public class BlockTableDialog extends JDialog {
     topBtnPanel.add(addRowBtn);
     topBtnPanel.add(removeRowBtn);
     leftPanel.add(topBtnPanel, BorderLayout.NORTH);
-    leftPanel.add(new JScrollPane(table), BorderLayout.CENTER);
+    leftPanel.add(Ui.scroll(table), BorderLayout.CENTER);
 
     JSplitPane splitPane =
-        new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPanel, new JScrollPane(iconPanel));
+        new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPanel, Ui.scroll(iconPanel));
     splitPane.setResizeWeight(0.5);
     splitPane.setDividerLocation(0.5);
 
@@ -316,8 +316,8 @@ public class BlockTableDialog extends JDialog {
   private JPanel buildButtonPanel() {
     JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
     panel.setBorder(new EmptyBorder(8, 8, 8, 8));
-    JButton okBtn = new JButton("OK");
-    JButton cancelBtn = new JButton("Cancel");
+    JButton okBtn = Ui.button("OK", "primary");
+    JButton cancelBtn = Ui.button("Cancel", "ghost");
     okBtn.setName("okButton");
     cancelBtn.setName("cancelButton");
     okBtn.addActionListener(

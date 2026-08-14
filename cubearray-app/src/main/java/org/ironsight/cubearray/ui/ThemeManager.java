@@ -20,6 +20,7 @@ public final class ThemeManager {
 
   private static final Preferences PREFS = Preferences.userNodeForPackage(ThemeManager.class);
   private static final String MODE = "mode";
+  private static final String FONT_SCALE = "fontScale";
   private static Mode mode = Mode.SYSTEM;
   private static float fontScale = 1f;
 
@@ -32,6 +33,7 @@ public final class ThemeManager {
     FlatLaf.setPreferredFontFamily(FlatInterFont.FAMILY);
     FlatLaf.setPreferredMonospacedFontFamily(FlatJetBrainsMonoFont.FAMILY);
     mode = readMode();
+    fontScale = PREFS.getFloat(FONT_SCALE, 1f);
     installLookAndFeel(false);
   }
 
@@ -52,9 +54,10 @@ public final class ThemeManager {
 
   public static void setFontScale(float scale) {
     fontScale = Math.max(.8f, Math.min(1.4f, scale));
+    PREFS.putFloat(FONT_SCALE, fontScale);
     var baseFont = UIManager.getFont("defaultFont");
     if (baseFont != null) UIManager.put("defaultFont", baseFont.deriveFont(13f * fontScale));
-    for (Window window : Window.getWindows()) SwingUtilities.updateComponentTreeUI(window);
+    updateWindows();
   }
 
   private static Mode readMode() {
@@ -71,15 +74,31 @@ public final class ThemeManager {
       if (animate) FlatAnimatedLafChange.showSnapshot();
       UIManager.setLookAndFeel(dark ? new FlatDarkLaf() : new FlatLightLaf());
       setFontScale(fontScale);
-      for (Window window : Window.getWindows()) {
-        SwingUtilities.updateComponentTreeUI(window);
-        window.invalidate();
-        window.repaint();
-      }
+      updateWindows();
       if (animate) FlatAnimatedLafChange.hideSnapshotWithAnimation();
     } catch (Exception e) {
       if (animate) FlatAnimatedLafChange.hideSnapshotWithAnimation();
       throw new IllegalStateException("Unable to install CubeArray theme", e);
+    }
+  }
+
+  private static void updateWindows() {
+    Runnable update =
+        () -> {
+          for (Window window : Window.getWindows()) {
+            SwingUtilities.updateComponentTreeUI(window);
+            window.invalidate();
+            window.repaint();
+          }
+        };
+    if (SwingUtilities.isEventDispatchThread()) {
+      update.run();
+      return;
+    }
+    try {
+      SwingUtilities.invokeAndWait(update);
+    } catch (Exception e) {
+      throw new IllegalStateException("Unable to update themed windows", e);
     }
   }
 }

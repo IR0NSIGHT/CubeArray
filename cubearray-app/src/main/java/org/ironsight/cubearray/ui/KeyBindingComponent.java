@@ -35,7 +35,7 @@ public class KeyBindingComponent extends JPanel {
     table.setAutoCreateRowSorter(true); // enable sorting
 
     // Add table to scroll pane
-    JScrollPane scrollPane = new JScrollPane(table);
+    JScrollPane scrollPane = Ui.scroll(table);
     add(new JLabel("3d Viewer Keybindings"), BorderLayout.NORTH);
     add(scrollPane, BorderLayout.CENTER);
 

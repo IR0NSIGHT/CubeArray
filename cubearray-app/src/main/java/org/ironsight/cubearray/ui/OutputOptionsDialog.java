@@ -4,7 +4,6 @@ import java.awt.*;
 import java.io.File;
 import java.util.Optional;
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
@@ -71,7 +70,7 @@ public class OutputOptionsDialog extends JDialog {
     folderCheckBox.setName("folderCheckBox");
 
     setLayout(new BorderLayout(8, 8));
-    getRootPane().setBorder(new EmptyBorder(12, 12, 12, 12));
+    getRootPane().setBorder(Ui.padding(Ui.MD, Ui.MD, Ui.MD, Ui.MD));
 
     add(buildForm(), BorderLayout.CENTER);
     add(buildButtonPanel(), BorderLayout.SOUTH);
@@ -131,7 +130,7 @@ public class OutputOptionsDialog extends JDialog {
     lbl.insets = new Insets(0, 0, 10, 8);
     fld.insets = new Insets(0, 0, 10, 0);
     panel.add(new JLabel("Example:"), lbl);
-    exampleLabel.setFont(exampleLabel.getFont().deriveFont(Font.ITALIC));
+    Ui.style(exampleLabel, "muted");
     panel.add(exampleLabel, fld);
 
     // Row 2 — folder checkbox (spans both columns)
@@ -146,7 +145,7 @@ public class OutputOptionsDialog extends JDialog {
     // Row 3 — folder path label (spans both columns)
     full.gridy = 3;
     full.insets = new Insets(0, 20, 0, 0);
-    folderLabel.setFont(folderLabel.getFont().deriveFont(Font.ITALIC));
+    Ui.style(folderLabel, "muted");
     panel.add(folderLabel, full);
 
     // Live example updates on every keystroke
@@ -187,8 +186,8 @@ public class OutputOptionsDialog extends JDialog {
   }
 
   private JPanel buildButtonPanel() {
-    JButton okBtn = new JButton("OK");
-    JButton cancelBtn = new JButton("Cancel");
+    JButton okBtn = Ui.button("OK", "primary");
+    JButton cancelBtn = Ui.button("Cancel", "ghost");
     okBtn.setName("okButton");
     cancelBtn.setName("cancelButton");
 

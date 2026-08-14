@@ -81,12 +81,13 @@ public class ChipSearchManager {
         new JDialog(parentWindow, "Add Search Condition", Dialog.ModalityType.APPLICATION_MODAL);
 
     JPanel panel = new JPanel(new GridBagLayout());
+    panel.setBorder(Ui.padding(Ui.LG, Ui.LG, Ui.LG, Ui.LG));
     GridBagConstraints gbc = new GridBagConstraints();
-    gbc.insets = new Insets(8, 8, 8, 8);
+    gbc.insets = new Insets(Ui.px(Ui.SM), Ui.px(Ui.SM), Ui.px(Ui.SM), Ui.px(Ui.SM));
     gbc.fill = GridBagConstraints.HORIZONTAL;
 
     JLabel searchTextLabel = new JLabel("\u201C" + searchText + "\u201D");
-    searchTextLabel.setFont(searchTextLabel.getFont().deriveFont(Font.BOLD));
+    Ui.style(searchTextLabel, "brand");
 
     gbc.gridx = 0;
     gbc.gridy = 0;
@@ -117,9 +118,9 @@ public class ChipSearchManager {
     gbc.gridx = 1;
     panel.add(columnCombo, gbc);
 
-    JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
-    JButton okButton = new JButton("OK");
-    JButton cancelButton = new JButton("Cancel");
+    JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, Ui.px(Ui.SM), 0));
+    JButton okButton = Ui.button("OK", "primary");
+    JButton cancelButton = Ui.button("Cancel", "ghost");
     buttonPanel.add(okButton);
     buttonPanel.add(cancelButton);
 
@@ -148,17 +149,23 @@ public class ChipSearchManager {
   private void addCondition(SearchCondition cond) {
     conditions.add(cond);
 
-    JPanel chip = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 2));
-    chip.setBackground(new Color(220, 230, 250));
-    chip.setBorder(
-        BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(180, 200, 240)),
-            BorderFactory.createEmptyBorder(2, 6, 2, 2)));
+    JPanel chip =
+        new JPanel(new FlowLayout(FlowLayout.LEFT, Ui.px(Ui.XS), Ui.px(Ui.XS))) {
+          @Override
+          protected void paintComponent(Graphics graphics) {
+            Graphics2D g = (Graphics2D) graphics.create();
+            g.setColor(Ui.color("App.chipBackgroundColor", getBackground()));
+            g.fillRoundRect(0, 0, getWidth(), getHeight(), getHeight(), getHeight());
+            g.dispose();
+            super.paintComponent(graphics);
+          }
+        };
+    chip.setOpaque(false);
+    chip.setBorder(Ui.hairline("App.chipBorderColor"));
 
     JLabel label = new JLabel(cond.column().displayName + ": " + cond.searchTerm());
-    JButton closeButton = new JButton("\u00D7");
-    closeButton.setFont(closeButton.getFont().deriveFont(Font.BOLD, 12f));
-    closeButton.setBorder(BorderFactory.createEmptyBorder(0, 4, 0, 2));
+    JButton closeButton = Ui.button("\u00D7", "ghost");
+    closeButton.setBorder(Ui.padding(0, Ui.XS, 0, Ui.XS));
     closeButton.setContentAreaFilled(false);
     closeButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 

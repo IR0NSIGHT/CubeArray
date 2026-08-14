@@ -193,7 +193,7 @@ public class BlockReplacerDialog extends JDialog {
     }
     allCategoryBlocks.values().forEach(list -> list.sort(null));
     setLayout(new BorderLayout(8, 8));
-    getRootPane().setBorder(new EmptyBorder(10, 10, 10, 10));
+    getRootPane().setBorder(Ui.padding(Ui.MD, Ui.MD, Ui.MD, Ui.MD));
 
     add(buildTopBar(), BorderLayout.NORTH);
     mappingScroll = buildMappingPanel();
@@ -225,7 +225,7 @@ public class BlockReplacerDialog extends JDialog {
     modeBtn.addActionListener(e -> toggleMode());
     modeBtn.setName("modeButton");
 
-    JTextField searchField = new JTextField();
+    JTextField searchField = Ui.searchField("Search blocks...");
     searchField.setName("searchField");
     searchField.putClientProperty("JTextField.placeholderText", "Search blocks…");
     searchField.setPreferredSize(new Dimension(200, searchField.getPreferredSize().height));
@@ -354,7 +354,7 @@ public class BlockReplacerDialog extends JDialog {
                       .filter(v -> searchText.isEmpty() || v.toLowerCase().contains(searchText))
                       .count();
         };
-    JScrollPane scroll = new JScrollPane(rows);
+    JScrollPane scroll = Ui.scroll(rows);
     scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
     scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
     Dimension contentPref = rows.getPreferredSize();
@@ -549,13 +549,12 @@ public class BlockReplacerDialog extends JDialog {
     return (list, value, index, isSelected, cellHasFocus) -> {
       String category = value == null ? "" : (String) value;
 
-      JPanel cell = new JPanel(new BorderLayout(6, 0));
-      cell.setOpaque(true);
-      cell.setBackground(isSelected ? list.getSelectionBackground() : list.getBackground());
-      cell.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
+      JPanel cell = new JPanel(new BorderLayout(Ui.px(Ui.SM), 0));
+      cell.setOpaque(false);
+      cell.setBorder(Ui.padding(Ui.XS, Ui.SM, Ui.XS, Ui.SM));
 
       JLabel nameLabel = new JLabel(category);
-      nameLabel.setForeground(isSelected ? list.getSelectionForeground() : list.getForeground());
+      nameLabel.setForeground(Ui.color("List.foreground", list.getForeground()));
       nameLabel.setFont(list.getFont());
       cell.add(nameLabel, BorderLayout.WEST);
 
@@ -698,7 +697,7 @@ public class BlockReplacerDialog extends JDialog {
       column.add(Box.createVerticalStrut(6));
     }
 
-    JScrollPane scroll = new JScrollPane(column);
+    JScrollPane scroll = Ui.scroll(column);
     scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
     scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
     scroll.setPreferredSize(new Dimension(isAfter ? 88 : 256 + 24, 1));
@@ -731,9 +730,9 @@ public class BlockReplacerDialog extends JDialog {
   }
 
   private JPanel buildButtonPanel() {
-    JButton open3dBtn = new JButton("Open 3D");
-    JButton okBtn = new JButton("OK");
-    JButton cancelBtn = new JButton("Cancel");
+    JButton open3dBtn = Ui.button("Open 3D", "ghost");
+    JButton okBtn = Ui.button("OK", "primary");
+    JButton cancelBtn = Ui.button("Cancel", "ghost");
     open3dBtn.setName("open3dButton");
     okBtn.setName("okButton");
     cancelBtn.setName("cancelButton");
@@ -763,7 +762,7 @@ public class BlockReplacerDialog extends JDialog {
 
     getRootPane().setDefaultButton(okBtn);
 
-    JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+    JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT, Ui.px(Ui.SM), 0));
     panel.add(open3dBtn);
     panel.add(okBtn);
     panel.add(cancelBtn);
@@ -772,7 +771,7 @@ public class BlockReplacerDialog extends JDialog {
 
   private static JLabel bold(String text) {
     JLabel lbl = new JLabel(text);
-    lbl.setFont(lbl.getFont().deriveFont(Font.BOLD));
+    Ui.style(lbl, "brand");
     return lbl;
   }
 

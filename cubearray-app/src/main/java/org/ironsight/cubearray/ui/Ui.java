@@ -6,7 +6,9 @@ import java.awt.Component;
 import java.awt.Graphics;
 import java.awt.Insets;
 import javax.swing.BorderFactory;
+import javax.swing.JButton;
 import javax.swing.JComponent;
+import javax.swing.JLabel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.UIManager;
@@ -28,6 +30,11 @@ public final class Ui {
     return UIScale.scale(value);
   }
 
+  public static Color color(String key, Color fallback) {
+    Color color = UIManager.getColor(key);
+    return color != null ? color : fallback;
+  }
+
   public static void style(JComponent component, String style) {
     component.putClientProperty("FlatLaf.styleClass", style);
   }
@@ -37,6 +44,18 @@ public final class Ui {
     field.putClientProperty("JTextField.placeholderText", placeholder);
     style(field, "search");
     return field;
+  }
+
+  public static JButton button(String text, String style) {
+    JButton button = new JButton(text);
+    if (style != null && !style.isBlank()) style(button, style);
+    return button;
+  }
+
+  public static JLabel label(String text, String style) {
+    JLabel label = new JLabel(text);
+    if (style != null && !style.isBlank()) style(label, style);
+    return label;
   }
 
   public static JScrollPane scroll(Component view) {

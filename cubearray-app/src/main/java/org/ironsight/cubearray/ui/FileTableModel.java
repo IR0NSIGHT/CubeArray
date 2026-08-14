@@ -156,7 +156,7 @@ class FileTableModel extends AbstractTableModel {
               }
               if (hasHighlights) {
                 String lowerText = text.toLowerCase();
-                g2.setColor(Color.YELLOW);
+                g2.setColor(Ui.color("App.searchHighlightColor", Color.YELLOW));
                 for (String hl : highlights) {
                   int idx = 0;
                   while ((idx = lowerText.indexOf(hl, idx)) >= 0) {
@@ -166,7 +166,7 @@ class FileTableModel extends AbstractTableModel {
                     idx += hl.length();
                   }
                 }
-                g2.setColor(Color.BLACK);
+                g2.setColor(Ui.color("Table.foreground", Color.BLACK));
               }
               g2.drawString(text, x, y);
               x += textWidth;
@@ -622,7 +622,11 @@ class FileTableModel extends AbstractTableModel {
     public Component getTableCellRendererComponent(
         JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
       currentColumn = column;
-      return super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+      Component component =
+          super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+      setOpaque(false);
+      setForeground(Ui.color("Table.foreground", table.getForeground()));
+      return component;
     }
 
     @Override
@@ -648,7 +652,7 @@ class FileTableModel extends AbstractTableModel {
       }
 
       if (highlights == null || highlights.isEmpty()) {
-        setForeground(UIManager.getColor("Table.foreground"));
+        setForeground(Ui.color("Table.foreground", getForeground()));
         super.paintComponent(g);
         return;
       }
@@ -661,8 +665,7 @@ class FileTableModel extends AbstractTableModel {
       int highlightY = insets.top + (getHeight() - insets.top - insets.bottom - fm.getHeight()) / 2;
       int highlightHeight = fm.getHeight();
 
-      Color highlightColor = UIManager.getColor("TextField.selectionBackground");
-      g.setColor(highlightColor != null ? highlightColor : Color.YELLOW);
+      g.setColor(Ui.color("App.searchHighlightColor", Color.YELLOW));
 
       for (String hl : highlights) {
         int index = 0;
@@ -677,8 +680,8 @@ class FileTableModel extends AbstractTableModel {
 
       setForeground(
           anyMatch
-              ? UIManager.getColor("Table.foreground")
-              : UIManager.getColor("App.secondaryForeground"));
+              ? Ui.color("Table.foreground", getForeground())
+              : Ui.color("App.secondaryForeground", getForeground()));
       super.paintComponent(g);
     }
   }
