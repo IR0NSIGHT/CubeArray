@@ -63,6 +63,7 @@ public class ModernTable extends JTable {
     g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
     g.setColor(Ui.color("App.surfaceColor", Ui.color("Table.background", getBackground())));
     g.fillRect(0, 0, getWidth(), getHeight());
+    paintColumnBands(g);
     paintSelectedRows(g, getSelectedRows());
     if (hoveredRow >= 0 && !isRowSelected(hoveredRow)) {
       paintRows(
@@ -70,6 +71,18 @@ public class ModernTable extends JTable {
     }
     g.dispose();
     super.paintComponent(graphics);
+  }
+
+  private void paintColumnBands(Graphics2D g) {
+    Color background = Ui.color("App.surfaceColor", Ui.color("Table.background", getBackground()));
+    Color foreground = Ui.color("Table.foreground", getForeground());
+    g.setColor(new Color(foreground.getRed(), foreground.getGreen(), foreground.getBlue(), 10));
+    for (int column = 1; column < getColumnCount(); column += 2) {
+      Rectangle bounds = getCellRect(0, column, true);
+      if (bounds.width <= 0) continue;
+      g.fillRect(bounds.x, 0, bounds.width, getHeight());
+    }
+    g.setColor(background);
   }
 
   private void paintRows(Graphics2D g, int[] rows, Color color) {

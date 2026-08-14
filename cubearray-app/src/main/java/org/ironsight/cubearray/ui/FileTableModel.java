@@ -156,7 +156,7 @@ class FileTableModel extends AbstractTableModel {
               }
               if (hasHighlights) {
                 String lowerText = text.toLowerCase();
-                g2.setColor(Ui.color("App.searchHighlightColor", Color.YELLOW));
+                g2.setColor(searchHighlightBackground());
                 for (String hl : highlights) {
                   int idx = 0;
                   while ((idx = lowerText.indexOf(hl, idx)) >= 0) {
@@ -166,12 +166,24 @@ class FileTableModel extends AbstractTableModel {
                     idx += hl.length();
                   }
                 }
-                g2.setColor(Ui.color("Table.foreground", Color.BLACK));
               }
+              g2.setColor(Ui.color("Table.foreground", Color.BLACK));
               g2.drawString(text, x, y);
+              if (hasHighlights) {
+                g2.setColor(searchHighlightForeground());
+                String lowerText = text.toLowerCase();
+                for (String hl : highlights) {
+                  int idx = 0;
+                  while ((idx = lowerText.indexOf(hl, idx)) >= 0) {
+                    int prefixW = fm.stringWidth(text.substring(0, idx));
+                    g2.drawString(text.substring(idx, idx + hl.length()), x + prefixW, y);
+                    idx += hl.length();
+                  }
+                }
+              }
               x += textWidth;
             } else {
-              if (moreText != null) g2.drawString(moreText, x, y);
+              g2.drawString("+" + (remaining + 1) + " more", x, y);
               break;
             }
           }
@@ -665,7 +677,9 @@ class FileTableModel extends AbstractTableModel {
       int highlightY = insets.top + (getHeight() - insets.top - insets.bottom - fm.getHeight()) / 2;
       int highlightHeight = fm.getHeight();
 
-      g.setColor(Ui.color("App.searchHighlightColor", Color.YELLOW));
+      Color highlightBackground = searchHighlightBackground();
+      Color highlightForeground = searchHighlightForeground();
+      g.setColor(highlightBackground);
 
       for (String hl : highlights) {
         int index = 0;
@@ -683,6 +697,29 @@ class FileTableModel extends AbstractTableModel {
               ? Ui.color("Table.foreground", getForeground())
               : Ui.color("App.secondaryForeground", getForeground()));
       super.paintComponent(g);
+      if (anyMatch) {
+        g.setColor(highlightForeground);
+        for (String hl : highlights) {
+          int index = 0;
+          while ((index = lowerText.indexOf(hl, index)) >= 0) {
+            int prefixWidth = fm.stringWidth(text.substring(0, index));
+            g.drawString(
+                text.substring(index, index + hl.length()),
+                textX + prefixWidth,
+                highlightY + fm.getAscent());
+            index += hl.length();
+          }
+        }
+      }
     }
+  }
+
+  private static Color searchHighlightBackground() {
+    return Ui.color(
+        "TextField.selectionBackground", Ui.color("App.searchHighlightColor", Color.YELLOW));
+  }
+
+  private static Color searchHighlightForeground() {
+    return Ui.color("TextField.selectionForeground", Ui.color("Table.foreground", Color.BLACK));
   }
 }

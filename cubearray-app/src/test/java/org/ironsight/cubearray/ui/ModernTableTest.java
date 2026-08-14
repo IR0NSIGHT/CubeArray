@@ -31,6 +31,16 @@ public class ModernTableTest {
   }
 
   @Test
+  public void paintsAlternatingColumnBandsWithoutError() {
+    ModernTable table = table();
+    table.setSize(320, 100);
+    BufferedImage image = new BufferedImage(320, 100, BufferedImage.TYPE_INT_ARGB);
+    Graphics2D graphics = image.createGraphics();
+    table.paint(graphics);
+    graphics.dispose();
+  }
+
+  @Test
   public void usesThemeSelectionBorderColor() {
     ModernTable table = table();
     table.setSize(320, 100);
