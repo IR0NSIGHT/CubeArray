@@ -1,5 +1,6 @@
 package org.ironsight.cubearray.ui;
 
+import com.formdev.flatlaf.extras.FlatSVGIcon;
 import java.awt.*;
 import java.net.URL;
 import java.util.HashMap;
@@ -23,6 +24,19 @@ public class Icons {
 
   private static Icon load(String name) {
     String file = filenames.get(name);
+    if ("settings".equals(name)) {
+      URL svg = Icons.class.getClassLoader().getResource("icons/ui_icons/settings_wheel.svg");
+      if (svg != null) {
+        return new FlatSVGIcon(svg)
+            .derive(SIZE, SIZE)
+            .setColorFilter(
+                new FlatSVGIcon.ColorFilter(
+                    (component, color) -> {
+                      Color foreground = UIManager.getColor("Label.foreground");
+                      return foreground != null ? foreground : color;
+                    }));
+      }
+    }
     if (file == null) return null;
     URL url = Icons.class.getClassLoader().getResource("icons/ui_icons/" + file);
     if (url == null) return null;

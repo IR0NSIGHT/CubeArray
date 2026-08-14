@@ -243,7 +243,8 @@ public class BlockTableDialog extends JDialog {
         };
     tableModel = new BlockTableModel(rows, onChange);
 
-    JTable table = new JTable(tableModel);
+    JTable table = new ModernTable();
+    table.setModel(tableModel);
     table.setName("gradientTable");
     table.setRowHeight(32);
     table.getColumnModel().getColumn(0).setCellRenderer(new BlockCellRenderer(iconProvider));

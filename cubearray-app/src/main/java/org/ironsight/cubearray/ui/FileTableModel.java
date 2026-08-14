@@ -648,7 +648,7 @@ class FileTableModel extends AbstractTableModel {
       }
 
       if (highlights == null || highlights.isEmpty()) {
-        setForeground(Color.BLACK);
+        setForeground(UIManager.getColor("Table.foreground"));
         super.paintComponent(g);
         return;
       }
@@ -661,7 +661,8 @@ class FileTableModel extends AbstractTableModel {
       int highlightY = insets.top + (getHeight() - insets.top - insets.bottom - fm.getHeight()) / 2;
       int highlightHeight = fm.getHeight();
 
-      g.setColor(Color.YELLOW);
+      Color highlightColor = UIManager.getColor("TextField.selectionBackground");
+      g.setColor(highlightColor != null ? highlightColor : Color.YELLOW);
 
       for (String hl : highlights) {
         int index = 0;
@@ -674,7 +675,10 @@ class FileTableModel extends AbstractTableModel {
         }
       }
 
-      setForeground(anyMatch ? Color.BLACK : Color.GRAY);
+      setForeground(
+          anyMatch
+              ? UIManager.getColor("Table.foreground")
+              : UIManager.getColor("App.secondaryForeground"));
       super.paintComponent(g);
     }
   }

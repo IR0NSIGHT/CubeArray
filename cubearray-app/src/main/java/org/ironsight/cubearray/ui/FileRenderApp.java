@@ -344,7 +344,8 @@ public class FileRenderApp {
       RowFilter<FileTableModel, Integer> extraFilter,
       JFrame parentFrame,
       Consumer<File> onDirDoubleClick) {
-    JTable table = new JTable(model);
+    JTable table = new ModernTable();
+    table.setModel(model);
     table.setName(extraFilter == null ? "fileTable" : "folderTable");
     TableRowSorter<FileTableModel> sorter = new TableRowSorter<>(model);
     sorter.setComparator(CaColumn.ICON.ordinal(), (a, b) -> 0);
@@ -483,6 +484,10 @@ public class FileRenderApp {
     table.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
     table.setRowSorter(sorter);
     table.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
+    table.setShowGrid(false);
+    table.setIntercellSpacing(new Dimension(0, 0));
+    table.setFillsViewportHeight(true);
+    table.setOpaque(false);
 
     Function<CaColumn, List<String>> highlightFn =
         col -> {
@@ -516,12 +521,11 @@ public class FileRenderApp {
           };
       table.getColumnModel().getColumn(c.ordinal()).setCellRenderer(wrapper);
     }
-    table.setRowHeight(64);
+    table.setRowHeight(Ui.px(52));
 
-    JTextField searchField = new JTextField(40);
+    JTextField searchField = Ui.searchField("Search files...");
+    searchField.setColumns(40);
     searchField.setName(extraFilter == null ? "fileSearchField" : "folderSearchField");
-    searchField.setText("Search");
-    searchField.putClientProperty("JTextField.placeholderText", "Search...");
 
     FreeTextSearchFilter freeTextFilter = new FreeTextSearchFilter(model, context);
     synchronized (searchFilters) {
@@ -559,7 +563,7 @@ public class FileRenderApp {
     JButton addConditionBtn = chipManager.createAddConditionButton();
 
     table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-    JScrollPane scrollPane = new JScrollPane(table);
+    JScrollPane scrollPane = Ui.scroll(table);
 
     JPanel topPanel = new JPanel();
     topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));
@@ -1492,6 +1496,12 @@ public class FileRenderApp {
 
       JPanel appPanel = new JPanel(new GridLayout(0, 1));
       appPanel.add(new JLabel("Application:"));
+      appPanel.add(new JLabel("Theme:"));
+      JComboBox<ThemeManager.Mode> themeMode = new JComboBox<>(ThemeManager.Mode.values());
+      themeMode.setSelectedItem(ThemeManager.mode());
+      themeMode.addActionListener(
+          e -> ThemeManager.setMode((ThemeManager.Mode) themeMode.getSelectedItem()));
+      appPanel.add(themeMode);
       JButton openInstallPathBtn = new JButton("Open install folder");
       openInstallPathBtn.addActionListener(
           e -> {

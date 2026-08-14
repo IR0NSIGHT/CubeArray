@@ -38,8 +38,8 @@ public class SearchableTextField extends JPanel {
     suggestionList.setFocusable(false);
     popup.setFocusable(false);
     popup.setLayout(new BorderLayout());
-    popup.setBorder(BorderFactory.createLineBorder(Color.GRAY));
-    popup.add(new JScrollPane(suggestionList), BorderLayout.CENTER);
+    popup.setBorder(Ui.hairline("App.borderColor"));
+    popup.add(Ui.scroll(suggestionList), BorderLayout.CENTER);
 
     iconLabel.setPreferredSize(new Dimension(32, 32));
     iconLabel.setVisible(false);
@@ -154,17 +154,17 @@ public class SearchableTextField extends JPanel {
     if (text.isEmpty()) {
       indicatorLabel.setVisible(true);
       indicatorLabel.setText(" ");
-      indicatorLabel.setForeground(UIManager.getColor("Panel.background"));
+      indicatorLabel.setForeground(UIManager.getColor("App.secondaryForeground"));
       return;
     }
     if (syntaxValidator.test(text)) {
       indicatorLabel.setVisible(true);
       indicatorLabel.setText("\u2713");
-      indicatorLabel.setForeground(new Color(0, 160, 0));
+      indicatorLabel.setForeground(UIManager.getColor("App.successColor"));
     } else {
       indicatorLabel.setVisible(true);
       indicatorLabel.setText("\u2717");
-      indicatorLabel.setForeground(new Color(200, 0, 0));
+      indicatorLabel.setForeground(UIManager.getColor("App.dangerColor"));
     }
   }
 

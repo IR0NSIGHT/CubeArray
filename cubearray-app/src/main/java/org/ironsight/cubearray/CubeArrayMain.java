@@ -10,6 +10,7 @@ import org.ironsight.cubearray.render.InstancedCubes;
 import org.ironsight.cubearray.schematic.SchemReader;
 import org.ironsight.cubearray.ui.AppContext;
 import org.ironsight.cubearray.ui.FileRenderApp;
+import org.ironsight.cubearray.ui.ThemeManager;
 
 public class CubeArrayMain {
 
@@ -34,6 +35,9 @@ public class CubeArrayMain {
       return;
     }
 
+    System.setProperty("flatlaf.useWindowDecorations", "true");
+    System.setProperty("flatlaf.menuBarEmbedded", "true");
+    ThemeManager.install();
     AppLogger.init();
     ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
     PeriodicChecker.INSTANCE.copyDefaultSchematics();

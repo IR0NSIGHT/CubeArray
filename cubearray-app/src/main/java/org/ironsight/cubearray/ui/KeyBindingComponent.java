@@ -30,7 +30,8 @@ public class KeyBindingComponent extends JPanel {
         };
 
     // Table
-    table = new JTable(model);
+    table = new ModernTable();
+    table.setModel(model);
     table.setAutoCreateRowSorter(true); // enable sorting
 
     // Add table to scroll pane

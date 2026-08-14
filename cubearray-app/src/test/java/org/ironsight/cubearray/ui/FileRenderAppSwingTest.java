@@ -36,7 +36,7 @@ public class FileRenderAppSwingTest extends SwingTestSupport {
     window.requireTitle("CubeArray");
     window.tabbedPane("mainTabs").requireVisible();
     window.table("fileTable").requireVisible();
-    window.textBox("fileSearchField").requireText("Search");
+    window.textBox("fileSearchField").requireText("");
 
     assertThat(app.frame.isVisible()).isTrue();
   }
