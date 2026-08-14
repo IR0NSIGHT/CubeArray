@@ -235,7 +235,7 @@ public class FileRenderApp {
     tabbedPane.addTab(
         null,
         Icons.get("settings"),
-        getSettingsComponent(context.columnContext().displayedColumns()));
+        getSettingsComponent());
     Card topStatusBar = new Card();
     topStatusBar.setLayout(new FlowLayout(FlowLayout.LEFT, Ui.px(Ui.SM), 0));
     Ui.style(topInfoLabel, "muted");
@@ -249,6 +249,8 @@ public class FileRenderApp {
     context.filesAndTimestamps().keySet().forEach(tableModel::addFile);
 
     initDisplayedColumns(context);
+    installColumnMenus(fileTable);
+    installColumnMenus(folderTable);
 
     rowSorter.addRowSorterListener(
         e -> {
@@ -1433,72 +1435,7 @@ public class FileRenderApp {
     SwingUtilities.invokeLater(() -> new FileRenderApp(context));
   }
 
-  private JComponent getSettingsComponent(List<CaColumn> initialCaColumns) {
-    // SELECT WHICH COLUMNS TO DISPLAY
-    Card columnSettings = new Card();
-    columnSettings.setLayout(new GridLayout(0, 1));
-    columnSettings.add(new JLabel("Show Columns:"));
-    HashSet<CaColumn> caColumns = new HashSet<>(initialCaColumns);
-
-    CaColumn[] caColumnSet = CaColumn.values();
-
-    IntStream.range(0, caColumnSet.length)
-        .mapToObj(i -> new AbstractMap.SimpleEntry<>(i, caColumnSet[i]))
-        .filter(e -> e.getValue() != CaColumn.ICON)
-        .sorted(Comparator.comparing(e -> e.getValue().displayName))
-        .forEach(
-            entry -> {
-              var c = entry.getValue();
-              JCheckBox checkBox = new JCheckBox(c.displayName);
-              checkBox.setToolTipText(c.tooltip);
-              checkBox.setSelected(caColumns.contains(c));
-              checkBox.addActionListener(
-                  e -> {
-                    boolean show = checkBox.isSelected();
-                    var oldColumnContext = context.columnContext();
-                    List<CaColumn> newDisplayed =
-                        new ArrayList<>(oldColumnContext.displayedColumns());
-                    List<Integer> newWidths = new ArrayList<>(oldColumnContext.columnWidths());
-                    int idx = newDisplayed.indexOf(c);
-                    if (show) {
-                      if (idx < 0) {
-                        newDisplayed.add(c);
-                        newWidths.add(c.defaultWidth);
-                      }
-                    } else if (idx >= 0) {
-                      newDisplayed.remove(idx);
-                      if (idx < newWidths.size()) newWidths.remove(idx);
-                    }
-                    var newColumnContext =
-                        new ColumnContext(
-                            newDisplayed,
-                            newWidths,
-                            oldColumnContext.orderedColumn(),
-                            oldColumnContext.orderAscending());
-                    flagContextDirty(
-                        new AppContext(
-                            context.filesAndTimestamps(),
-                            context.lastSearchPath(),
-                            context.guiBounds(),
-                            context.neverBeforeUsed(),
-                            newColumnContext,
-                            context.folderViewPath()));
-                    updateDisplayColumns(
-                        new ArrayList<>(newColumnContext.displayedColumns()),
-                        new ArrayList<>(newColumnContext.columnWidths()),
-                        new HashSet<>(),
-                        fileTable.getColumnModel(),
-                        columToTableColumn);
-                    updateDisplayColumns(
-                        new ArrayList<>(newColumnContext.displayedColumns()),
-                        new ArrayList<>(newColumnContext.columnWidths()),
-                        new HashSet<>(),
-                        folderTable.getColumnModel(),
-                        folderColumToTableColumn);
-                  });
-              columnSettings.add(checkBox);
-            });
-
+  private JComponent getSettingsComponent() {
     JScrollPane settingsPanel = Ui.scroll(new JPanel());
     {
       settingsPanel.setBorder(Ui.padding(Ui.MD, Ui.MD, Ui.MD, Ui.MD));
@@ -1609,12 +1546,87 @@ public class FileRenderApp {
       settingsContentPane.setLayout(new BoxLayout(settingsContentPane, BoxLayout.Y_AXIS));
       settingsContentPane.add(appPanel);
       settingsContentPane.add(Box.createVerticalStrut(Ui.px(Ui.MD)));
-      settingsContentPane.add(columnSettings);
-      settingsContentPane.add(Box.createVerticalStrut(Ui.px(Ui.MD)));
       settingsContentPane.add(keyBindingsCard);
       settingsPanel.setViewportView(settingsContentPane);
     }
     return settingsPanel;
+  }
+
+  private void installColumnMenus(JTable table) {
+    JPopupMenu menu = new JPopupMenu();
+    Arrays.stream(CaColumn.values())
+        .filter(column -> column != CaColumn.ICON)
+        .sorted(Comparator.comparing(column -> column.displayName))
+        .forEach(
+            column -> {
+              JCheckBoxMenuItem item = new JCheckBoxMenuItem(column.displayName);
+              item.putClientProperty("column", column);
+              item.setToolTipText(column.tooltip);
+              item.addActionListener(
+                  e -> {
+                    setColumnVisible(column, item.isSelected());
+                    SwingUtilities.invokeLater(() -> menu.setVisible(true));
+                  });
+              menu.add(item);
+            });
+    menu.addPopupMenuListener(
+        new PopupMenuListener() {
+          @Override
+          public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+            refreshColumnMenu(menu);
+          }
+
+          @Override
+          public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {}
+
+          @Override
+          public void popupMenuCanceled(PopupMenuEvent e) {}
+        });
+    table.getTableHeader().setComponentPopupMenu(menu);
+    refreshColumnMenu(menu);
+  }
+
+  private void refreshColumnMenu(JPopupMenu menu) {
+    Set<CaColumn> displayed = new HashSet<>(context.columnContext().displayedColumns());
+    for (Component component : menu.getComponents()) {
+      if (component instanceof JCheckBoxMenuItem item) {
+        CaColumn column = (CaColumn) item.getClientProperty("column");
+        item.setSelected(displayed.contains(column));
+      }
+    }
+  }
+
+  private void setColumnVisible(CaColumn column, boolean visible) {
+    if (column == CaColumn.ICON) return;
+    var oldColumnContext = context.columnContext();
+    List<CaColumn> displayed = new ArrayList<>(oldColumnContext.displayedColumns());
+    List<Integer> widths = new ArrayList<>(oldColumnContext.columnWidths());
+    int index = displayed.indexOf(column);
+    if (visible && index < 0) {
+      displayed.add(column);
+      widths.add(column.defaultWidth);
+    } else if (!visible && index >= 0) {
+      displayed.remove(index);
+      if (index < widths.size()) widths.remove(index);
+    } else {
+      return;
+    }
+
+    var newColumnContext =
+        new ColumnContext(
+            displayed, widths, oldColumnContext.orderedColumn(), oldColumnContext.orderAscending());
+    flagContextDirty(
+        new AppContext(
+            context.filesAndTimestamps(),
+            context.lastSearchPath(),
+            context.guiBounds(),
+            context.neverBeforeUsed(),
+            newColumnContext,
+            context.folderViewPath()));
+    updateDisplayColumns(
+        displayed, widths, new HashSet<>(), fileTable.getColumnModel(), columToTableColumn);
+    updateDisplayColumns(
+        displayed, widths, new HashSet<>(), folderTable.getColumnModel(), folderColumToTableColumn);
   }
 
   private static void selectTheme(JComboBox<ThemeManager.ThemeOption> combo, String className) {
