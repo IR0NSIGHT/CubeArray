@@ -35,6 +35,7 @@ public class ThemeManagerTest {
 
   @Test
   public void lightAndDarkThemesLoadCubeArrayTokens() throws Exception {
+    runOnEdt(ThemeManager::install);
     runOnEdt(() -> ThemeManager.setMode(ThemeManager.Mode.LIGHT));
 
     assertThat(UIManager.getLookAndFeel()).isInstanceOf(FlatLaf.class);
