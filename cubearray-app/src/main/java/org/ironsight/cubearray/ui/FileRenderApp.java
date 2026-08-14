@@ -236,9 +236,13 @@ public class FileRenderApp {
         null,
         Icons.get("settings"),
         getSettingsComponent(context.columnContext().displayedColumns()));
-    JPanel topStatusBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
+    Card topStatusBar = new Card();
+    topStatusBar.setLayout(new FlowLayout(FlowLayout.LEFT, Ui.px(Ui.SM), 0));
+    Ui.style(topInfoLabel, "muted");
+    Ui.style(renderInfoLabel, "muted");
+    topInfoLabel.setVisible(false);
+    renderInfoLabel.setVisible(false);
     topStatusBar.add(topInfoLabel);
-    topStatusBar.add(Box.createHorizontalStrut(16));
     topStatusBar.add(renderInfoLabel);
     frame.add(topStatusBar, BorderLayout.NORTH);
     frame.add(tabbedPane, BorderLayout.CENTER);
@@ -1697,10 +1701,12 @@ public class FileRenderApp {
 
   private void setTextRemainingFiles(String text) {
     topInfoLabel.setText(text);
+    topInfoLabel.setVisible(text != null && !text.isEmpty());
   }
 
   private void setTextRenderingSchematics(String text) {
     renderInfoLabel.setText(text);
+    renderInfoLabel.setVisible(text != null && !text.isEmpty());
   }
 
   private void checkLoadingThreads() {
