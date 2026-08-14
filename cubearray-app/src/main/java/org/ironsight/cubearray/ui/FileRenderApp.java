@@ -613,8 +613,12 @@ public class FileRenderApp {
 
     JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
 
+    Card searchCard = new Card();
+    searchCard.setLayout(new BorderLayout());
+    searchCard.add(topPanel, BorderLayout.CENTER);
+
     JPanel panel = new JPanel(new BorderLayout());
-    panel.add(topPanel, BorderLayout.NORTH);
+    panel.add(searchCard, BorderLayout.NORTH);
     panel.add(scrollPane, BorderLayout.CENTER);
     panel.add(bottomPanel, BorderLayout.SOUTH);
 
@@ -1053,7 +1057,8 @@ public class FileRenderApp {
   }
 
   private JPanel createFolderPathBar() {
-    JPanel pathBar = new JPanel(new BorderLayout(Ui.px(Ui.XS), Ui.px(2)));
+    Card pathBar = new Card();
+    pathBar.setLayout(new BorderLayout(Ui.px(Ui.XS), Ui.px(2)));
     pathBar.setBorder(Ui.padding(Ui.XS, Ui.XS, Ui.XS, Ui.XS));
 
     folderPathField = new JTextField();
