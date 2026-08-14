@@ -35,7 +35,7 @@ public class BlockIconPanel extends JPanel {
     if (icon != null) {
       icon.paintIcon(this, g, px + 1, py + 1);
     } else {
-      g.setColor(Color.GRAY);
+      g.setColor(Ui.color("App.borderColor", Color.GRAY));
       g.fillRect(px + 1, py + 1, ICON_SIZE - 2, ICON_SIZE - 2);
     }
   }
@@ -48,7 +48,7 @@ public class BlockIconPanel extends JPanel {
         drawIcon(g, x, y);
       }
     }
-    g.setColor(Color.LIGHT_GRAY);
+    g.setColor(Ui.color("App.borderColor", Color.LIGHT_GRAY));
     for (int i = 0; i <= GRID_SIZE; i++) {
       g.drawLine(i * ICON_SIZE, 0, i * ICON_SIZE, GRID_SIZE * ICON_SIZE);
       g.drawLine(0, i * ICON_SIZE, GRID_SIZE * ICON_SIZE, i * ICON_SIZE);

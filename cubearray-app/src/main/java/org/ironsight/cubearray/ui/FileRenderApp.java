@@ -1053,12 +1053,11 @@ public class FileRenderApp {
   }
 
   private JPanel createFolderPathBar() {
-    JPanel pathBar = new JPanel(new BorderLayout(4, 2));
-    pathBar.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+    JPanel pathBar = new JPanel(new BorderLayout(Ui.px(Ui.XS), Ui.px(2)));
+    pathBar.setBorder(Ui.padding(Ui.XS, Ui.XS, Ui.XS, Ui.XS));
 
     folderPathField = new JTextField();
     folderPathField.setEditable(false);
-    folderPathField.setFont(folderPathField.getFont().deriveFont(Font.PLAIN, 12f));
     folderPathField.setColumns(30);
 
     folderErrorIcon = new JLabel();
@@ -1066,7 +1065,7 @@ public class FileRenderApp {
     folderErrorIcon.setToolTipText("Folder no longer exists");
     folderErrorIcon.setVisible(false);
 
-    JButton upBtn = new JButton("\u2191 Up");
+    JButton upBtn = Ui.button("\u2191 Up", "ghost");
     upBtn.setToolTipText("Go to parent folder");
     upBtn.addActionListener(
         e -> {
@@ -1077,7 +1076,7 @@ public class FileRenderApp {
           }
         });
 
-    JButton browseBtn = new JButton("Browse...");
+    JButton browseBtn = Ui.button("Browse...", "ghost");
     browseBtn.setToolTipText("Select a folder");
     browseBtn.addActionListener(
         e -> {
@@ -1490,27 +1489,29 @@ public class FileRenderApp {
               columnSettings.add(checkBox);
             });
 
-    JScrollPane settingsPanel = new JScrollPane();
+    JScrollPane settingsPanel = Ui.scroll(new JPanel());
     {
-      settingsPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+      settingsPanel.setBorder(Ui.padding(Ui.MD, Ui.MD, Ui.MD, Ui.MD));
 
       JPanel appPanel = new JPanel(new GridLayout(0, 1));
-      appPanel.add(new JLabel("Application:"));
-      appPanel.add(new JLabel("Theme:"));
+      appPanel.add(Ui.label("Application:", "brand"));
+      appPanel.add(Ui.label("Theme:", "muted"));
       JComboBox<ThemeManager.Mode> themeMode = new JComboBox<>(ThemeManager.Mode.values());
+      themeMode.setName("themeMode");
       themeMode.setSelectedItem(ThemeManager.mode());
       themeMode.addActionListener(
           e -> ThemeManager.setMode((ThemeManager.Mode) themeMode.getSelectedItem()));
       appPanel.add(themeMode);
-      appPanel.add(new JLabel("Font size:"));
+      appPanel.add(Ui.label("Font size:", "muted"));
       JComboBox<String> fontSize = new JComboBox<>(new String[] {"Small", "Default", "Large"});
+      fontSize.setName("fontSize");
       float scale = ThemeManager.fontScale();
       fontSize.setSelectedIndex(scale < 0.95f ? 0 : scale > 1.05f ? 2 : 1);
       fontSize.addActionListener(
           e ->
               ThemeManager.setFontScale(new float[] {0.9f, 1f, 1.1f}[fontSize.getSelectedIndex()]));
       appPanel.add(fontSize);
-      JButton openInstallPathBtn = new JButton("Open install folder");
+      JButton openInstallPathBtn = Ui.button("Open install folder", "ghost");
       openInstallPathBtn.addActionListener(
           e -> {
             try {
@@ -1521,7 +1522,7 @@ public class FileRenderApp {
           });
       appPanel.add(openInstallPathBtn);
 
-      JButton openLogFileBtn = new JButton("Open log file");
+      JButton openLogFileBtn = Ui.button("Open log file", "ghost");
       openLogFileBtn.addActionListener(
           e -> {
             try {
@@ -1550,6 +1551,7 @@ public class FileRenderApp {
       appPanel.add(openLogFileBtn);
 
       JPanel settingsContentPane = new JPanel();
+      settingsContentPane.setBorder(Ui.padding(Ui.SM, Ui.SM, Ui.SM, Ui.SM));
       settingsContentPane.setLayout(new GridLayout(0, 1));
       settingsContentPane.add(appPanel);
       settingsContentPane.add(columnSettings);
@@ -1710,12 +1712,13 @@ public class FileRenderApp {
     for (String block : blocks) {
       JLabel label = new JLabel(block, blockIconProvider.getIcon(block), JLabel.LEADING);
       label.setIconTextGap(6);
-      label.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
+      label.setBorder(Ui.padding(Ui.XS, Ui.SM, Ui.XS, Ui.SM));
+      Ui.style(label, "muted");
       panel.add(label);
     }
-    JScrollPane scroll = new JScrollPane(panel);
+    JScrollPane scroll = Ui.scroll(panel);
     scroll.setPreferredSize(new Dimension(300, Math.min(400, blocks.size() * 28 + 10)));
-    menu.add(new JLabel("Blocks"));
+    menu.add(Ui.label("Blocks", "muted"));
     menu.add(scroll);
     SwingUtilities.invokeLater(() -> menu.show(e.getComponent(), e.getX(), e.getY()));
   }

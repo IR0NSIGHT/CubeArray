@@ -8,7 +8,6 @@ import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import org.ironsight.cubearray.edit.BlockListUtil;
@@ -302,7 +301,7 @@ public class BlockReplacerDialog extends JDialog {
 
   private JScrollPane buildMappingPanel() {
     JPanel rows = new JPanel(new GridBagLayout());
-    rows.setBorder(new EmptyBorder(0, 0, 6, 0));
+    rows.setBorder(Ui.padding(0, 0, Ui.SM, 0));
 
     GridBagConstraints srcC = new GridBagConstraints();
     srcC.gridx = 0;
@@ -657,7 +656,7 @@ public class BlockReplacerDialog extends JDialog {
   private JScrollPane buildFileColumn(boolean isAfter) {
     JPanel column = new JPanel();
     column.setLayout(new BoxLayout(column, BoxLayout.Y_AXIS));
-    column.setBorder(new EmptyBorder(4, 4, 4, 4));
+    column.setBorder(Ui.padding(Ui.XS, Ui.XS, Ui.XS, Ui.XS));
 
     for (File file : loadedSchematics.keySet()) {
       JPanel entry = new JPanel();
@@ -686,7 +685,7 @@ public class BlockReplacerDialog extends JDialog {
       }
 
       JLabel nameLabel = new JLabel(file.getName(), SwingConstants.CENTER);
-      nameLabel.setFont(nameLabel.getFont().deriveFont(10f));
+      Ui.style(nameLabel, "muted");
       nameLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
       Dimension iconDim = new Dimension(64, nameLabel.getPreferredSize().height);
       nameLabel.setPreferredSize(iconDim);

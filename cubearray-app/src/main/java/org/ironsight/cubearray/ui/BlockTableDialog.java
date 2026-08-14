@@ -17,7 +17,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
 import javax.swing.table.AbstractTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableRowSorter;
@@ -315,7 +314,7 @@ public class BlockTableDialog extends JDialog {
 
   private JPanel buildButtonPanel() {
     JPanel panel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-    panel.setBorder(new EmptyBorder(8, 8, 8, 8));
+    panel.setBorder(Ui.padding(Ui.SM, Ui.SM, Ui.SM, Ui.SM));
     JButton okBtn = Ui.button("OK", "primary");
     JButton cancelBtn = Ui.button("Cancel", "ghost");
     okBtn.setName("okButton");
