@@ -34,6 +34,18 @@ public class BlockIconProviderTest {
   }
 
   @Test
+  public void airUsesDedicatedIcon() {
+    Icon air = provider.getIcon("minecraft:air");
+    Icon airState = provider.getIcon("air[waterlogged=false]");
+    Icon unknown = provider.getIcon("this_does_not_exist");
+
+    assertEquals(32, air.getIconWidth());
+    assertEquals(32, air.getIconHeight());
+    assertSame(air, airState);
+    assertNotSame(air, unknown);
+  }
+
+  @Test
   public void sameKeyNormalizationReturnsCachedInstance() {
     Icon a = provider.getIcon("oak_planks");
     Icon b = provider.getIcon("minecraft:oak_planks");

@@ -20,6 +20,7 @@ public class BlockIconProvider {
 
   public Icon getIcon(String block) {
     String key = normalizeKey(block);
+    if ("minecraft:air".equals(key)) return airIcon(defaultSize);
     Icon cached = cache.get(key);
     if (cached != null) return cached;
     Icon icon = loadIcon(key, defaultSize);
@@ -34,6 +35,7 @@ public class BlockIconProvider {
 
   public Icon getIconSmall(String block) {
     String key = normalizeKey(block);
+    if ("minecraft:air".equals(key)) return airIcon(smallSize);
     String cacheKey = key + "__small__";
     Icon cached = cache.get(cacheKey);
     if (cached != null) return cached;
@@ -52,6 +54,10 @@ public class BlockIconProvider {
     String key = metaStart >= 0 ? block.substring(0, metaStart) : block;
     if (!key.contains(":")) key = "minecraft:" + key;
     return key;
+  }
+
+  private Icon airIcon(int size) {
+    return cache.computeIfAbsent("__air__" + size, ignored -> new AirIcon(size));
   }
 
   private Icon loadIcon(String key, int size) {
@@ -88,5 +94,35 @@ public class BlockIconProvider {
                 .getScaledInstance(smallSize, smallSize, Image.SCALE_SMOOTH));
     cache.put("__unknown_small__", icon);
     return icon;
+  }
+
+  private static final class AirIcon implements Icon {
+    private static final Color COLOR = new Color(126, 211, 239);
+    private final int size;
+
+    private AirIcon(int size) {
+      this.size = size;
+    }
+
+    @Override
+    public int getIconWidth() {
+      return size;
+    }
+
+    @Override
+    public int getIconHeight() {
+      return size;
+    }
+
+    @Override
+    public void paintIcon(Component component, Graphics graphics, int x, int y) {
+      Graphics2D g = (Graphics2D) graphics.create();
+      g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+      g.setColor(COLOR);
+      int inset = Math.max(2, size / 6);
+      g.setStroke(new BasicStroke(Math.max(1, size / 12f)));
+      g.drawOval(x + inset, y + inset, size - inset * 2 - 1, size - inset * 2 - 1);
+      g.dispose();
+    }
   }
 }
