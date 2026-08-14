@@ -1435,7 +1435,8 @@ public class FileRenderApp {
 
   private JComponent getSettingsComponent(List<CaColumn> initialCaColumns) {
     // SELECT WHICH COLUMNS TO DISPLAY
-    JComponent columnSettings = new JPanel(new GridLayout(0, 1));
+    Card columnSettings = new Card();
+    columnSettings.setLayout(new GridLayout(0, 1));
     columnSettings.add(new JLabel("Show Columns:"));
     HashSet<CaColumn> caColumns = new HashSet<>(initialCaColumns);
 
@@ -1502,7 +1503,8 @@ public class FileRenderApp {
     {
       settingsPanel.setBorder(Ui.padding(Ui.MD, Ui.MD, Ui.MD, Ui.MD));
 
-      JPanel appPanel = new JPanel(new GridLayout(0, 1));
+      Card appPanel = new Card();
+      appPanel.setLayout(new GridLayout(0, 1));
       appPanel.add(Ui.label("Application:", "brand"));
       appPanel.add(Ui.label("Theme:", "muted"));
       JComboBox<ThemeManager.Mode> themeMode = new JComboBox<>(ThemeManager.Mode.values());
@@ -1559,12 +1561,18 @@ public class FileRenderApp {
           });
       appPanel.add(openLogFileBtn);
 
+      Card keyBindingsCard = new Card();
+      keyBindingsCard.setLayout(new BorderLayout());
+      keyBindingsCard.add(new KeyBindingComponent(), BorderLayout.CENTER);
+
       JPanel settingsContentPane = new JPanel();
       settingsContentPane.setBorder(Ui.padding(Ui.SM, Ui.SM, Ui.SM, Ui.SM));
-      settingsContentPane.setLayout(new GridLayout(0, 1));
+      settingsContentPane.setLayout(new BoxLayout(settingsContentPane, BoxLayout.Y_AXIS));
       settingsContentPane.add(appPanel);
+      settingsContentPane.add(Box.createVerticalStrut(Ui.px(Ui.MD)));
       settingsContentPane.add(columnSettings);
-      settingsContentPane.add(new KeyBindingComponent());
+      settingsContentPane.add(Box.createVerticalStrut(Ui.px(Ui.MD)));
+      settingsContentPane.add(keyBindingsCard);
       settingsPanel.setViewportView(settingsContentPane);
     }
     return settingsPanel;
