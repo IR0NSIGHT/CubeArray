@@ -83,8 +83,8 @@ public class FileRenderApp {
 
   private static final long DEBUG_SEARCH_DELAY_MS = 0;
 
-  private final JLabel topInfoLabel = new JLabel();
-  private final JLabel renderInfoLabel = new JLabel();
+  private final Badge topInfoLabel = new Badge("", "brand");
+  private final Badge renderInfoLabel = new Badge("", "muted");
 
   private record FileListPanel(
       JPanel panel,
