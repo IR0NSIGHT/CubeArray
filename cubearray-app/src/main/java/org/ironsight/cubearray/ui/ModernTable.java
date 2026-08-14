@@ -12,6 +12,7 @@ import javax.swing.JTable;
 /** JTable with a quiet surface and row-level selection/hover treatment. */
 public class ModernTable extends JTable {
   private int hoveredRow = -1;
+  private boolean hoverEnabled = true;
 
   public ModernTable() {
     setShowGrid(false);
@@ -35,11 +36,17 @@ public class ModernTable extends JTable {
   }
 
   private void updateHoveredRow(int row) {
+    if (!hoverEnabled) row = -1;
     if (row == hoveredRow) return;
     int old = hoveredRow;
     hoveredRow = row;
     repaintRow(old);
     repaintRow(row);
+  }
+
+  public void setHoverEnabled(boolean enabled) {
+    hoverEnabled = enabled;
+    if (!enabled) updateHoveredRow(-1);
   }
 
   private void repaintRow(int row) {

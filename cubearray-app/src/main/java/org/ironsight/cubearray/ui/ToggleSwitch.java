@@ -42,7 +42,9 @@ public class ToggleSwitch extends JComponent {
   }
 
   public void setSelected(boolean selected) {
+    boolean old = this.selected;
     this.selected = selected;
+    firePropertyChange("selected", old, selected);
     animation.start();
   }
 

@@ -1546,6 +1546,17 @@ public class FileRenderApp {
           e ->
               ThemeManager.setFontScale(new float[] {0.9f, 1f, 1.1f}[fontSize.getSelectedIndex()]));
       appPanel.add(fontSize);
+      appPanel.add(Ui.label("Table hover:", "muted"));
+      ToggleSwitch tableHover = new ToggleSwitch();
+      tableHover.setName("tableHoverToggle");
+      tableHover.setSelected(true);
+      tableHover.addPropertyChangeListener(
+          "selected",
+          e -> {
+            fileTable.setHoverEnabled(tableHover.isSelected());
+            folderTable.setHoverEnabled(tableHover.isSelected());
+          });
+      appPanel.add(tableHover);
       JButton openInstallPathBtn = Ui.button("Open install folder", "ghost");
       openInstallPathBtn.addActionListener(
           e -> {
@@ -1602,8 +1613,7 @@ public class FileRenderApp {
     return settingsPanel;
   }
 
-  private static void selectTheme(
-      JComboBox<ThemeManager.ThemeOption> combo, String className) {
+  private static void selectTheme(JComboBox<ThemeManager.ThemeOption> combo, String className) {
     for (int i = 0; i < combo.getItemCount(); i++) {
       if (combo.getItemAt(i).className().equals(className)) {
         combo.setSelectedIndex(i);
