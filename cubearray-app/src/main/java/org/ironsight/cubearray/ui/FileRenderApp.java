@@ -1549,6 +1549,7 @@ public class FileRenderApp {
       appPanel.add(Ui.label("Table hover:", "muted"));
       ToggleSwitch tableHover = new ToggleSwitch();
       tableHover.setName("tableHoverToggle");
+      tableHover.setToolTipText("Toggle table hover highlighting");
       tableHover.setSelected(true);
       tableHover.addPropertyChangeListener(
           "selected",
