@@ -40,7 +40,7 @@ public class FileRenderApp {
   private AppContext context;
   // UI model
   private final FileTableModel tableModel;
-  private final JTable fileTable;
+  private final ModernTable fileTable;
 
   private final TableRowSorter<FileTableModel> rowSorter;
 
@@ -67,7 +67,7 @@ public class FileRenderApp {
   private final Map<String, ChipSearchFilter> chipFilters = new HashMap<>();
 
   // Folder view components
-  private JTable folderTable;
+  private ModernTable folderTable;
   private TableRowSorter<FileTableModel> folderRowSorter;
   private JTextField folderSearchField;
   private JPanel folderChipRow;
@@ -88,7 +88,7 @@ public class FileRenderApp {
 
   private record FileListPanel(
       JPanel panel,
-      JTable table,
+      ModernTable table,
       TableRowSorter<FileTableModel> sorter,
       JTextField searchField,
       ChipSearchManager chipManager,
@@ -348,7 +348,7 @@ public class FileRenderApp {
       RowFilter<FileTableModel, Integer> extraFilter,
       JFrame parentFrame,
       Consumer<File> onDirDoubleClick) {
-    JTable table = new ModernTable();
+    ModernTable table = new ModernTable();
     table.setModel(model);
     table.setName(extraFilter == null ? "fileTable" : "folderTable");
     TableRowSorter<FileTableModel> sorter = new TableRowSorter<>(model);
