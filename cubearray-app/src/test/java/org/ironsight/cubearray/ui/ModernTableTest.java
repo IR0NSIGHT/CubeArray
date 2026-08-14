@@ -30,6 +30,15 @@ public class ModernTableTest {
     graphics.dispose();
   }
 
+  @Test
+  public void usesThemeSelectionBorderColor() {
+    ModernTable table = table();
+    table.setSize(320, 100);
+    table.getSelectionModel().setSelectionInterval(0, 0);
+
+    assertThat(table.getSelectionBackground()).isEqualTo(new Color(0, 0, 0, 0));
+  }
+
   private static ModernTable table() {
     ModernTable table = new ModernTable();
     table.setModel(new DefaultTableModel(new Object[][] {{"one", "two"}}, new String[] {"A", "B"}));

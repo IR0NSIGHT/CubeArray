@@ -63,7 +63,7 @@ public class ModernTable extends JTable {
     g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
     g.setColor(Ui.color("App.surfaceColor", Ui.color("Table.background", getBackground())));
     g.fillRect(0, 0, getWidth(), getHeight());
-    paintRows(g, getSelectedRows(), Ui.color("App.brandSoftColor", new Color(0, 0, 0, 0)));
+    paintSelectedRows(g, getSelectedRows());
     if (hoveredRow >= 0 && !isRowSelected(hoveredRow)) {
       paintRows(
           g, new int[] {hoveredRow}, Ui.color("App.surfaceHoverColor", new Color(0, 0, 0, 0)));
@@ -84,6 +84,24 @@ public class ModernTable extends JTable {
           bounds.y + Ui.px(2),
           Math.max(0, right - bounds.x - Ui.px(4)),
           Math.max(0, bounds.height - Ui.px(4)),
+          Ui.px(8),
+          Ui.px(8));
+    }
+  }
+
+  private void paintSelectedRows(Graphics2D g, int[] rows) {
+    g.setColor(Ui.color("Component.focusColor", Ui.color("App.brandColor", Color.ORANGE)));
+    g.setStroke(new java.awt.BasicStroke(Ui.px(2)));
+    for (int row : rows) {
+      if (row < 0 || row >= getRowCount() || getColumnCount() == 0) continue;
+      Rectangle bounds = getCellRect(row, 0, true);
+      Rectangle last = getCellRect(row, getColumnCount() - 1, true);
+      int right = Math.max(last.x + last.width, getWidth());
+      g.drawRoundRect(
+          bounds.x + Ui.px(2),
+          bounds.y + Ui.px(2),
+          Math.max(0, right - bounds.x - Ui.px(5)),
+          Math.max(0, bounds.height - Ui.px(5)),
           Ui.px(8),
           Ui.px(8));
     }
