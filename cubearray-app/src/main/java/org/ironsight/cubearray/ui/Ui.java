@@ -63,6 +63,8 @@ public final class Ui {
     scroll.setBorder(BorderFactory.createEmptyBorder());
     scroll.getViewport().setOpaque(false);
     scroll.setOpaque(false);
+    scroll.getVerticalScrollBar().setUnitIncrement(px(16));
+    scroll.getHorizontalScrollBar().setUnitIncrement(px(16));
     return scroll;
   }
 
