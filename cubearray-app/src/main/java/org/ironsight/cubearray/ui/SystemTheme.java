@@ -5,13 +5,24 @@ import java.io.InputStreamReader;
 import java.util.Locale;
 
 final class SystemTheme {
+  private static volatile Boolean cachedDark;
+
   private SystemTheme() {}
 
   static boolean isDark() {
+    Boolean cached = cachedDark;
+    return cached != null ? cached : refresh();
+  }
+
+  static boolean refresh() {
     String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-    if (os.contains("win")) return windowsDark();
-    if (os.contains("mac")) return commandDark("defaults", "read", "-g", "AppleInterfaceStyle");
-    return commandDark("gsettings", "get", "org.gnome.desktop.interface", "color-scheme");
+    boolean dark;
+    if (os.contains("win")) dark = windowsDark();
+    else if (os.contains("mac"))
+      dark = commandDark("defaults", "read", "-g", "AppleInterfaceStyle");
+    else dark = commandDark("gsettings", "get", "org.gnome.desktop.interface", "color-scheme");
+    cachedDark = dark;
+    return dark;
   }
 
   private static boolean windowsDark() {

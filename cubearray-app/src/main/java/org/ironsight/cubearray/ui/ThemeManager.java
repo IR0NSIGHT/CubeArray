@@ -30,6 +30,7 @@ public final class ThemeManager {
   private static float fontScale = 1f;
   private static String lightTheme = FlatLightLaf.class.getName();
   private static String darkTheme = FlatDarkLaf.class.getName();
+  private static boolean systemDark;
 
   public record ThemeOption(String name, String className) {
     @Override
@@ -50,6 +51,7 @@ public final class ThemeManager {
     fontScale = PREFS.getFloat(FONT_SCALE, 1f);
     lightTheme = PREFS.get(LIGHT_THEME, FlatLightLaf.class.getName());
     darkTheme = PREFS.get(DARK_THEME, FlatDarkLaf.class.getName());
+    systemDark = SystemTheme.refresh();
     installLookAndFeel(false);
   }
 
@@ -115,7 +117,7 @@ public final class ThemeManager {
   }
 
   private static void installLookAndFeel(boolean animate) {
-    boolean dark = mode == Mode.DARK || (mode == Mode.SYSTEM && SystemTheme.isDark());
+    boolean dark = mode == Mode.DARK || (mode == Mode.SYSTEM && systemDark);
     try {
       if (animate) FlatAnimatedLafChange.showSnapshot();
       UIManager.setLookAndFeel(dark ? darkTheme : lightTheme);
@@ -129,7 +131,7 @@ public final class ThemeManager {
   }
 
   private static boolean isDarkActive() {
-    return mode == Mode.DARK || (mode == Mode.SYSTEM && SystemTheme.isDark());
+    return mode == Mode.DARK || (mode == Mode.SYSTEM && systemDark);
   }
 
   private static List<ThemeOption> themes(boolean dark) {
