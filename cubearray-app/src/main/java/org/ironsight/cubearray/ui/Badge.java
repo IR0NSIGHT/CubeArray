@@ -21,6 +21,7 @@ public class Badge extends JLabel {
 
   @Override
   public Color getForeground() {
+    if (foregroundKey == null) return super.getForeground();
     Color color = UIManager.getColor(foregroundKey);
     return color != null ? color : super.getForeground();
   }
