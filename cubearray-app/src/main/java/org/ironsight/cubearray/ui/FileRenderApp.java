@@ -1557,7 +1557,10 @@ public class FileRenderApp {
             fileTable.setHoverEnabled(tableHover.isSelected());
             folderTable.setHoverEnabled(tableHover.isSelected());
           });
-      appPanel.add(tableHover);
+      JPanel tableHoverRow = new JPanel(new FlowLayout(FlowLayout.LEADING, 0, 0));
+      tableHoverRow.setOpaque(false);
+      tableHoverRow.add(tableHover);
+      appPanel.add(tableHoverRow);
       JButton openInstallPathBtn = Ui.button("Open install folder", "ghost");
       openInstallPathBtn.addActionListener(
           e -> {
