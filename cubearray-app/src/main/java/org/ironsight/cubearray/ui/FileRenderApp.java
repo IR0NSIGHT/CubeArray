@@ -1513,6 +1513,30 @@ public class FileRenderApp {
       themeMode.addActionListener(
           e -> ThemeManager.setMode((ThemeManager.Mode) themeMode.getSelectedItem()));
       appPanel.add(themeMode);
+      appPanel.add(Ui.label("Light theme:", "muted"));
+      JComboBox<ThemeManager.ThemeOption> lightTheme =
+          new JComboBox<>(ThemeManager.lightThemes().toArray(ThemeManager.ThemeOption[]::new));
+      lightTheme.setName("lightTheme");
+      selectTheme(lightTheme, ThemeManager.lightTheme());
+      lightTheme.addActionListener(
+          e -> {
+            ThemeManager.ThemeOption selected =
+                (ThemeManager.ThemeOption) lightTheme.getSelectedItem();
+            if (selected != null) ThemeManager.setLightTheme(selected.className());
+          });
+      appPanel.add(lightTheme);
+      appPanel.add(Ui.label("Dark theme:", "muted"));
+      JComboBox<ThemeManager.ThemeOption> darkTheme =
+          new JComboBox<>(ThemeManager.darkThemes().toArray(ThemeManager.ThemeOption[]::new));
+      darkTheme.setName("darkTheme");
+      selectTheme(darkTheme, ThemeManager.darkTheme());
+      darkTheme.addActionListener(
+          e -> {
+            ThemeManager.ThemeOption selected =
+                (ThemeManager.ThemeOption) darkTheme.getSelectedItem();
+            if (selected != null) ThemeManager.setDarkTheme(selected.className());
+          });
+      appPanel.add(darkTheme);
       appPanel.add(Ui.label("Font size:", "muted"));
       JComboBox<String> fontSize = new JComboBox<>(new String[] {"Small", "Default", "Large"});
       fontSize.setName("fontSize");
@@ -1576,6 +1600,16 @@ public class FileRenderApp {
       settingsPanel.setViewportView(settingsContentPane);
     }
     return settingsPanel;
+  }
+
+  private static void selectTheme(
+      JComboBox<ThemeManager.ThemeOption> combo, String className) {
+    for (int i = 0; i < combo.getItemCount(); i++) {
+      if (combo.getItemAt(i).className().equals(className)) {
+        combo.setSelectedIndex(i);
+        return;
+      }
+    }
   }
 
   private void initDisplayedColumns(AppContext context) {
