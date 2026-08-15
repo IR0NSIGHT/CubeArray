@@ -35,6 +35,7 @@ import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.opengl.GL;
+import org.lwjgl.system.MemoryStack;
 
 public class InstancedCubes {
 
@@ -311,9 +312,26 @@ public class InstancedCubes {
 
     GL.createCapabilities();
 
+    try (MemoryStack stack = MemoryStack.stackPush()) {
+      IntBuffer framebufferWidth = stack.mallocInt(1);
+      IntBuffer framebufferHeight = stack.mallocInt(1);
+      glfwGetFramebufferSize(window, framebufferWidth, framebufferHeight);
+      width = framebufferWidth.get(0);
+      height = framebufferHeight.get(0);
+    }
+
     glViewport(0, 0, width, height);
     projection =
         new Matrix4f().perspective((float) toRadians(45.0f), (float) width / height, .1f, 10000.0f);
+
+    resolveFbo = glGenFramebuffers();
+    glBindFramebuffer(GL_FRAMEBUFFER, resolveFbo);
+    resolveColorRb = glGenRenderbuffers();
+    glBindRenderbuffer(GL_RENDERBUFFER, resolveColorRb);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, width, height);
+    glFramebufferRenderbuffer(
+        GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, resolveColorRb);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     glfwSetFramebufferSizeCallback(
         window,
@@ -328,15 +346,6 @@ public class InstancedCubes {
           glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, fbWidth, fbHeight);
           lastChangeTime = glfwGetTime();
         });
-
-    resolveFbo = glGenFramebuffers();
-    glBindFramebuffer(GL_FRAMEBUFFER, resolveFbo);
-    resolveColorRb = glGenRenderbuffers();
-    glBindRenderbuffer(GL_RENDERBUFFER, resolveColorRb);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, width, height);
-    glFramebufferRenderbuffer(
-        GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, resolveColorRb);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     setupShaders();
     setupVertexData();
