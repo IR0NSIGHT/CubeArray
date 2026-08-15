@@ -4,7 +4,6 @@ import java.nio.file.Path;
 import java.util.List;
 import org.ironsight.cubearray.platform.AppLogger;
 import org.ironsight.cubearray.platform.PeriodicChecker;
-import org.ironsight.cubearray.platform.ResourceUtils;
 import org.ironsight.cubearray.render.CubeSetup;
 import org.ironsight.cubearray.render.InstancedCubes;
 import org.ironsight.cubearray.schematic.SchemReader;
@@ -21,7 +20,7 @@ public class CubeArrayMain {
       int imgWidth = args.length >= 4 ? Integer.parseInt(args[3]) : 1920;
       int imgHeight = args.length >= 5 ? Integer.parseInt(args[4]) : 1080;
 
-      ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
+      SchemReader.preloadSynchronously();
 
       CubeSetup setup =
           SchemReader.prepareData(
@@ -39,7 +38,7 @@ public class CubeArrayMain {
     System.setProperty("flatlaf.menuBarEmbedded", "true");
     ThemeManager.install();
     AppLogger.init();
-    ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
+    SchemReader.startBackgroundPreload();
     PeriodicChecker.INSTANCE.copyDefaultSchematics();
     PeriodicChecker.INSTANCE.startPeriodicTask();
     FileRenderApp.startApp(AppContext.read());

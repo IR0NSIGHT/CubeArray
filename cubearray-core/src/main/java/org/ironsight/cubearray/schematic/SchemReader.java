@@ -9,7 +9,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -49,6 +53,14 @@ public class SchemReader {
   private static Map<String, BlockModel> blockModels = Map.of();
   private static Map<String, BlockStateParser.BlockState> blockStates = Map.of();
   private static boolean assetsLoaded = false;
+  private static CompletableFuture<Void> preloadFuture;
+  private static final ExecutorService PRELOAD_EXECUTOR =
+      Executors.newSingleThreadExecutor(
+          runnable -> {
+            Thread thread = new Thread(runnable, "resource-preloader");
+            thread.setDaemon(true);
+            return thread;
+          });
 
   // cache of the render pieces a material expands into (deterministic per material)
   private static final Map<Material, List<Piece>> pieceCache = new ConcurrentHashMap<>();
@@ -74,12 +86,12 @@ public class SchemReader {
    */
   private static synchronized void ensureAssetsLoaded() {
     if (assetsLoaded) return;
-    assetsLoaded = true;
     try {
       ResourceUtils.copyResourcesToFile(ResourceUtils.VANILLA_ASSETS_RESOURCES);
       Path root = ResourceUtils.getInstallPath().resolve(ResourceUtils.VANILLA_ASSETS_RESOURCES);
       blockModels = BlockModelParser.parseAll(root);
       blockStates = BlockStateParser.parseAll(root);
+      assetsLoaded = true;
       logger.info(
           "parsed "
               + blockModels.size()
@@ -87,8 +99,52 @@ public class SchemReader {
               + blockStates.size()
               + " blockstates");
     } catch (IOException e) {
+      assetsLoaded = true;
       logger.log(
           Level.WARNING, "failed to parse vanilla assets; blocks will render as default cubes", e);
+    }
+  }
+
+  /** Starts copying and parsing bundled render resources without blocking the caller. */
+  public static void startBackgroundPreload() {
+    synchronized (SchemReader.class) {
+      if (preloadFuture != null) return;
+      preloadFuture =
+          CompletableFuture.runAsync(
+              () -> {
+                try {
+                  ResourceUtils.copyResourcesToFile(ResourceUtils.TEXTURE_RESOURCES);
+                  ensureAssetsLoaded();
+                  logger.info("finished preloading render resources");
+                } catch (IOException e) {
+                  throw new CompletionException("failed to preload render resources", e);
+                }
+              },
+              PRELOAD_EXECUTOR);
+    }
+  }
+
+  /** Prepares bundled render resources synchronously, primarily for headless rendering. */
+  public static void preloadSynchronously() throws IOException {
+    startBackgroundPreload();
+    awaitBackgroundPreload();
+  }
+
+  private static void awaitBackgroundPreload() throws IOException {
+    CompletableFuture<Void> preload;
+    synchronized (SchemReader.class) {
+      preload = preloadFuture;
+    }
+    if (preload == null) return;
+    try {
+      preload.join();
+    } catch (CompletionException e) {
+      Throwable cause = e;
+      while (cause instanceof CompletionException && cause.getCause() != null) {
+        cause = cause.getCause();
+      }
+      if (cause instanceof IOException ioException) throw ioException;
+      throw e;
     }
   }
 
@@ -249,6 +305,7 @@ public class SchemReader {
   }
 
   public static CubeSetup prepareData(List<WPObject> schematics, boolean useGrid) throws Exception {
+    awaitBackgroundPreload();
     ensureAssetsLoaded();
     if (schematics.isEmpty()) return null;
     final String name = schematics.size() == 1 ? schematics.get(0).getName() : "schematics";
