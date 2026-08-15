@@ -314,6 +314,8 @@ public class SchemReader {
     List<Vector3f> positions = new ArrayList<>();
     List<Integer> blockTypeIndicesList = new ArrayList<>();
     List<Integer> schematicIndices = new ArrayList<>();
+    List<SchematicTransform> transforms = new ArrayList<>();
+    transforms.add(new SchematicTransform("global axis", new Matrix4f()));
 
     HashMap<Material, Integer> mat_to_palette_idx = new HashMap<>();
     int maxColorIdx = 0;
@@ -331,7 +333,9 @@ public class SchemReader {
       }
       var dimensions = object.getDimensions();
       maxDim = Math.max(maxDim, Math.max(dimensions.x, Math.max(dimensions.y, dimensions.z)));
-      var offset = object.getOffset();
+      transforms.add(
+          new SchematicTransform(
+              object.getName(), new Matrix4f().translation(gridOffset.x, 0, gridOffset.y)));
       for (int x = 0; x < object.getDimensions().x; x++) {
         for (int y = 0; y < object.getDimensions().y; y++) {
           for (int z = object.getDimensions().z - 1; z >= 0; z--) {
@@ -363,8 +367,7 @@ public class SchemReader {
               if (!hasNonSolidNeighbour) continue;
 
               Vector3f pos =
-                  new Vector3f(
-                      x + offset.x + gridOffset.x, z + offset.z, y + offset.y + gridOffset.y);
+                  new Vector3f(x, z, y);
 
               maxColorIdx =
                   addPieces(
@@ -518,24 +521,22 @@ public class SchemReader {
 
     int[] blockTypeIndices = blockTypeIndicesList.stream().mapToInt(i -> i).toArray();
     int[] instanceSchematicIndices = schematicIndices.stream().mapToInt(i -> i).toArray();
-    SchematicTransform[] transforms = new SchematicTransform[schematics.size() + 1];
-    transforms[0] = new SchematicTransform("global axis", new Matrix4f());
-    for (int i = 0; i < schematics.size(); i++) {
-      transforms[i + 1] = new SchematicTransform(schematics.get(i).getName(), new Matrix4f());
-    }
+    SchematicTransform[] transformArray = transforms.toArray(new SchematicTransform[0]);
 
     Vector3f min = new Vector3f(Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE);
-    Vector3f max = new Vector3f(Float.MIN_VALUE, Float.MIN_VALUE, Float.MIN_VALUE);
-    positions.stream()
-        .forEach(
-            p -> {
-              min.x = Math.min(p.x, min.x);
-              min.y = Math.min(p.y, min.y);
-              min.z = Math.min(p.z, min.z);
-              max.x = Math.max(p.x, max.x);
-              max.y = Math.max(p.y, max.y);
-              max.z = Math.max(p.z, max.z);
-            });
+    Vector3f max = new Vector3f(-Float.MAX_VALUE, -Float.MAX_VALUE, -Float.MAX_VALUE);
+    for (int i = 0; i < positions.size(); i++) {
+      Vector3f p =
+          transformArray[schematicIndices.get(i)]
+              .matrix()
+              .transformPosition(new Vector3f(positions.get(i)));
+      min.x = Math.min(p.x, min.x);
+      min.y = Math.min(p.y, min.y);
+      min.z = Math.min(p.z, min.z);
+      max.x = Math.max(p.x, max.x);
+      max.y = Math.max(p.y, max.y);
+      max.z = Math.max(p.z, max.z);
+    }
 
     return new CubeSetup(
         positions.toArray(new Vector3f[0]),
@@ -551,7 +552,7 @@ public class SchemReader {
         max,
         name,
         useGrid,
-        transforms);
+        transformArray);
   }
 
   /**
