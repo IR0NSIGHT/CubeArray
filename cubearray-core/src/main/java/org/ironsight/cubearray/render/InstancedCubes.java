@@ -38,7 +38,6 @@ import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryStack;
 
 public class InstancedCubes {
-  private static final float SCHEMATIC_ROTATION_SPEED = (float) Math.toRadians(15.0);
 
   // Serializes the process-global GLFW lifecycle (glfwInit/glfwCreateWindow/glfwTerminate),
   // shared by the interactive viewer and every offscreen renderToFile call, so concurrent
@@ -671,10 +670,6 @@ public class InstancedCubes {
       double currentTime = glfwGetTime();
       float deltaTime = (float) (currentTime - lastTime);
       lastTime = currentTime;
-
-      if (!headless && !localRotation) {
-        setup.rotateSchematicTransforms(SCHEMATIC_ROTATION_SPEED * Math.min(deltaTime, 0.1f));
-      }
 
       renderText("FPS: " + Math.round(1f / deltaTime), 10, 30);
 
