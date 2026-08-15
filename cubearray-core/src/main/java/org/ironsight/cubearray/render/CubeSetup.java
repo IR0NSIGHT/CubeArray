@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
+import org.joml.Vector3fc;
 
 /**
  * GPU-ready render data for a grid of cubes: per-instance positions and block-type indices, plus
@@ -134,6 +135,28 @@ public class CubeSetup {
           .translate(-pivot.x, -pivot.y, -pivot.z);
       schematicTransforms[i] =
           new SchematicTransform(current.name(), matrix, pivot);
+    }
+    transformVersion.incrementAndGet();
+  }
+
+  /** Rotates every transform around its local up axis and the supplied world-space pitch axis. */
+  public synchronized void rotateSchematicTransformsAroundLocalUp(
+      float yawRadians, float pitchRadians, Vector3fc pitchAxis) {
+    if ((yawRadians == 0f && pitchRadians == 0f) || schematicTransforms.length == 0) return;
+    for (int i = 0; i < schematicTransforms.length; i++) {
+      SchematicTransform current = schematicTransforms[i];
+      Matrix4f currentMatrix = current.matrix();
+      Vector3f worldPivot = currentMatrix.transformPosition(new Vector3f(current.pivot()));
+      Vector3f localUp =
+          currentMatrix.transformDirection(new Vector3f(0, 1, 0)).normalize();
+      Matrix4f delta =
+          new Matrix4f()
+              .translate(worldPivot)
+              .rotate(yawRadians, localUp)
+              .rotate(pitchRadians, pitchAxis)
+              .translate(-worldPivot.x, -worldPivot.y, -worldPivot.z);
+      schematicTransforms[i] =
+          new SchematicTransform(current.name(), delta.mul(currentMatrix), current.pivot());
     }
     transformVersion.incrementAndGet();
   }

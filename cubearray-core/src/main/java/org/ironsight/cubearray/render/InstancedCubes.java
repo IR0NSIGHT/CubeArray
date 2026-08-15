@@ -715,7 +715,8 @@ public class InstancedCubes {
 
       if (rotateCameraByMouse && localRotation) {
         float sensitivity = .2f * deltaTime;
-        setup.rotateSchematicTransforms(-xoffset * sensitivity);
+        setup.rotateSchematicTransformsAroundLocalUp(
+            -xoffset * sensitivity, 0f, right);
       } else if (rotateCameraByMouse) {
         float sensitivity = .2f * deltaTime; // scaled by delta time
         float yaw = cameraState.yaw - xoffset * sensitivity;

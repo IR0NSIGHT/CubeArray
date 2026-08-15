@@ -127,4 +127,44 @@ public class InstancedCubesCameraTest {
     assertEquals(0f, setup.schematicTransform(0).matrix().m00(), 1e-6f);
     assertEquals(1L, setup.transformVersion());
   }
+
+  @Test
+  public void screenAxisRotationUsesWorldAxesAndPreservesPivot() {
+    CubeSetup setup = minimalSetup();
+
+    setup.rotateSchematicTransformsAroundLocalUp(
+        (float) Math.PI / 2, 0f, new Vector3f(1, 0, 0));
+
+    Matrix4f schematic = setup.schematicTransform(1).matrix();
+    Vector3f pivot = setup.schematicTransform(1).pivot();
+    schematic.transformPosition(pivot);
+    assertEquals(6f, pivot.x, 1e-6f);
+    assertEquals(9f, pivot.z, 1e-6f);
+
+    Vector3f point = new Vector3f(3, 0, 3);
+    schematic.transformPosition(point);
+    assertEquals(6f, point.x, 1e-6f);
+    assertEquals(8f, point.z, 1e-6f);
+  }
+
+  @Test
+  public void horizontalRotationUsesCurrentLocalUpAxis() {
+    CubeSetup setup = minimalSetup();
+    Matrix4f initial = new Matrix4f().translation(4, 0, 6).rotateX((float) Math.PI / 2);
+    setup.setSchematicTransform(1, initial);
+    Vector3f localUpBefore = initial.transformDirection(new Vector3f(0, 1, 0)).normalize();
+
+    setup.rotateSchematicTransformsAroundLocalUp(
+        (float) Math.PI / 2, 0f, new Vector3f(1, 0, 0));
+
+    Vector3f localUpAfter =
+        setup
+            .schematicTransform(1)
+            .matrix()
+            .transformDirection(new Vector3f(0, 1, 0))
+            .normalize();
+    assertEquals(localUpBefore.x, localUpAfter.x, 1e-6f);
+    assertEquals(localUpBefore.y, localUpAfter.y, 1e-6f);
+    assertEquals(localUpBefore.z, localUpAfter.z, 1e-6f);
+  }
 }
