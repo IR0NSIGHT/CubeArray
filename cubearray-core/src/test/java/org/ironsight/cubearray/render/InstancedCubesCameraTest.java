@@ -22,6 +22,7 @@ public class InstancedCubesCameraTest {
     return new CubeSetup(
         new Vector3f[] {new Vector3f(0, 0, 0)},
         new int[] {0},
+        new int[] {1},
         new Vector3f[] {new Vector3f(1, 1, 1)},
         new Vector3f[] {new Vector3f(1, 1, 1)},
         new Vector3f[] {new Vector3f(0, 0, 0)},
@@ -31,7 +32,12 @@ public class InstancedCubesCameraTest {
         new Vector3f(-1, -1, -1),
         new Vector3f(1, 1, 1),
         "test",
-        false);
+        false,
+        new SchematicTransform[] {
+          new SchematicTransform("global axis", new Matrix4f()),
+          new SchematicTransform(
+              "test schematic", new Matrix4f().translation(4, 0, 6), new Vector3f(2, 0, 3))
+        });
   }
 
   @Test
@@ -92,6 +98,7 @@ public class InstancedCubesCameraTest {
     CubeSetup setup = minimalSetup();
 
     assertEquals("global axis", setup.schematicTransform(0).name());
+    assertEquals("test schematic", setup.schematicTransform(1).name());
     assertEquals(0L, setup.transformVersion());
 
     Matrix4f translation = new Matrix4f().translation(4, 5, 6);
@@ -103,5 +110,21 @@ public class InstancedCubesCameraTest {
     assertEquals(4f, stored.m30(), 1e-6f);
     assertEquals(5f, stored.m31(), 1e-6f);
     assertEquals(6f, stored.m32(), 1e-6f);
+  }
+
+  @Test
+  public void rotatingSchematicTransformsPreservesBasePivot() {
+    CubeSetup setup = minimalSetup();
+
+    setup.rotateSchematicTransforms((float) Math.PI / 2);
+
+    Matrix4f schematic = setup.schematicTransform(1).matrix();
+    Vector3f pivot = setup.schematicTransform(1).pivot();
+    schematic.transformPosition(pivot);
+    assertEquals(6f, pivot.x, 1e-6f);
+    assertEquals(9f, pivot.z, 1e-6f);
+    assertEquals("global axis", setup.schematicTransform(0).name());
+    assertEquals(0f, setup.schematicTransform(0).matrix().m00(), 1e-6f);
+    assertEquals(1L, setup.transformVersion());
   }
 }

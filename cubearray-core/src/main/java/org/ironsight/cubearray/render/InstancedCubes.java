@@ -38,6 +38,7 @@ import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryStack;
 
 public class InstancedCubes {
+  private static final float SCHEMATIC_ROTATION_SPEED = (float) Math.toRadians(15.0);
 
   // Serializes the process-global GLFW lifecycle (glfwInit/glfwCreateWindow/glfwTerminate),
   // shared by the interactive viewer and every offscreen renderToFile call, so concurrent
@@ -83,6 +84,7 @@ public class InstancedCubes {
       fixPos_8,
       fixPos_9;
   private boolean isFPV = false;
+  private boolean localRotation;
   private CameraState prevCameraState;
   private double lastChangeTime;
   private CameraTransition transition;
@@ -670,6 +672,10 @@ public class InstancedCubes {
       float deltaTime = (float) (currentTime - lastTime);
       lastTime = currentTime;
 
+      if (!headless && !localRotation) {
+        setup.rotateSchematicTransforms(SCHEMATIC_ROTATION_SPEED * Math.min(deltaTime, 0.1f));
+      }
+
       renderText("FPS: " + Math.round(1f / deltaTime), 10, 30);
 
       boolean dataChanged = setup != lastUploadedSetup;
@@ -709,8 +715,13 @@ public class InstancedCubes {
       boolean rotateCameraByMouse =
           (glfwGetMouseButton(window, ROTATE_CAM_MOUSE.key) == GLFW_PRESS);
       boolean moveCameraByMouse = (glfwGetMouseButton(window, MOVE_CAM_MOUSE.key) == GLFW_PRESS);
+      localRotation =
+          rotateCameraByMouse && glfwGetKey(window, MOVE_FAST.key) == GLFW_PRESS;
 
-      if (rotateCameraByMouse) {
+      if (rotateCameraByMouse && localRotation) {
+        float sensitivity = .2f * deltaTime;
+        setup.rotateSchematicTransforms(-xoffset * sensitivity);
+      } else if (rotateCameraByMouse) {
         float sensitivity = .2f * deltaTime; // scaled by delta time
         float yaw = cameraState.yaw - xoffset * sensitivity;
         float pitch = cameraState.pitch - yoffset * sensitivity;
@@ -732,7 +743,7 @@ public class InstancedCubes {
         movement.add(forwardFlat.mul(yoffset * sensitivityShift));
       }
 
-      if (autoRotate != 0) {
+      if (!localRotation && autoRotate != 0) {
         cameraState =
             new CameraState(
                 cameraState.target(),

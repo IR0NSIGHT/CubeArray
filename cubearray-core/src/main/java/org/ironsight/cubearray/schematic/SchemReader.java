@@ -335,7 +335,9 @@ public class SchemReader {
       maxDim = Math.max(maxDim, Math.max(dimensions.x, Math.max(dimensions.y, dimensions.z)));
       transforms.add(
           new SchematicTransform(
-              object.getName(), new Matrix4f().translation(gridOffset.x, 0, gridOffset.y)));
+              object.getName(),
+              new Matrix4f().translation(gridOffset.x, 0, gridOffset.y),
+              new Vector3f(dimensions.x / 2f, 0, dimensions.y / 2f)));
       for (int x = 0; x < object.getDimensions().x; x++) {
         for (int y = 0; y < object.getDimensions().y; y++) {
           for (int z = object.getDimensions().z - 1; z >= 0; z--) {

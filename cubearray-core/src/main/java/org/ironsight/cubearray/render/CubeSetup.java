@@ -111,13 +111,36 @@ public class CubeSetup {
 
   public synchronized void setSchematicTransform(int index, Matrix4f matrix) {
     SchematicTransform current = schematicTransforms[index];
-    schematicTransforms[index] = new SchematicTransform(current.name(), matrix);
+    schematicTransforms[index] = new SchematicTransform(current.name(), matrix, current.pivot());
+    transformVersion.incrementAndGet();
+  }
+
+  /** Rotates every transform around the world up axis. */
+  public synchronized void rotateSchematicTransforms(float angleRadians) {
+    rotateSchematicTransforms(angleRadians, 0f);
+  }
+
+  /** Rotates every transform around its local pivot. */
+  public synchronized void rotateSchematicTransforms(float yawRadians, float pitchRadians) {
+    if ((yawRadians == 0f && pitchRadians == 0f) || schematicTransforms.length == 0) return;
+    for (int i = 0; i < schematicTransforms.length; i++) {
+      SchematicTransform current = schematicTransforms[i];
+      Vector3f pivot = current.pivot();
+      Matrix4f matrix = current.matrix();
+      matrix
+          .translate(pivot)
+          .rotateY(yawRadians)
+          .rotateX(pitchRadians)
+          .translate(-pivot.x, -pivot.y, -pivot.z);
+      schematicTransforms[i] =
+          new SchematicTransform(current.name(), matrix, pivot);
+    }
     transformVersion.incrementAndGet();
   }
 
   public synchronized SchematicTransform schematicTransform(int index) {
     SchematicTransform transform = schematicTransforms[index];
-    return new SchematicTransform(transform.name(), transform.matrix());
+    return new SchematicTransform(transform.name(), transform.matrix(), transform.pivot());
   }
 
   public long transformVersion() {
