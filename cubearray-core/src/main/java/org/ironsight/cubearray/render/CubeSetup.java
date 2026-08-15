@@ -1,6 +1,10 @@
 package org.ironsight.cubearray.render;
 
 import java.awt.image.BufferedImage;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
+import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
@@ -15,9 +19,13 @@ import org.joml.Vector4f;
  * setup.positions.length}); {@link InstancedCubes} reads them per-instance during upload.
  */
 public class CubeSetup {
+  public record TransformSnapshot(long version, Matrix4f[] matrices) {}
+
   public final String name;
   public final Vector3f[] positions;
   public final int[] colorIndices;
+  /** Per-instance transform slot. Slot zero is reserved for the global axis markers. */
+  public final int[] schematicIndices;
   // block colors by type
   public final Vector3f[] colorPalette;
   // block dimensions by type
@@ -32,7 +40,41 @@ public class CubeSetup {
   public final Vector3f min;
   public final Vector3f max;
   public final boolean useGrid;
+  private final SchematicTransform[] schematicTransforms;
+  private final AtomicLong transformVersion = new AtomicLong();
 
+  public CubeSetup(
+      Vector3f[] positions,
+      int[] colorIndices,
+      int[] schematicIndices,
+      Vector3f[] colorPalette,
+      Vector3f[] sizePalette,
+      Vector3f[] offsetPalette,
+      Vector3f[] rotationPalette,
+      Vector4f[] uvCoordsPalette,
+      BufferedImage textureAtlas,
+      Vector3f min,
+      Vector3f max,
+      String name,
+      boolean useGrid,
+      SchematicTransform[] schematicTransforms) {
+    this.positions = positions;
+    this.colorIndices = colorIndices;
+    this.schematicIndices = schematicIndices;
+    this.colorPalette = colorPalette;
+    this.sizePalette = sizePalette;
+    this.offsetPalette = offsetPalette;
+    this.rotationPalette = rotationPalette;
+    this.uvCoordsPalette = uvCoordsPalette;
+    this.textureAtlas = textureAtlas;
+    this.min = min;
+    this.max = max;
+    this.name = name;
+    this.useGrid = useGrid;
+    this.schematicTransforms = schematicTransforms.clone();
+  }
+
+  /** Compatibility constructor for setups containing one unnamed schematic. */
   public CubeSetup(
       Vector3f[] positions,
       int[] colorIndices,
@@ -46,17 +88,50 @@ public class CubeSetup {
       Vector3f max,
       String name,
       boolean useGrid) {
-    this.positions = positions;
-    this.colorIndices = colorIndices;
-    this.colorPalette = colorPalette;
-    this.sizePalette = sizePalette;
-    this.offsetPalette = offsetPalette;
-    this.rotationPalette = rotationPalette;
-    this.uvCoordsPalette = uvCoordsPalette;
-    this.textureAtlas = textureAtlas;
-    this.min = min;
-    this.max = max;
-    this.name = name;
-    this.useGrid = useGrid;
+    this(
+        positions,
+        colorIndices,
+        new int[positions.length],
+        colorPalette,
+        sizePalette,
+        offsetPalette,
+        rotationPalette,
+        uvCoordsPalette,
+        textureAtlas,
+        min,
+        max,
+        name,
+        useGrid,
+        new SchematicTransform[] {new SchematicTransform("global axis", new Matrix4f())});
+  }
+
+  public synchronized List<SchematicTransform> schematicTransforms() {
+    return List.copyOf(Arrays.asList(schematicTransforms));
+  }
+
+  public synchronized void setSchematicTransform(int index, Matrix4f matrix) {
+    SchematicTransform current = schematicTransforms[index];
+    schematicTransforms[index] = new SchematicTransform(current.name(), matrix);
+    transformVersion.incrementAndGet();
+  }
+
+  public synchronized SchematicTransform schematicTransform(int index) {
+    SchematicTransform transform = schematicTransforms[index];
+    return new SchematicTransform(transform.name(), transform.matrix());
+  }
+
+  public long transformVersion() {
+    return transformVersion.get();
+  }
+
+  /** Snapshot used by the render thread while preparing the GPU upload. */
+  public synchronized Matrix4f[] transformMatrixSnapshot() {
+    Matrix4f[] snapshot = new Matrix4f[schematicTransforms.length];
+    for (int i = 0; i < snapshot.length; i++) snapshot[i] = schematicTransforms[i].matrix();
+    return snapshot;
+  }
+
+  public synchronized TransformSnapshot transformSnapshot() {
+    return new TransformSnapshot(transformVersion.get(), transformMatrixSnapshot());
   }
 }

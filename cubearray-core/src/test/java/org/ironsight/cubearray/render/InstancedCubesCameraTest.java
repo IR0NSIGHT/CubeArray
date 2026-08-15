@@ -7,6 +7,7 @@ import static org.junit.Assert.*;
 import java.awt.image.BufferedImage;
 import org.ironsight.cubearray.mcmodel.Face;
 import org.ironsight.cubearray.render.InstancedCubes.CameraState;
+import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.junit.Test;
@@ -84,5 +85,23 @@ public class InstancedCubesCameraTest {
     assertEquals(before.pitch(), after.pitch(), 1e-6f);
     assertEquals(before.radius(), after.radius(), 1e-6f);
     assertEquals(0f, after.roll(), 1e-6f);
+  }
+
+  @Test
+  public void schematicTransformsAreNamedAndVersioned() {
+    CubeSetup setup = minimalSetup();
+
+    assertEquals("global axis", setup.schematicTransform(0).name());
+    assertEquals(0L, setup.transformVersion());
+
+    Matrix4f translation = new Matrix4f().translation(4, 5, 6);
+    setup.setSchematicTransform(0, translation);
+    translation.identity();
+
+    assertEquals(1L, setup.transformVersion());
+    Matrix4f stored = setup.schematicTransform(0).matrix();
+    assertEquals(4f, stored.m30(), 1e-6f);
+    assertEquals(5f, stored.m31(), 1e-6f);
+    assertEquals(6f, stored.m32(), 1e-6f);
   }
 }

@@ -54,7 +54,7 @@ public class InstancedCubes {
   private long window;
   private int width = 1920;
   private int height = 1080;
-  private int vao, vbo, ebo, instanceVBO, colorIndexVBO;
+  private int vao, vbo, ebo, instanceVBO, colorIndexVBO, schematicIndexVBO;
   private int shaderProgram;
   private int colorPaletteTexId,
       sizePaletteTexId,
@@ -67,6 +67,7 @@ public class InstancedCubes {
   private CameraState cameraState;
   private volatile CubeSetup setup;
   private volatile CubeSetup lastUploadedSetup;
+  private long uploadedTransformVersion = -1;
   private float autoRotate = 5f;
   private CameraState orbitCamera;
   private CameraState initialPos;
@@ -277,9 +278,7 @@ public class InstancedCubes {
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), false, projBuffer);
     glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), false, viewBuffer);
 
-    glBindVertexArray(vao);
-    glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, setup.positions.length);
-    glBindVertexArray(0);
+    drawInstances();
 
     glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolveFbo);
@@ -674,6 +673,7 @@ public class InstancedCubes {
       renderText("FPS: " + Math.round(1f / deltaTime), 10, 30);
 
       boolean dataChanged = setup != lastUploadedSetup;
+      boolean transformsChanged = setup.transformVersion() != uploadedTransformVersion;
       if (dataChanged) {
         uploadInstanceData();
         uploadPaletteTextures();
@@ -780,7 +780,10 @@ public class InstancedCubes {
       xoffset = 0;
       yoffset = 0;
 
-      if (prevCameraState == null || !cameraState.equals(prevCameraState) || dataChanged) {
+      if (prevCameraState == null
+          || !cameraState.equals(prevCameraState)
+          || dataChanged
+          || transformsChanged) {
         lastChangeTime = glfwGetTime();
       }
 
@@ -815,9 +818,7 @@ public class InstancedCubes {
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), false, projBuffer);
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), false, viewBuffer);
 
-        glBindVertexArray(vao);
-        glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, setup.positions.length);
-        glBindVertexArray(0);
+         drawInstances();
 
         // TODO: only blit when pendingTasks contains a screenshot request to avoid the per-frame
         // cost
@@ -986,6 +987,7 @@ public class InstancedCubes {
     glDeleteBuffers(ebo);
     glDeleteBuffers(instanceVBO);
     glDeleteBuffers(colorIndexVBO);
+    glDeleteBuffers(schematicIndexVBO);
     glDeleteTextures(colorPaletteTexId);
     glDeleteTextures(sizePaletteTexId);
     glDeleteTextures(offsetPaletteTexId);
@@ -1144,7 +1146,46 @@ public class InstancedCubes {
     glEnableVertexAttribArray(3);
     glVertexAttribDivisor(3, 1);
 
+    IntBuffer schematicIndexData = BufferUtils.createIntBuffer(setup.schematicIndices.length);
+    schematicIndexData.put(setup.schematicIndices).flip();
+
+    if (schematicIndexVBO == 0) schematicIndexVBO = glGenBuffers();
+    glBindBuffer(GL_ARRAY_BUFFER, schematicIndexVBO);
+    glBufferData(GL_ARRAY_BUFFER, schematicIndexData, GL_DYNAMIC_DRAW);
+    glVertexAttribIPointer(5, 1, GL_INT, Integer.BYTES, 0);
+    glEnableVertexAttribArray(5);
+    glVertexAttribDivisor(5, 1);
+
     glBindVertexArray(0);
+  }
+
+  private void drawInstances() {
+    CubeSetup currentSetup = setup;
+    CubeSetup.TransformSnapshot transforms = currentSetup.transformSnapshot();
+    int transformLocation = glGetUniformLocation(shaderProgram, "schematicTransform");
+    glBindVertexArray(vao);
+    int start = 0;
+    while (start < currentSetup.positions.length) {
+      int schematicIndex = currentSetup.schematicIndices[start];
+      int end = start + 1;
+      while (end < currentSetup.positions.length
+          && currentSetup.schematicIndices[end] == schematicIndex) end++;
+      FloatBuffer matrixBuffer = BufferUtils.createFloatBuffer(16);
+      transforms.matrices()[schematicIndex].get(matrixBuffer);
+      glUseProgram(shaderProgram);
+      glUniformMatrix4fv(transformLocation, false, matrixBuffer);
+      glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+      glVertexAttribPointer(
+          2, 3, GL_FLOAT, false, 3 * Float.BYTES, (long) start * 3 * Float.BYTES);
+      glBindBuffer(GL_ARRAY_BUFFER, colorIndexVBO);
+      glVertexAttribIPointer(3, 1, GL_INT, Integer.BYTES, (long) start * Integer.BYTES);
+      glBindBuffer(GL_ARRAY_BUFFER, schematicIndexVBO);
+      glVertexAttribIPointer(5, 1, GL_INT, Integer.BYTES, (long) start * Integer.BYTES);
+      glDrawElementsInstanced(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0, end - start);
+      start = end;
+    }
+    glBindVertexArray(0);
+    uploadedTransformVersion = transforms.version();
   }
 
   private void uploadPaletteTextures() {

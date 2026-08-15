@@ -30,7 +30,9 @@ import org.ironsight.cubearray.mcmodel.SubBlock;
 import org.ironsight.cubearray.platform.AppLogger;
 import org.ironsight.cubearray.platform.ResourceUtils;
 import org.ironsight.cubearray.render.CubeSetup;
+import org.ironsight.cubearray.render.SchematicTransform;
 import org.joml.Matrix3f;
+import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.pepsoft.minecraft.Material;
@@ -311,6 +313,7 @@ public class SchemReader {
     final String name = schematics.size() == 1 ? schematics.get(0).getName() : "schematics";
     List<Vector3f> positions = new ArrayList<>();
     List<Integer> blockTypeIndicesList = new ArrayList<>();
+    List<Integer> schematicIndices = new ArrayList<>();
 
     HashMap<Material, Integer> mat_to_palette_idx = new HashMap<>();
     int maxColorIdx = 0;
@@ -365,15 +368,24 @@ public class SchemReader {
 
               maxColorIdx =
                   addPieces(
-                      mat, pos, positions, blockTypeIndicesList, mat_to_palette_idx, maxColorIdx);
+                      mat,
+                      pos,
+                      index + 1,
+                      positions,
+                      blockTypeIndicesList,
+                      schematicIndices,
+                      mat_to_palette_idx,
+                      maxColorIdx);
 
               if (mat.is(WATERLOGGED) || mat.watery) {
                 maxColorIdx =
                     addPieces(
                         WATER,
                         pos,
+                        index + 1,
                         positions,
                         blockTypeIndicesList,
+                        schematicIndices,
                         mat_to_palette_idx,
                         maxColorIdx);
               }
@@ -397,8 +409,10 @@ public class SchemReader {
             addInstance(
                 m,
                 new Vector3f(0, 0, 0),
+                0,
                 positions,
                 blockTypeIndicesList,
+                schematicIndices,
                 mat_to_palette_idx,
                 maxColorIdx);
       }
@@ -503,6 +517,12 @@ public class SchemReader {
     }
 
     int[] blockTypeIndices = blockTypeIndicesList.stream().mapToInt(i -> i).toArray();
+    int[] instanceSchematicIndices = schematicIndices.stream().mapToInt(i -> i).toArray();
+    SchematicTransform[] transforms = new SchematicTransform[schematics.size() + 1];
+    transforms[0] = new SchematicTransform("global axis", new Matrix4f());
+    for (int i = 0; i < schematics.size(); i++) {
+      transforms[i + 1] = new SchematicTransform(schematics.get(i).getName(), new Matrix4f());
+    }
 
     Vector3f min = new Vector3f(Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE);
     Vector3f max = new Vector3f(Float.MIN_VALUE, Float.MIN_VALUE, Float.MIN_VALUE);
@@ -520,6 +540,7 @@ public class SchemReader {
     return new CubeSetup(
         positions.toArray(new Vector3f[0]),
         blockTypeIndices,
+        instanceSchematicIndices,
         colorPalette,
         sizePalette,
         offsetPalette,
@@ -529,7 +550,8 @@ public class SchemReader {
         min,
         max,
         name,
-        useGrid);
+        useGrid,
+        transforms);
   }
 
   /**
@@ -539,8 +561,10 @@ public class SchemReader {
   private static int addInstance(
       Material mat,
       Vector3f pos,
+      int schematicIndex,
       List<Vector3f> positions,
       List<Integer> blockTypeIndicesList,
+      List<Integer> schematicIndices,
       HashMap<Material, Integer> mat_to_palette_idx,
       int maxColorIdx) {
     int idx;
@@ -552,6 +576,7 @@ public class SchemReader {
     }
     positions.add(pos);
     blockTypeIndicesList.add(idx);
+    schematicIndices.add(schematicIndex);
     return maxColorIdx;
   }
 
@@ -565,8 +590,10 @@ public class SchemReader {
   private static int addPieces(
       Material mat,
       Vector3f pos,
+      int schematicIndex,
       List<Vector3f> positions,
       List<Integer> blockTypeIndicesList,
+      List<Integer> schematicIndices,
       HashMap<Material, Integer> mat_to_palette_idx,
       int maxColorIdx) {
     List<Piece> pieces = piecesFor(mat);
@@ -574,7 +601,15 @@ public class SchemReader {
     for (int i = 0; i < pieces.size(); i++) {
       Material keyed = single ? mat : mat.withProperty(PIECE_PROPERTY, String.valueOf(i));
       maxColorIdx =
-          addInstance(keyed, pos, positions, blockTypeIndicesList, mat_to_palette_idx, maxColorIdx);
+          addInstance(
+              keyed,
+              pos,
+              schematicIndex,
+              positions,
+              blockTypeIndicesList,
+              schematicIndices,
+              mat_to_palette_idx,
+              maxColorIdx);
     }
     return maxColorIdx;
   }

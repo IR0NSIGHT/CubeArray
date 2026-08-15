@@ -15,6 +15,7 @@ public class VertexShaderSource {
             // Per-instance attributes
             layout(location = 2) in vec3 aInstancePos;
             layout(location = 3) in int  aInstanceColorIndex;
+            layout(location = 5) in int  aInstanceSchematicIndex;
 
 
             // Camera transforms
@@ -27,6 +28,7 @@ public class VertexShaderSource {
             uniform sampler2D offsetPaletteTex;
             uniform sampler2D rotationPaletteTex;
             uniform sampler2D uvPaletteTex;
+            uniform mat4 schematicTransform;
             uniform int paletteSize; // total number of entries
             uniform float atlasSize; // block texture atlas width/height in pixels
 
@@ -96,10 +98,10 @@ public class VertexShaderSource {
              // X axis) then y (around the Y axis), so compose as Ry * Rx
              vec3 rotatedPosition =
                  rotationY(blockRotation.y) * rotationX(blockRotation.x) * scaledVertex;
-             vec3 worldPos     = rotatedPosition + aInstancePos;
+              vec3 worldPos = (schematicTransform * vec4(rotatedPosition + aInstancePos, 1.0)).xyz;
 
              // Outputs
-             float r = rand(gl_InstanceID) * 0.025;
+              float r = rand(float(gl_InstanceID) + float(aInstanceSchematicIndex) * 0.001) * 0.025;
              vColor    = blockColor + vec3(r);
              vWorldPos = worldPos;
 
