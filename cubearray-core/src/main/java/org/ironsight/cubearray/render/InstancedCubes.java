@@ -94,6 +94,8 @@ public class InstancedCubes {
   private final BlockingQueue<Runnable> deferredSharedTasks = new LinkedBlockingQueue<>();
   private int resolveFbo;
   private int resolveColorRb;
+  private int resolveWidth;
+  private int resolveHeight;
   private Matrix4f projection;
   private boolean sharedService;
   private volatile boolean sharedVisible;
@@ -217,12 +219,27 @@ public class InstancedCubes {
 
   BufferedImage renderSharedFrame(
       CubeSetup newSetup, int frameWidth, int frameHeight, CameraState camera) {
-    replaceData(newSetup);
-    width = frameWidth;
-    height = frameHeight;
-    CompletableFuture<BufferedImage> screenshot = requestScreenshot();
-    renderOneFrame(camera);
-    return screenshot.join();
+    if (frameWidth <= 0 || frameHeight <= 0) {
+      throw new IllegalArgumentException("Screenshot dimensions must be positive");
+    }
+
+    int previousWidth = width;
+    int previousHeight = height;
+    int previousResolveWidth = resolveWidth;
+    int previousResolveHeight = resolveHeight;
+    try {
+      replaceData(newSetup);
+      width = frameWidth;
+      height = frameHeight;
+      resizeResolveBuffer(frameWidth, frameHeight);
+      CompletableFuture<BufferedImage> screenshot = requestScreenshot();
+      renderOneFrame(camera);
+      return screenshot.join();
+    } finally {
+      width = previousWidth;
+      height = previousHeight;
+      resizeResolveBuffer(previousResolveWidth, previousResolveHeight);
+    }
   }
 
   /**
@@ -327,10 +344,7 @@ public class InstancedCubes {
     resolveFbo = glGenFramebuffers();
     glBindFramebuffer(GL_FRAMEBUFFER, resolveFbo);
     resolveColorRb = glGenRenderbuffers();
-    glBindRenderbuffer(GL_RENDERBUFFER, resolveColorRb);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, width, height);
-    glFramebufferRenderbuffer(
-        GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, resolveColorRb);
+    resizeResolveBuffer(width, height);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     glfwSetFramebufferSizeCallback(
@@ -342,8 +356,7 @@ public class InstancedCubes {
           projection =
               new Matrix4f()
                   .perspective((float) toRadians(45.0f), (float) fbWidth / fbHeight, .1f, 10000.0f);
-          glBindRenderbuffer(GL_RENDERBUFFER, resolveColorRb);
-          glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, fbWidth, fbHeight);
+          resizeResolveBuffer(fbWidth, fbHeight);
           lastChangeTime = glfwGetTime();
         });
 
@@ -866,6 +879,18 @@ public class InstancedCubes {
 
   private void saveScreenshot(Path out) throws IOException {
     ImageIO.write(captureScreenshot(), "png", out.toFile());
+  }
+
+  private void resizeResolveBuffer(int bufferWidth, int bufferHeight) {
+    if (bufferWidth <= 0 || bufferHeight <= 0) return;
+    glBindRenderbuffer(GL_RENDERBUFFER, resolveColorRb);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, bufferWidth, bufferHeight);
+    glBindFramebuffer(GL_FRAMEBUFFER, resolveFbo);
+    glFramebufferRenderbuffer(
+        GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, resolveColorRb);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    resolveWidth = bufferWidth;
+    resolveHeight = bufferHeight;
   }
 
   private void saveScreenshot() {
