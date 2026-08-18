@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
-import org.joml.Vector4f;
 import org.joml.Vector3fc;
+import org.joml.Vector4f;
 
 /**
  * GPU-ready render data for a grid of cubes: per-instance positions and block-type indices, plus
@@ -25,8 +25,10 @@ public class CubeSetup {
   public final String name;
   public final Vector3f[] positions;
   public final int[] colorIndices;
+
   /** Per-instance transform slot. Slot zero is reserved for the global axis markers. */
   public final int[] schematicIndices;
+
   // block colors by type
   public final Vector3f[] colorPalette;
   // block dimensions by type
@@ -133,8 +135,7 @@ public class CubeSetup {
           .rotateY(yawRadians)
           .rotateX(pitchRadians)
           .translate(-pivot.x, -pivot.y, -pivot.z);
-      schematicTransforms[i] =
-          new SchematicTransform(current.name(), matrix, pivot);
+      schematicTransforms[i] = new SchematicTransform(current.name(), matrix, pivot);
     }
     transformVersion.incrementAndGet();
   }
@@ -147,8 +148,7 @@ public class CubeSetup {
       SchematicTransform current = schematicTransforms[i];
       Matrix4f currentMatrix = current.matrix();
       Vector3f worldPivot = currentMatrix.transformPosition(new Vector3f(current.pivot()));
-      Vector3f localUp =
-          currentMatrix.transformDirection(new Vector3f(0, 1, 0)).normalize();
+      Vector3f localUp = currentMatrix.transformDirection(new Vector3f(0, 1, 0)).normalize();
       Matrix4f delta =
           new Matrix4f()
               .translate(worldPivot)

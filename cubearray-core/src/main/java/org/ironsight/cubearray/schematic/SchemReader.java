@@ -368,8 +368,7 @@ public class SchemReader {
                   }
               if (!hasNonSolidNeighbour) continue;
 
-              Vector3f pos =
-                  new Vector3f(x, z, y);
+              Vector3f pos = new Vector3f(x, z, y);
 
               maxColorIdx =
                   addPieces(

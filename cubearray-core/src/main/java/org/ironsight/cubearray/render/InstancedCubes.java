@@ -723,13 +723,11 @@ public class InstancedCubes {
       boolean rotateCameraByMouse =
           (glfwGetMouseButton(window, ROTATE_CAM_MOUSE.key) == GLFW_PRESS);
       boolean moveCameraByMouse = (glfwGetMouseButton(window, MOVE_CAM_MOUSE.key) == GLFW_PRESS);
-      localRotation =
-          rotateCameraByMouse && glfwGetKey(window, MOVE_FAST.key) == GLFW_PRESS;
+      localRotation = rotateCameraByMouse && glfwGetKey(window, MOVE_FAST.key) == GLFW_PRESS;
 
       if (rotateCameraByMouse && localRotation) {
         float sensitivity = .2f * deltaTime;
-        setup.rotateSchematicTransformsAroundLocalUp(
-            -xoffset * sensitivity, 0f, right);
+        setup.rotateSchematicTransformsAroundLocalUp(-xoffset * sensitivity, 0f, right);
       } else if (rotateCameraByMouse) {
         float sensitivity = .2f * deltaTime; // scaled by delta time
         float yaw = cameraState.yaw - xoffset * sensitivity;
@@ -838,7 +836,7 @@ public class InstancedCubes {
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), false, projBuffer);
         glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), false, viewBuffer);
 
-         drawInstances();
+        drawInstances();
 
         // TODO: only blit when pendingTasks contains a screenshot request to avoid the per-frame
         // cost
@@ -1207,8 +1205,7 @@ public class InstancedCubes {
       glUseProgram(shaderProgram);
       glUniformMatrix4fv(transformLocation, false, matrixBuffer);
       glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-      glVertexAttribPointer(
-          2, 3, GL_FLOAT, false, 3 * Float.BYTES, (long) start * 3 * Float.BYTES);
+      glVertexAttribPointer(2, 3, GL_FLOAT, false, 3 * Float.BYTES, (long) start * 3 * Float.BYTES);
       glBindBuffer(GL_ARRAY_BUFFER, colorIndexVBO);
       glVertexAttribIPointer(3, 1, GL_INT, Integer.BYTES, (long) start * Integer.BYTES);
       glBindBuffer(GL_ARRAY_BUFFER, schematicIndexVBO);

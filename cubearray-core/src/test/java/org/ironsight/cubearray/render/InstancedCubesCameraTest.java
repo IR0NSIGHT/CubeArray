@@ -132,8 +132,7 @@ public class InstancedCubesCameraTest {
   public void screenAxisRotationUsesWorldAxesAndPreservesPivot() {
     CubeSetup setup = minimalSetup();
 
-    setup.rotateSchematicTransformsAroundLocalUp(
-        (float) Math.PI / 2, 0f, new Vector3f(1, 0, 0));
+    setup.rotateSchematicTransformsAroundLocalUp((float) Math.PI / 2, 0f, new Vector3f(1, 0, 0));
 
     Matrix4f schematic = setup.schematicTransform(1).matrix();
     Vector3f pivot = setup.schematicTransform(1).pivot();
@@ -154,15 +153,10 @@ public class InstancedCubesCameraTest {
     setup.setSchematicTransform(1, initial);
     Vector3f localUpBefore = initial.transformDirection(new Vector3f(0, 1, 0)).normalize();
 
-    setup.rotateSchematicTransformsAroundLocalUp(
-        (float) Math.PI / 2, 0f, new Vector3f(1, 0, 0));
+    setup.rotateSchematicTransformsAroundLocalUp((float) Math.PI / 2, 0f, new Vector3f(1, 0, 0));
 
     Vector3f localUpAfter =
-        setup
-            .schematicTransform(1)
-            .matrix()
-            .transformDirection(new Vector3f(0, 1, 0))
-            .normalize();
+        setup.schematicTransform(1).matrix().transformDirection(new Vector3f(0, 1, 0)).normalize();
     assertEquals(localUpBefore.x, localUpAfter.x, 1e-6f);
     assertEquals(localUpBefore.y, localUpAfter.y, 1e-6f);
     assertEquals(localUpBefore.z, localUpAfter.z, 1e-6f);
