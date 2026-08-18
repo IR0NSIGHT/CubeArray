@@ -807,10 +807,6 @@ public class FileRenderApp {
     replaceSandstoneBtn.addActionListener(a -> replaceSandstoneWithCobblestone(table));
     rightMenu.add(replaceSandstoneBtn);
 
-    JButton applyGradientBtn = Ui.button("Apply gradient", "primary");
-    applyGradientBtn.addActionListener(a -> applyGradientToSelected(table));
-    rightMenu.add(applyGradientBtn);
-
     return rightMenu;
   }
 
