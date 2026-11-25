@@ -100,6 +100,9 @@ public class InstancedCubes {
   private boolean sharedService;
   private volatile boolean sharedVisible;
   private volatile boolean sharedShutdown;
+  private boolean glInitialized;
+  private GLFWErrorCallback errorCallback;
+  private GLFWErrorCallback previousErrorCallback;
 
   public InstancedCubes(CubeSetup setup) {
     this.setup = setup;
@@ -147,10 +150,12 @@ public class InstancedCubes {
     // (list icons / previews) cannot call glfwTerminate while this window is alive. Queued
     // renders run after the viewer window is closed.
     synchronized (GLFW_LOCK) {
-      init();
-
-      loop();
-      cleanup();
+      try {
+        init();
+        loop();
+      } finally {
+        cleanup();
+      }
     }
   }
 
@@ -159,9 +164,12 @@ public class InstancedCubes {
     synchronized (GLFW_LOCK) {
       sharedService = true;
       headless = true;
-      init();
-      loop();
-      cleanup();
+      try {
+        init();
+        loop();
+      } finally {
+        cleanup();
+      }
     }
   }
 
@@ -185,6 +193,13 @@ public class InstancedCubes {
         });
   }
 
+  void warmUpSharedRenderer(CubeSetup newSetup) {
+    if (sharedVisible) return;
+    replaceData(newSetup);
+    renderOneFrame();
+    glFinish();
+  }
+
   void showSharedWindow(CubeSetup newSetup) {
     replaceData(newSetup);
     updateFixedPositions();
@@ -195,6 +210,7 @@ public class InstancedCubes {
     firstMouse = true;
     xoffset = 0;
     yoffset = 0;
+    lastChangeTime = glfwGetTime();
     glfwSetWindowShouldClose(window, false);
     glfwSwapInterval(1);
     glfwShowWindow(window);
@@ -232,12 +248,15 @@ public class InstancedCubes {
       width = frameWidth;
       height = frameHeight;
       resizeResolveBuffer(frameWidth, frameHeight);
-      CompletableFuture<BufferedImage> screenshot = requestScreenshot();
       renderOneFrame(camera);
-      return screenshot.join();
+      glBindFramebuffer(GL_READ_FRAMEBUFFER, resolveFbo);
+      glReadBuffer(GL_COLOR_ATTACHMENT0);
+      return captureScreenshot();
     } finally {
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
       width = previousWidth;
       height = previousHeight;
+      glViewport(0, 0, previousWidth, previousHeight);
       resizeResolveBuffer(previousResolveWidth, previousResolveHeight);
     }
   }
@@ -303,22 +322,22 @@ public class InstancedCubes {
     glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    executePendingTasks();
-
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
 
   private void init() throws Exception {
-    GLFWErrorCallback.createPrint(System.err).set();
+    errorCallback = GLFWErrorCallback.createPrint(System.err);
+    previousErrorCallback = glfwSetErrorCallback(errorCallback);
 
     if (!glfwInit()) throw new IllegalStateException("Unable to initialize GLFW");
 
+    glfwDefaultWindowHints();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW.GLFW_SAMPLES, 8); // 4x MSAA
-    if (headless) glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_VISIBLE, headless ? GLFW_FALSE : GLFW_TRUE);
 
     window = glfwCreateWindow(width, height, "Instanced Cubes", NULL, NULL);
     if (window == NULL) throw new RuntimeException("Failed to create GLFW window");
@@ -328,6 +347,7 @@ public class InstancedCubes {
     if (!headless) glfwShowWindow(window);
 
     GL.createCapabilities();
+    glInitialized = true;
 
     try (MemoryStack stack = MemoryStack.stackPush()) {
       IntBuffer framebufferWidth = stack.mallocInt(1);
@@ -383,15 +403,6 @@ public class InstancedCubes {
             -size, size,
             0.1f, 10000.0f
     ); */
-
-    GLFW.glfwSetKeyCallback(
-        window,
-        (windowHandle, key, scancode, action, mods) -> {
-          if (action == GLFW.GLFW_PRESS) {
-            String name = GLFW.glfwGetKeyName(key, scancode);
-            System.out.println("############### Pressed: " + name + ", " + scancode);
-          }
-        });
 
     // Scroll callback for zoom
     glfwSetScrollCallback(
@@ -1012,24 +1023,53 @@ public class InstancedCubes {
   }
 
   private void cleanup() {
-    glDeleteVertexArrays(vao);
-    glDeleteBuffers(vbo);
-    glDeleteBuffers(ebo);
-    glDeleteBuffers(instanceVBO);
-    glDeleteBuffers(colorIndexVBO);
-    glDeleteBuffers(schematicIndexVBO);
-    glDeleteTextures(colorPaletteTexId);
-    glDeleteTextures(sizePaletteTexId);
-    glDeleteTextures(offsetPaletteTexId);
-    glDeleteTextures(rotationPaletteTexId);
-    glDeleteTextures(uvPaletteTexId);
-    glDeleteTextures(blockTexId);
-    glDeleteProgram(shaderProgram);
-    glDeleteRenderbuffers(resolveColorRb);
-    glDeleteFramebuffers(resolveFbo);
-
-    glfwFreeCallbacks(window);
-    glfwDestroyWindow(window);
+    try {
+      if (glInitialized) {
+        glDeleteVertexArrays(vao);
+        glDeleteBuffers(vbo);
+        glDeleteBuffers(ebo);
+        glDeleteBuffers(instanceVBO);
+        glDeleteBuffers(colorIndexVBO);
+        glDeleteBuffers(schematicIndexVBO);
+        glDeleteTextures(colorPaletteTexId);
+        glDeleteTextures(sizePaletteTexId);
+        glDeleteTextures(offsetPaletteTexId);
+        glDeleteTextures(rotationPaletteTexId);
+        glDeleteTextures(uvPaletteTexId);
+        glDeleteTextures(blockTexId);
+        glDeleteProgram(shaderProgram);
+        glDeleteRenderbuffers(resolveColorRb);
+        glDeleteFramebuffers(resolveFbo);
+      }
+    } finally {
+      if (glInitialized) {
+        glInitialized = false;
+        GL.setCapabilities(null);
+      }
+      try {
+        if (window != NULL) {
+          glfwFreeCallbacks(window);
+          glfwMakeContextCurrent(NULL);
+          glfwDestroyWindow(window);
+          window = NULL;
+        }
+      } finally {
+        // Do not terminate process-global GLFW: the embedding application may also use it.
+        // Release our window and restore the callback we temporarily installed instead.
+        if (errorCallback != null) {
+          GLFWErrorCallback current = glfwSetErrorCallback(null);
+          glfwSetErrorCallback(
+              current != null && current.address() == errorCallback.address()
+                  ? previousErrorCallback
+                  : current);
+          errorCallback.free();
+          errorCallback = null;
+        }
+        pendingTasks.clear();
+        priorityTasks.clear();
+        deferredSharedTasks.clear();
+      }
+    }
   }
 
   public static void renderToFile(CubeSetup setup, Path outputPath, int width, int height)
@@ -1071,23 +1111,25 @@ public class InstancedCubes {
   }
 
   private void setupShaders() {
-    // --- Compile Shaders ---
-    int vertexShader = compileShader(GL_VERTEX_SHADER, VertexShaderSource.source, "VERTEX");
-    int geometryShader = compileShader(GL_GEOMETRY_SHADER, GeometryShaderSource.source, "GEOMETRY");
-    int fragmentShader = compileShader(GL_FRAGMENT_SHADER, FragmentShaderSource.source, "FRAGMENT");
+    int vertexShader = 0;
+    int geometryShader = 0;
+    int fragmentShader = 0;
+    try {
+      vertexShader = compileShader(GL_VERTEX_SHADER, VertexShaderSource.source, "VERTEX");
+      geometryShader = compileShader(GL_GEOMETRY_SHADER, GeometryShaderSource.source, "GEOMETRY");
+      fragmentShader = compileShader(GL_FRAGMENT_SHADER, FragmentShaderSource.source, "FRAGMENT");
 
-    // --- Link Program ---
-    shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, geometryShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-    checkCompileErrors(shaderProgram, "PROGRAM");
-
-    // --- Delete shaders after linking ---
-    glDeleteShader(vertexShader);
-    glDeleteShader(geometryShader);
-    glDeleteShader(fragmentShader);
+      shaderProgram = glCreateProgram();
+      glAttachShader(shaderProgram, vertexShader);
+      glAttachShader(shaderProgram, geometryShader);
+      glAttachShader(shaderProgram, fragmentShader);
+      glLinkProgram(shaderProgram);
+      checkCompileErrors(shaderProgram, "PROGRAM");
+    } finally {
+      glDeleteShader(vertexShader);
+      glDeleteShader(geometryShader);
+      glDeleteShader(fragmentShader);
+    }
   }
 
   private void setupVertexData() {
@@ -1154,7 +1196,8 @@ public class InstancedCubes {
     glEnableVertexAttribArray(4);
   }
 
-  private void uploadInstanceData() {
+  void uploadInstanceData() {
+    glBindVertexArray(vao);
     FloatBuffer instancePositionsFlat = BufferUtils.createFloatBuffer(setup.positions.length * 3);
     for (Vector3f pos : setup.positions) instancePositionsFlat.put(pos.x).put(pos.y).put(pos.z);
     instancePositionsFlat.flip();
@@ -1217,7 +1260,7 @@ public class InstancedCubes {
     uploadedTransformVersion = transforms.version();
   }
 
-  private void uploadPaletteTextures() {
+  void uploadPaletteTextures() {
     glUseProgram(shaderProgram);
 
     int lightDirLoc = glGetUniformLocation(shaderProgram, "lightDir");
@@ -1371,7 +1414,12 @@ public class InstancedCubes {
     int shader = glCreateShader(type);
     glShaderSource(shader, source);
     glCompileShader(shader);
-    checkCompileErrors(shader, typeName);
+    try {
+      checkCompileErrors(shader, typeName);
+    } catch (IllegalStateException e) {
+      glDeleteShader(shader);
+      throw e;
+    }
     return shader;
   }
 
@@ -1380,14 +1428,13 @@ public class InstancedCubes {
     if (type.equals("PROGRAM")) {
       success = glGetProgrami(shader, GL_LINK_STATUS);
       if (success == GL_FALSE) {
-        System.err.println("ERROR::PROGRAM_LINKING_ERROR");
-        System.err.println(glGetProgramInfoLog(shader));
+        throw new IllegalStateException("Program linking failed: " + glGetProgramInfoLog(shader));
       }
     } else {
       success = glGetShaderi(shader, GL_COMPILE_STATUS);
       if (success == GL_FALSE) {
-        System.err.println("ERROR::SHADER_COMPILATION_ERROR of type: " + type);
-        System.err.println(glGetShaderInfoLog(shader));
+        throw new IllegalStateException(
+            "Shader compilation failed (" + type + "): " + glGetShaderInfoLog(shader));
       }
     }
   }
